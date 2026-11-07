@@ -1,13 +1,13 @@
-# rmx-backend-probe
+# rmx-server-app-probe
 
 A small learning and diagnostic project for **Blade of Grass**, an open-source
 robotic lawn mower. It rehearses the full production workflow of the future
-`rmx-backend` (Go) and `rmx-client` (React + Bun) on a toy problem:
+`rmx-server-app` (Go backend, React frontend) on a toy problem:
 
 > A web page with a live table `records(time, connection_type, value)` and full
 > CRUD over a selectable transport (**HTTPS REST** or **WSS**), plus the same
 > CRUD for devices over **MQTT** (like the LTE modem probe in
-> `rmx-mower-modem-probe`). Every change is logged to a TimescaleDB hypertable
+> `rmx-mower-gateway-probe`). Every change is logged to a TimescaleDB hypertable
 > and pushed live to every open page, whatever transport made it.
 
 The same stack as production: a Go server (`net/http`, pgx, goose,
@@ -58,4 +58,4 @@ earlier Rust version migrated (with sqlx) is adopted on the first start.
 
 ## License
 
-[Apache-2.0](LICENSE).
+Code and documentation are licensed under [Apache-2.0](LICENSE).

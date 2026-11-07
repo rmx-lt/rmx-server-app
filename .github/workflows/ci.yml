@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Installs the Go version from go.mod and caches modules and the build.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: gofmt
@@ -75,7 +75,7 @@ jobs:
         run: |
           cp .env.example .env
           docker compose -f compose.dev.yaml up -d --wait
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       # The settings come from the .env copied above (the tests load it).
@@ -125,7 +125,7 @@ jobs:
 
   # Deploy every push to production (a merged development -> production PR).
   # The SSH key's authorized_keys entry on the VPS
-  # forces one script (/usr/local/sbin/rmx-deploy-probe, source in rmx-vps:
+  # forces one script (/usr/local/sbin/rmx-deploy-probe, source in rmx-server-infra:
   # services/probe/deploy/), so the only thing this job can send is the tag.
   # The script pulls the image, restarts probe-app, waits for /probe/health
   # and rolls back if it isn't healthy (then this job fails).
