@@ -155,7 +155,7 @@ answers only on `<prefix>/res/<id>` for the id it got the request on.
 ## Login and sessions
 
 The probe rehearses how production (`rmx-server-app`) should log
-people in. Code: `crates/probe-server/src/auth/` and
+people in. Code: `internal/auth/` and
 `client/src/components/LoginForm.tsx`.
 
 ```
@@ -192,7 +192,7 @@ browser                                   probe-server                     Times
 
 | What | Choice | Why |
 |---|---|---|
-| Password hash | Argon2id, `argon2` crate defaults (m = 19 MiB, t = 2, p = 1), random salt | OWASP's recommendation. Slow and memory-hard, so stolen hashes are expensive to crack. The PHC string stores its parameters, so they can be raised later. One check at a time, because probe-app has a 64 MB memory limit. |
+| Password hash | Argon2id (m = 19 MiB, t = 2, p = 1), random salt | OWASP's recommendation. Slow and memory-hard, so stolen hashes are expensive to crack. The PHC string stores its parameters, so they can be raised later. One check at a time, because probe-app has a 64 MB memory limit. |
 | Password rules | 12–256 characters, nothing else | NIST SP 800-63B: length matters, composition rules don't. |
 | Session id | 32 bytes from the OS random generator (64 hex characters) | 256 bits can't be guessed. |
 | Stored as | SHA-256 of the token | A leaked database dump has no working sessions. A fast hash is fine because the token is random (passwords need the slow one). |
@@ -212,7 +212,7 @@ browser                                   probe-server                     Times
 **What's public:** `/probe/health` (only up/down and the version, for the
 deploy script and monitoring), login and logout, and the client's static files
 (the same code as in this repository, no data). All other routes are in the
-router's `protected` group (`crates/probe-server/src/http.rs`), which requires
+router's `protected` group (`internal/server/routes.go`), which requires
 a session, so a new route is protected unless someone deliberately puts it in
 the public group.
 
