@@ -15,9 +15,10 @@ paho.golang, coder/websocket), a TypeScript + React client on Bun's bundler,
 TimescaleDB, Mosquitto, GitHub Actions, images on GHCR. The TypeScript types in
 `client/src/generated` are generated from the Go types in `internal/protocol`.
 
-- **Docs:** [Backend-Probe](https://github.com/rmx-lt/blade-of-grass/wiki/Backend-Probe)
+- **Docs:** [Server-App-Probe](https://github.com/rmx-lt/blade-of-grass/wiki/Server-App-Probe)
   on the wiki: how it works, wire protocol, login and sessions, tests, CI/CD and
-  the deployment contract.
+  the deployment contract. The page lives in this repo's `wiki/` folder and
+  changes by pull request; rules: [Wiki-Policy](https://github.com/rmx-lt/blade-of-grass/blob/development/wiki/Wiki-Policy.md).
 - **Work:** issues on the [Blade of Grass project](https://github.com/orgs/rmx-lt/projects/1).
 
 ## Local development
@@ -40,7 +41,7 @@ bun run dev
 
 Create a login once (`go run ./cmd/probe-server create-user dev`, any
 password of 12+ characters), then open <http://localhost:3000/probe/> and log in. Ports, MQTT testing and
-the checks CI runs: see the wiki page.
+the checks CI runs: see the wiki page Server-App-Probe.
 
 Checks before a pull request:
 
