@@ -1,0 +1,35 @@
+# Caller of the shared rmx-lt workflows (source: rmx-lt/blade-of-grass,
+# https://github.com/rmx-lt/blade-of-grass/issues/30): add new issues to the
+# project, check PR bodies (Wiki-Policy sections 4-5), and republish the wiki
+# when wiki/ changes on development.
+name: rmx
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+    branches: [development]
+  push:
+    branches: [development]
+    paths: ['wiki/**']
+
+permissions: {}
+
+jobs:
+  add-to-project:
+    if: github.event_name == 'issues'
+    uses: rmx-lt/blade-of-grass/.github/workflows/add-to-project.yml@development
+    secrets: inherit
+
+  wiki-check:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: rmx-lt/blade-of-grass/.github/workflows/wiki-check.yml@development
+
+  wiki-dispatch:
+    if: github.event_name == 'push'
+    uses: rmx-lt/blade-of-grass/.github/workflows/wiki-dispatch.yml@development
+    secrets: inherit
