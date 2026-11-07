@@ -32,9 +32,11 @@ jobs:
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
         run: |
-          # A new branch or tag (all-zero before) or a failing diff counts as code.
+          # A new branch or tag (all-zero before), a failing diff or an empty diff
+          # (e.g. an empty commit pushed to force a redeploy) counts as code.
+          # Only a non-empty diff with every path under wiki/ is not code.
           code=true
-          if [[ ! "$BEFORE" =~ ^0+$ ]] && files=$(git diff --name-only "$BEFORE" "$SHA"); then
+          if [[ ! "$BEFORE" =~ ^0+$ ]] && files=$(git diff --name-only "$BEFORE" "$SHA") && [ -n "$files" ]; then
             code=false
             while IFS= read -r f; do
               case "$f" in wiki/*) ;; *) code=true ;; esac
