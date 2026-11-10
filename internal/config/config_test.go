@@ -28,7 +28,7 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "probe-server" ||
-		c.MQTT.TopicPrefix != "probe" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
+		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
 		!slices.Equal(c.AllowedOrigins, []string{"https://api.rmx.lt"}) {
 		t.Fatalf("%+v", c)
 	}

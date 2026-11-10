@@ -147,15 +147,15 @@ func TestLoginRequestHidesPassword(t *testing.T) {
 }
 
 func TestRequestTopicParsing(t *testing.T) {
-	if id, ok := ParseRequestTopic("probe", "probe/req/web-1a"); !ok || id != "web-1a" {
+	if id, ok := ParseRequestTopic("mower", "mower/web-1a/req"); !ok || id != "web-1a" {
 		t.Error(id, ok)
 	}
-	for _, bad := range []string{"probe/req/a/b", "probe/req/", "probe/res/x", "probex/req/x", "probe/req/a+b"} {
-		if id, ok := ParseRequestTopic("probe", bad); ok {
+	for _, bad := range []string{"mower/a/b/req", "mower//req", "mower/x/res", "mowerx/x/req", "mower/a+b/req", "mower/events/req", "mower/x/req/y", "mower/req"} {
+		if id, ok := ParseRequestTopic("mower", bad); ok {
 			t.Errorf("%s parsed as %s", bad, id)
 		}
 	}
-	if ResponseTopic("probe", "x") != "probe/res/x" {
+	if ResponseTopic("mower", "x") != "mower/x/res" || RequestFilter("mower") != "mower/+/req" {
 		t.Error()
 	}
 	if ValidClientID("a+b") || ValidClientID(strings.Repeat("a", 65)) || ValidClientID("") {
