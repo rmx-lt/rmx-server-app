@@ -143,7 +143,7 @@ func startApp(t *testing.T, pool *pgxpool.Pool) *testApp { return startAppWith(t
 
 func startAppWith(t *testing.T, pool *pgxpool.Pool, staticDir string) *testApp {
 	t.Helper()
-	prefix := "probe/it-" + randomHex(8)
+	prefix := "mower/it-" + randomHex(8)
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
 		switch key {
 		case "MQTT_TOPIC_PREFIX":

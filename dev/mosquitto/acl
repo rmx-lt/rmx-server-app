@@ -1,10 +1,10 @@
-# Local development broker. On the VPS each login is narrower (probe-device
-# may only use probe/req/probe-device, probe/res/probe-device, probe/events/#
-# and probe/status/#); here both may use probe/#, because the integration
-# tests give every test its own topic prefix (probe/it-<random>).
+# Local development broker. On the VPS each login is narrower (a device may
+# only use mower/<its username>/#, plus read mower/events/# and
+# mower/status/server); here both may use mower/#, because the integration
+# tests give every test its own topic prefix (mower/it-<random>).
 user probe-app
-topic readwrite probe/#
+topic readwrite mower/#
 
-# A device (like the LTE modem probe), used by the integration tests.
+# A device (like the LTE gateway), used by the integration tests.
 user probe-device
-topic readwrite probe/#
+topic readwrite mower/#
