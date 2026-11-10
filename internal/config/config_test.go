@@ -29,6 +29,7 @@ func TestDefaults(t *testing.T) {
 	}
 	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "probe-server" ||
 		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
+		c.FirmwareDir != "" || c.FirmwareChunkBytes != 4096 ||
 		!slices.Equal(c.AllowedOrigins, []string{"https://api.rmx.lt"}) {
 		t.Fatalf("%+v", c)
 	}
@@ -73,16 +74,34 @@ func TestMissingRequired(t *testing.T) {
 
 func TestInvalidValues(t *testing.T) {
 	for key, bad := range map[string]string{
-		"MQTT_PORT":          "abc",
-		"MQTT_TOPIC_PREFIX":  "probe/#",
-		"BIND_ADDR":          "8080",
-		"DB_MAX_CONNECTIONS": "-1",
+		"MQTT_PORT":            "abc",
+		"MQTT_TOPIC_PREFIX":    "probe/#",
+		"BIND_ADDR":            "8080",
+		"DB_MAX_CONNECTIONS":   "-1",
+		"FIRMWARE_CHUNK_BYTES": "100",
 	} {
 		vars := base()
 		vars[key] = bad
 		if _, err := load(vars); err == nil {
 			t.Errorf("%s=%s accepted", key, bad)
 		}
+	}
+}
+
+func TestFirmwareSettings(t *testing.T) {
+	vars := base()
+	vars["FIRMWARE_DIR"] = "  /firmware  "
+	vars["FIRMWARE_CHUNK_BYTES"] = "8192"
+	c, err := load(vars)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.FirmwareDir != "/firmware" || c.FirmwareChunkBytes != 8192 {
+		t.Fatalf("%+v", c)
+	}
+	vars["FIRMWARE_CHUNK_BYTES"] = "16385"
+	if _, err := load(vars); err == nil {
+		t.Fatal("chunk size above the header limit accepted")
 	}
 }
 

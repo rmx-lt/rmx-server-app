@@ -19,6 +19,7 @@ and ported to Go in November 2026, when the backend language was decided
 ## Contents
 
 - [How it works](#how-it-works)
+- [Firmware over MQTT](#firmware-over-mqtt)
 - [Login and sessions](#login-and-sessions)
 - [Repository layout](#repository-layout)
 - [Local development](#local-development)
@@ -49,6 +50,8 @@ over HTTPS and its WebSocket, with their session.
   server-pushed change events.
 - **MQTT** (devices): the server subscribes to `mower/+/req` and answers on
   `mower/<client-id>/res`; change events go to `mower/events/records`.
+  Firmware images go out as binary chunks on `mower/<client-id>/fw/chunk`
+  (see [Firmware over MQTT](#firmware-over-mqtt)).
 - **Login**: the app's own login page and server-side sessions in a cookie
   protect the API and the WebSocket (see
   [Login and sessions](#login-and-sessions)).
@@ -146,11 +149,177 @@ MQTT topics (`<prefix>` is `mower`):
 | `<prefix>/<client-id>/res` | server → client | response envelope |
 | `<prefix>/events/records` | server → all | change event |
 | `<prefix>/status/server` | server → all, **retained** | `online` / `offline` (last will) |
+| `<prefix>/<client-id>/fw/req` | client → server | firmware request (JSON) |
+| `<prefix>/<client-id>/fw/chunk` | server → client | one firmware chunk (binary) |
+| `<prefix>/<client-id>/fw/res` | server → client | firmware info, or a JSON error |
+
+The byte layout of a chunk, and the firmware request, are in
+[Firmware over MQTT](#firmware-over-mqtt). Nothing on the `fw` topics is retained.
 
 The client id travels in the topic (like `mower/<id>/cmd`; `events` and `status` are reserved and cannot be client ids), not in
 MQTT 5 properties, so the scheme works on MQTT 3.1.1 and on small device
 clients, and a broker ACL can scope each login to its own topics. The server
 answers only on `<prefix>/<id>/res` for the id it got the request on.
+
+## Firmware over MQTT
+
+A device downloads a firmware image as binary chunks on the same MQTT
+connection it already uses. The image file is the same `*.bin` that Caddy
+serves today at `https://api.rmx.lt/fw/probe/<version>.bin`. The file stays
+signed; the device checks the signature. This transport adds a SHA-256 of the
+whole file, and the device can resume from any chunk index.
+
+One firmware request is in flight per device. A second request that arrives
+before the answer is published is ignored. A topic that does not parse is
+ignored. QoS is 1. Chunks, info and errors are not retained.
+
+The gateway side is
+[rmx-mower-gateway#44](https://github.com/rmx-lt/rmx-mower-gateway/issues/44).
+This section is the contract that firmware is written against.
+
+### Request
+
+The device publishes a JSON object on `<prefix>/<name>/fw/req`. `<name>` is
+the device id, the same rules as any other client id (1–64 of
+`[A-Za-z0-9_-]`; `events` and `status` are not ids).
+
+```json
+{ "request_id": "c0", "file": "1.2.3.bin", "chunk": 0 }
+{ "request_id": "i0", "op": "info", "file": "1.2.3.bin" }
+```
+
+| Field | Rule |
+|---|---|
+| `request_id` | Required. 1–64 of `[A-Za-z0-9_-]`. |
+| `op` | `chunk` or `info`. Omitted means `chunk`. Unknown fields are ignored. |
+| `file` | Required. The file name only, not a path: `[A-Za-z0-9._-]+\.bin`, at most 128 characters. The version is that name (`1.2.3.bin`), the same last segment as the old HTTPS URL. |
+| `chunk` | Required for `chunk`: an integer from 0. Ignored for `info`. |
+
+The body is at most 1024 bytes. `info` is optional. Chunk 0, and every other
+chunk, already carries the size, the chunk count and the SHA-256.
+
+### Chunk frame
+
+The answer to `chunk` is one binary MQTT payload on
+`<prefix>/<name>/fw/chunk`: a 64-byte little-endian header, then the raw
+bytes. No base64. Integers are little-endian. The ESP32 is little-endian, and
+every field below is naturally aligned, so a packed C struct of this layout
+matches the bytes.
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | Magic `RMFW` (bytes `52 4D 46 57`) |
+| 4 | 1 | Header version, `1` |
+| 5 | 1 | Flags. Bit 0 is set: bytes 32–63 are the whole-image SHA-256. Other bits are 0 |
+| 6 | 2 | Header length, `64`. The payload starts at this offset |
+| 8 | 4 | Chunk index |
+| 12 | 4 | Chunk count |
+| 16 | 4 | Image size, in bytes |
+| 20 | 2 | Chunk length: how many payload bytes follow the header |
+| 22 | 2 | Reserved, `0` |
+| 24 | 8 | Request-id hash: the first 8 bytes of SHA-256 over the raw UTF-8 `request_id` |
+| 32 | 32 | SHA-256 of the whole image, raw bytes (not hex) |
+| 64 | chunk length | The chunk |
+
+Reject a frame whose magic, version, flags, header length or reserved field
+differ, or whose MQTT payload length is not `64 + chunk length`. The SHA-256
+in every chunk is the same, so a resume from the middle does not need a
+separate info call. An empty file is one chunk of length 0 (the SHA-256 of
+empty input). The last chunk of a longer file is shorter than the chunk size.
+A chunk index at or past the chunk count is an error, not an empty frame.
+
+```c
+typedef struct __attribute__((packed)) {
+    char magic[4];             /* 'R','M','F','W' */
+    uint8_t version;           /* 1 */
+    uint8_t flags;             /* bit 0 set */
+    uint16_t header_len;       /* 64 */
+    uint32_t chunk_index;
+    uint32_t chunk_count;
+    uint32_t image_size;
+    uint16_t chunk_len;
+    uint16_t reserved;         /* 0 */
+    uint8_t request_id_hash[8];
+    uint8_t sha256[32];
+} rmx_fw_header_t;
+```
+
+### Info and errors
+
+`info`, and every error, is JSON on `<prefix>/<name>/fw/res` (not on the
+records `res` topic, and not on `fw/chunk`).
+
+```json
+{
+  "request_id": "i0",
+  "op": "info",
+  "file": "1.2.3.bin",
+  "size": 9000,
+  "sha256": "0123abcd…",
+  "chunk_size": 4096,
+  "chunks": 3
+}
+```
+
+`sha256` here is 64 lower-case hex characters. `chunk_size` is the server's
+configured size; only the last chunk is shorter.
+
+```json
+{ "request_id": "c3", "error": { "code": "bad_request", "message": "chunk is past the end of the file" } }
+```
+
+| `code` | When |
+|---|---|
+| `bad_request` | The JSON is not a request, the file name is not allowed, or the chunk index is past the end |
+| `not_found` | No such regular file in the firmware directory |
+| `internal` | The file is larger than 32 MiB, or the server could not read it |
+
+`request_id` is empty when the id itself was missing or not valid. The
+message strings are stable enough to log; branch on `code`.
+
+### Files, chunk size, and the device buffer
+
+`FIRMWARE_DIR` is the directory of images (read-only). Unset, the server does
+not subscribe to `fw/req` and firmware is off. `FIRMWARE_CHUNK_BYTES` is the
+chunk size, default **4096**, allowed **256–16384**. A file over **32 MiB**
+is refused. The SHA-256 is cached in memory and recomputed when the file's
+size or modification time changes. Names are looked up inside that directory
+only (`os.Root`), so a name cannot escape it.
+
+**esp-mqtt buffer.** The gateway is an ESP32. esp-mqtt's receive buffer
+(`esp_mqtt_client_config_t.buffer.size`) defaults to
+`MQTT_BUFFER_SIZE_BYTE`, which is **1024** unless `CONFIG_MQTT_BUFFER_SIZE`
+is set (`mqtt_config.h` in espressif/esp-mqtt). A publish larger than that
+buffer is still delivered, as several `MQTT_EVENT_DATA` callbacks with
+`current_data_offset` and `total_data_len` (ESP-IDF v5.4.1 MQTT docs). A 4096-byte
+chunk plus the 64-byte header and the MQTT framing (topic, packet id) is
+about 4.2 KB, so the default 1024-byte buffer works only if the firmware
+reassembles those callbacks. Set `buffer.size` to at least
+`96 + FIRMWARE_CHUNK_BYTES` (5120 for the default 4096-byte chunk; 8192
+leaves room to raise the chunk size later) so one event is the whole frame.
+`buffer.out_size` can stay at the default: the device's request is a small
+JSON publish, and esp-mqtt already fragments a publish that is larger than
+the output buffer. One request in flight matches a small LTE uplink.
+
+### Mount on the VPS
+
+The app container does not have the firmware directory until
+`rmx-server-infra` mounts it. That change is not in this repo. In
+`services/probe/compose.yaml`, on `probe-app`:
+
+```yaml
+environment:
+  FIRMWARE_DIR: /firmware
+volumes:
+  - ../caddy/firmware/probe:/firmware:ro
+```
+
+`services/caddy/firmware/probe` is the host directory Caddy already serves as
+`/fw/probe/` (`firmware/probe/<version>.bin`). The container runs as uid
+65532, so that directory needs to be readable by it (directories `0755` and
+files `0644` are enough). No Mosquitto ACL change: `probe-app` already has
+readwrite `mower/#`, and each device already has `mower/<its username>/#`,
+which covers `fw/req`, `fw/chunk` and `fw/res`.
 
 ## Login and sessions
 
@@ -255,6 +424,7 @@ go.mod, go.sum                    Go module (go 1.26), staticcheck pinned as a t
 cmd/probe-server/                 main: server, healthcheck, user commands
 cmd/gen-ts/                       TypeScript type generator
 internal/protocol/                wire types, union codec, MQTT topic helpers
+internal/firmware/                firmware file names, chunk frames, directory reads
 internal/{config,apperr,clientip,db}/  settings, errors, client IP, connection + migrations
 internal/auth/                    passwords, sessions, rate limit, login routes, Origin check
 internal/records/                 records service and the event hub
@@ -352,6 +522,8 @@ Then open <http://localhost:8080/probe/>.
 The integration tests (`internal/server/integration_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover REST, WSS and MQTT CRUD,
+a firmware download (every chunk, including a resume from the middle, checked
+against the file's SHA-256),
 cross-transport live events, health, the `record_events` log,
 the retained server status and graceful shutdown, and the login: wrong
 password and unknown user, protected routes (REST, WebSocket)
@@ -395,7 +567,8 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 
 - Listens on **`0.0.0.0:8080`** (HTTP; TLS is Caddy's job). Publish no port;
   Caddy reaches it over the Docker network.
-- Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes.
+- Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
+  unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
 - `HEALTHCHECK` built in (`/app/probe-server healthcheck` → `GET /probe/health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
@@ -420,6 +593,8 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `MQTT_TOPIC_PREFIX` | no | `mower` | |
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
+| `FIRMWARE_DIR` | no | `/firmware` | directory of `*.bin` images. Unset: firmware requests are not served. See [Firmware over MQTT](#firmware-over-mqtt) |
+| `FIRMWARE_CHUNK_BYTES` | no | `4096` | 256–16384. Every chunk except the last is this long |
 
 **Database:** TimescaleDB on Postgres 17 (`timescale/timescaledb:2.30.2-pg17`
 or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS

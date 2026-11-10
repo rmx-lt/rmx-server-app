@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -39,6 +40,7 @@ import (
 	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
 	"github.com/rmx-lt/rmx-backend-probe/internal/config"
 	"github.com/rmx-lt/rmx-backend-probe/internal/db"
+	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
 	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
 	"github.com/rmx-lt/rmx-backend-probe/internal/server"
 )
@@ -141,7 +143,16 @@ type testApp struct {
 
 func startApp(t *testing.T, pool *pgxpool.Pool) *testApp { return startAppWith(t, pool, "") }
 
+type appOptions struct {
+	staticDir   string
+	firmwareDir string
+}
+
 func startAppWith(t *testing.T, pool *pgxpool.Pool, staticDir string) *testApp {
+	return startAppOptions(t, pool, appOptions{staticDir: staticDir})
+}
+
+func startAppOptions(t *testing.T, pool *pgxpool.Pool, opts appOptions) *testApp {
 	t.Helper()
 	prefix := "mower/it-" + randomHex(8)
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
@@ -151,7 +162,9 @@ func startAppWith(t *testing.T, pool *pgxpool.Pool, staticDir string) *testApp {
 		case "MQTT_CLIENT_ID":
 			return "server-" + strings.ReplaceAll(prefix, "/", "-"), true
 		case "STATIC_DIR":
-			return staticDir, staticDir != ""
+			return opts.staticDir, opts.staticDir != ""
+		case "FIRMWARE_DIR":
+			return opts.firmwareDir, opts.firmwareDir != ""
 		case "ALLOWED_ORIGINS":
 			return origin + ",http://other.allowed.test", true
 		}
@@ -461,11 +474,27 @@ func (d *mqttDevice) send(requestID string, req any) {
 
 func (d *mqttDevice) sendRaw(payload []byte) {
 	d.t.Helper()
+	d.publish(protocol.RequestTopic(d.prefix, d.id), payload)
+}
+
+func (d *mqttDevice) publish(topic string, payload []byte) {
+	d.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	_, err := d.cm.Publish(ctx, &paho.Publish{Topic: protocol.RequestTopic(d.prefix, d.id), QoS: 1, Payload: payload})
+	_, err := d.cm.Publish(ctx, &paho.Publish{Topic: topic, QoS: 1, Payload: payload})
 	if err != nil {
 		d.t.Fatal(err)
+	}
+}
+
+func (d *mqttDevice) subscribe(topics ...string) {
+	d.t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	for _, topic := range topics {
+		if _, err := d.cm.Subscribe(ctx, &paho.Subscribe{Subscriptions: []paho.SubscribeOptions{{Topic: topic, QoS: 1}}}); err != nil {
+			d.t.Fatal(err)
+		}
 	}
 }
 
@@ -707,6 +736,75 @@ func TestMQTTCRUDAndLiveEvents(t *testing.T) {
 	// On a clean shutdown the server marks itself offline.
 	app.shutdown()
 	eq(t, string(dev.nextOn(protocol.StatusTopic(app.prefix))), "offline")
+}
+
+func TestFirmwareChunksResumeAndSHA256(t *testing.T) {
+	dir := t.TempDir()
+	// 9000 bytes at the default 4096-byte chunk: 4096 + 4096 + 808.
+	image := bytes.Repeat([]byte("fw-image-"), 1000)
+	if err := os.WriteFile(dir+"/app.bin", image, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := sha256.Sum256(image)
+
+	pool := newDatabase(t)
+	app := startAppOptions(t, pool, appOptions{firmwareDir: dir})
+	dev := app.mqttConnect()
+	chunkTopic := protocol.FirmwareChunkTopic(app.prefix, dev.id)
+	resTopic := protocol.FirmwareResponseTopic(app.prefix, dev.id)
+	dev.subscribe(chunkTopic, resTopic)
+
+	dev.publish(protocol.FirmwareRequestTopic(app.prefix, dev.id), []byte(`{"request_id":"info","op":"info","file":"app.bin"}`))
+	info := decode[firmware.Info](t, dev.nextOn(resTopic))
+	eq(t, info.RequestID, "info")
+	eq(t, info.File, "app.bin")
+	eq(t, info.Size, int64(len(image)))
+	eq(t, info.ChunkSize, firmware.DefaultChunkBytes)
+	eq(t, info.Chunks, uint32(3))
+	eq(t, info.SHA256, hex.EncodeToString(want[:]))
+
+	// Resume from the middle chunk, then the tail, then the first.
+	got := make([]byte, len(image))
+	for _, index := range []uint32{1, 2, 0} {
+		body, _ := json.Marshal(map[string]any{"request_id": fmt.Sprintf("c%d", index), "file": "app.bin", "chunk": index})
+		dev.publish(protocol.FirmwareRequestTopic(app.prefix, dev.id), body)
+		frame, err := firmware.ParseFrame(dev.nextOn(chunkTopic))
+		if err != nil {
+			t.Fatal(err)
+		}
+		eq(t, frame.ChunkIndex, index)
+		eq(t, frame.ChunkCount, uint32(3))
+		eq(t, frame.ImageSize, uint32(len(image)))
+		if frame.IDHash != firmware.RequestIDHash(fmt.Sprintf("c%d", index)) {
+			t.Fatalf("chunk %d request id hash %x", index, frame.IDHash)
+		}
+		if frame.SHA256 != want {
+			t.Fatalf("chunk %d sha256 %x", index, frame.SHA256)
+		}
+		off := int(index) * firmware.DefaultChunkBytes
+		copy(got[off:], frame.Payload)
+	}
+	if !bytes.Equal(got, image) {
+		t.Fatal("assembled image differs from the file")
+	}
+	if sha256.Sum256(got) != want {
+		t.Fatal("assembled sha256 differs")
+	}
+	t.Logf("resumed %d bytes from chunks 1, 2, 0; sha256 %x", len(got), want)
+
+	ask := func(body string) firmware.ErrorMessage {
+		t.Helper()
+		dev.publish(protocol.FirmwareRequestTopic(app.prefix, dev.id), []byte(body))
+		return decode[firmware.ErrorMessage](t, dev.nextOn(resTopic))
+	}
+	missing := ask(`{"request_id":"e1","file":"missing.bin","chunk":0}`)
+	eq(t, missing.Error.Code, "not_found")
+	badName := ask(`{"request_id":"e2","file":"../app.bin","chunk":0}`)
+	eq(t, badName.RequestID, "e2")
+	eq(t, badName.Error.Code, "bad_request")
+	past := ask(`{"request_id":"e3","file":"app.bin","chunk":3}`)
+	eq(t, past.Error.Code, "bad_request")
+	eq(t, past.Error.Message, "chunk is past the end of the file")
 }
 
 func TestServesClientFilesUnderPrefix(t *testing.T) {
