@@ -44,7 +44,7 @@ type MQTT struct {
 	Password string
 	// ClientID is MQTT_CLIENT_ID, default probe-server.
 	ClientID string
-	// TopicPrefix is MQTT_TOPIC_PREFIX, default probe.
+	// TopicPrefix is MQTT_TOPIC_PREFIX, default mower.
 	TopicPrefix string
 }
 
@@ -94,7 +94,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			Username:    required("MQTT_USERNAME"),
 			Password:    required("MQTT_PASSWORD"),
 			ClientID:    "probe-server",
-			TopicPrefix: "probe",
+			TopicPrefix: "mower",
 		},
 		StaticDir: get("STATIC_DIR"),
 	}

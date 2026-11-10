@@ -47,8 +47,8 @@ over HTTPS and its WebSocket, with their session.
 - **HTTPS**: REST under `/probe/api/records`.
 - **WSS**: `/probe/ws`, JSON request/response with a `request_id`, plus
   server-pushed change events.
-- **MQTT** (devices): the server subscribes to `probe/req/+` and answers on
-  `probe/res/<client-id>`; change events go to `probe/events/records`.
+- **MQTT** (devices): the server subscribes to `mower/+/req` and answers on
+  `mower/<client-id>/res`; change events go to `mower/events/records`.
 - **Login**: the app's own login page and server-side sessions in a cookie
   protect the API and the WebSocket (see
   [Login and sessions](#login-and-sessions)).
@@ -138,19 +138,19 @@ WSS and MQTT share one envelope:
 { "op": "delete", "id": 7, "connection_type": "mqtt" }
 ```
 
-MQTT topics (`<prefix>` is `probe`):
+MQTT topics (`<prefix>` is `mower`):
 
 | Topic | Direction | Payload |
 |---|---|---|
-| `<prefix>/req/<client-id>` | client → server | request envelope |
-| `<prefix>/res/<client-id>` | server → client | response envelope |
+| `<prefix>/<client-id>/req` | client → server | request envelope |
+| `<prefix>/<client-id>/res` | server → client | response envelope |
 | `<prefix>/events/records` | server → all | change event |
 | `<prefix>/status/server` | server → all, **retained** | `online` / `offline` (last will) |
 
-The client id travels in the topic (like the planned `mower/<id>/cmd`), not in
+The client id travels in the topic (like `mower/<id>/cmd`; `events` and `status` are reserved and cannot be client ids), not in
 MQTT 5 properties, so the scheme works on MQTT 3.1.1 and on small device
 clients, and a broker ACL can scope each login to its own topics. The server
-answers only on `<prefix>/res/<id>` for the id it got the request on.
+answers only on `<prefix>/<id>/res` for the id it got the request on.
 
 ## Login and sessions
 
@@ -299,7 +299,7 @@ go run ./cmd/probe-server create-user dev     # any password of 12+ characters
 
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
 `probe-device` with the `PROBE_DEVICE_PASSWORD` from `.env`
-(`probe-device-dev`), publishing to `probe/req/<client-id>`.
+(`probe-device-dev`), publishing to `mower/<client-id>/req`.
 
 Local ports (chosen so they don't clash with a Postgres or Mosquitto
 installed on the PC):
@@ -417,7 +417,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`. The Rust version's `RUST_LOG` is ignored |
 | `BIND_ADDR` | no | `0.0.0.0:8080` | already set in the image |
 | `MQTT_CLIENT_ID` | no | `probe-server` | must be unique on the broker |
-| `MQTT_TOPIC_PREFIX` | no | `probe` | |
+| `MQTT_TOPIC_PREFIX` | no | `mower` | |
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
 
@@ -445,9 +445,9 @@ uses it). **First user:** see [Users](#users).
 
 **MQTT devices** connect to the broker's public TLS listener (VPS:
 `mqtts://mqtt.rmx.lt:8883`, `use_username_as_clientid`), so a device's client
-id is its login, e.g. `probe-device`. Its ACL needs: write
-`probe/req/<login>`, read `probe/res/<login>`, `probe/events/#`,
-`probe/status/#`. The broker needs no WebSocket listener and Caddy no MQTT
+id is its login, e.g. `probe-device`. Its ACL needs: its own `mower/<login>/#` (covered by the broker's
+`pattern readwrite mower/%u/#`) plus read `mower/events/#` and
+`mower/status/server`. The broker needs no WebSocket listener and Caddy no MQTT
 route: browsers don't use MQTT. `MQTT_WS_URL` and `/probe/config.json` were
 removed (an old `MQTT_WS_URL` in the environment is ignored).
 

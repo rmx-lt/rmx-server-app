@@ -2,22 +2,25 @@ package protocol
 
 import "strings"
 
-// MQTT topic layout. A client puts its own id in the topic, like mowers will
-// (mower/<id>/...), so a broker ACL can scope each login later.
+// MQTT topic layout (<prefix> is "mower" in production). A client puts its own
+// id in the topic (mower/<id>/...), so a broker ACL scopes each login to
+// mower/<its username>/#.
 //
-//   - <prefix>/req/<client-id>: client to server, payload RequestEnvelope
-//   - <prefix>/res/<client-id>: server to client, payload ResponseEnvelope
+//   - <prefix>/<client-id>/req: client to server, payload RequestEnvelope
+//   - <prefix>/<client-id>/res: server to client, payload ResponseEnvelope
 //   - <prefix>/events/records: server to all, payload ChangeEvent
 //   - <prefix>/status/server: retained "online" / "offline" (last will)
+//
+// "events" and "status" are therefore not usable as client ids.
 
 // RequestTopic is where a client publishes its requests.
-func RequestTopic(prefix, clientID string) string { return prefix + "/req/" + clientID }
+func RequestTopic(prefix, clientID string) string { return prefix + "/" + clientID + "/req" }
 
 // RequestFilter is a subscription filter that matches every client's requests.
-func RequestFilter(prefix string) string { return prefix + "/req/+" }
+func RequestFilter(prefix string) string { return prefix + "/+/req" }
 
 // ResponseTopic is where the server answers a client.
-func ResponseTopic(prefix, clientID string) string { return prefix + "/res/" + clientID }
+func ResponseTopic(prefix, clientID string) string { return prefix + "/" + clientID + "/res" }
 
 // EventsTopic is where the server publishes every change.
 func EventsTopic(prefix string) string { return prefix + "/events/records" }
@@ -32,8 +35,12 @@ func ParseRequestTopic(prefix, topic string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	id, ok := strings.CutPrefix(rest, "/req/")
-	if !ok || !ValidClientID(id) {
+	rest, ok = strings.CutPrefix(rest, "/")
+	if !ok {
+		return "", false
+	}
+	id, ok := strings.CutSuffix(rest, "/req")
+	if !ok || !ValidClientID(id) || id == "events" || id == "status" {
 		return "", false
 	}
 	return id, true
