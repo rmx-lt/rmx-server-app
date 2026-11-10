@@ -20,6 +20,7 @@ import (
 	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
 	"github.com/rmx-lt/rmx-backend-probe/internal/config"
 	"github.com/rmx-lt/rmx-backend-probe/internal/db"
+	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
 	"github.com/rmx-lt/rmx-backend-probe/internal/records"
 )
 
@@ -61,7 +62,14 @@ func Run(ctx context.Context, cfg *config.Config, ln net.Listener) error {
 func Serve(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, ln net.Listener) error {
 	defer pool.Close()
 	recs := records.New(pool)
-	mq := startMQTT(cfg.MQTT, recs)
+	fw, err := openFirmware(cfg)
+	if err != nil {
+		return err
+	}
+	if fw != nil {
+		defer fw.Close()
+	}
+	mq := startMQTT(cfg.MQTT, recs, fw)
 	s := &Server{cfg: cfg, pool: pool, records: recs, auth: auth.New(pool), mqtt: mq, ctx: ctx}
 
 	var background sync.WaitGroup
@@ -102,6 +110,20 @@ func Serve(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, ln net.L
 	background.Wait()
 	slog.Info("stopped")
 	return nil
+}
+
+// openFirmware opens FIRMWARE_DIR. An empty path means firmware is off.
+func openFirmware(cfg *config.Config) (*firmware.Store, error) {
+	if cfg.FirmwareDir == "" {
+		slog.Info("firmware directory is not set; firmware requests are not served")
+		return nil, nil
+	}
+	store, err := firmware.Open(cfg.FirmwareDir, cfg.FirmwareChunkBytes)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("firmware directory ready", "dir", cfg.FirmwareDir, "chunk_bytes", cfg.FirmwareChunkBytes)
+	return store, nil
 }
 
 // deleteExpiredSessions deletes sessions that have timed out, once an hour.

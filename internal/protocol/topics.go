@@ -8,6 +8,9 @@ import "strings"
 //
 //   - <prefix>/<client-id>/req: client to server, payload RequestEnvelope
 //   - <prefix>/<client-id>/res: server to client, payload ResponseEnvelope
+//   - <prefix>/<client-id>/fw/req: client to server, firmware request (JSON)
+//   - <prefix>/<client-id>/fw/chunk: server to client, one firmware chunk (binary)
+//   - <prefix>/<client-id>/fw/res: server to client, firmware info or error (JSON)
 //   - <prefix>/events/records: server to all, payload ChangeEvent
 //   - <prefix>/status/server: retained "online" / "offline" (last will)
 //
@@ -27,6 +30,40 @@ func EventsTopic(prefix string) string { return prefix + "/events/records" }
 
 // StatusTopic carries the retained "online" / "offline" of the server.
 func StatusTopic(prefix string) string { return prefix + "/status/server" }
+
+// FirmwareRequestTopic is where a device asks for a firmware chunk or for
+// the image description. wiki Server-App, section "Firmware over MQTT".
+func FirmwareRequestTopic(prefix, clientID string) string {
+	return prefix + "/" + clientID + "/fw/req"
+}
+
+// FirmwareRequestFilter matches every device's firmware requests.
+func FirmwareRequestFilter(prefix string) string { return prefix + "/+/fw/req" }
+
+// FirmwareChunkTopic carries one binary chunk.
+func FirmwareChunkTopic(prefix, clientID string) string {
+	return prefix + "/" + clientID + "/fw/chunk"
+}
+
+// FirmwareResponseTopic carries a firmware info object or a JSON error.
+func FirmwareResponseTopic(prefix, clientID string) string {
+	return prefix + "/" + clientID + "/fw/res"
+}
+
+// ParseFirmwareRequestTopic extracts the device id from a firmware request
+// topic. It returns false for any other topic, or for an id that is not a
+// single plain topic level. "events" and "status" are not device ids.
+func ParseFirmwareRequestTopic(prefix, topic string) (string, bool) {
+	rest, ok := strings.CutPrefix(topic, prefix+"/")
+	if !ok {
+		return "", false
+	}
+	id, ok := strings.CutSuffix(rest, "/fw/req")
+	if !ok || !ValidClientID(id) || id == "events" || id == "status" {
+		return "", false
+	}
+	return id, true
+}
 
 // ParseRequestTopic extracts the client id from a request topic. It returns
 // false for any other topic, or for an id that is not a single plain topic level.
