@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # probe-server image: the Go binary plus the built client, nothing else.
-#   docker build -t rmx-server-app-probe .
+#   docker build -t rmx-server-app .
 # Bun is only a build tool here; the runtime image has no Bun, shell or package manager.
 
 # ---- 1. Client: bun build -> /client/dist ---------------------------------
