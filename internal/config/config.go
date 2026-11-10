@@ -11,6 +11,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
 )
 
 // Config holds every setting of the server.
@@ -30,6 +32,12 @@ type Config struct {
 	// StaticDir is STATIC_DIR: built client files to serve under /probe/. Empty
 	// in local development, where the Bun dev server serves the client instead.
 	StaticDir string
+	// FirmwareDir is FIRMWARE_DIR: a directory of *.bin images served to
+	// devices over MQTT. Empty means firmware requests are not served.
+	FirmwareDir string
+	// FirmwareChunkBytes is FIRMWARE_CHUNK_BYTES, default 4096. Each chunk
+	// except the last is this long.
+	FirmwareChunkBytes int
 }
 
 // MQTT holds the broker settings.
@@ -96,7 +104,9 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			ClientID:    "probe-server",
 			TopicPrefix: "mower",
 		},
-		StaticDir: get("STATIC_DIR"),
+		StaticDir:          get("STATIC_DIR"),
+		FirmwareDir:        strings.TrimSpace(get("FIRMWARE_DIR")),
+		FirmwareChunkBytes: firmware.DefaultChunkBytes,
 	}
 	if v := get("BIND_ADDR"); v != "" {
 		if _, err := netip.ParseAddrPort(strings.TrimSpace(v)); err != nil {
@@ -113,6 +123,13 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			errs = append(errs, errors.New("MQTT_TOPIC_PREFIX must not contain + or # or end with /"))
 		}
 		c.MQTT.TopicPrefix = v
+	}
+	if v := get("FIRMWARE_CHUNK_BYTES"); v != "" {
+		n := number("FIRMWARE_CHUNK_BYTES", uint64(firmware.DefaultChunkBytes), 16)
+		if n < uint64(firmware.MinChunkBytes) || n > uint64(firmware.MaxChunkBytes) {
+			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", firmware.MinChunkBytes, firmware.MaxChunkBytes))
+		}
+		c.FirmwareChunkBytes = int(n)
 	}
 	if v := required("ALLOWED_ORIGINS"); v != "" {
 		origins, err := ParseOrigins(v)

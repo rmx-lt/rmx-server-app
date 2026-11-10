@@ -162,3 +162,30 @@ func TestRequestTopicParsing(t *testing.T) {
 		t.Error()
 	}
 }
+
+func TestFirmwareTopicParsing(t *testing.T) {
+	if id, ok := ParseFirmwareRequestTopic("mower", "mower/mower-01/fw/req"); !ok || id != "mower-01" {
+		t.Fatal(id, ok)
+	}
+	if FirmwareRequestFilter("mower") != "mower/+/fw/req" ||
+		FirmwareChunkTopic("mower", "mower-01") != "mower/mower-01/fw/chunk" ||
+		FirmwareResponseTopic("mower", "mower-01") != "mower/mower-01/fw/res" {
+		t.Fatal("topic shape")
+	}
+	for _, bad := range []string{
+		"mower/mower-01/req",
+		"mower/mower-01/fw/chunk",
+		"mower/mower-01/fw/res",
+		"mower/a/b/fw/req",
+		"mower//fw/req",
+		"mower/events/fw/req",
+		"mower/status/fw/req",
+		"mower/a+b/fw/req",
+		"mowerx/a/fw/req",
+		"other/a/fw/req",
+	} {
+		if id, ok := ParseFirmwareRequestTopic("mower", bad); ok {
+			t.Errorf("%s parsed as %s", bad, id)
+		}
+	}
+}
