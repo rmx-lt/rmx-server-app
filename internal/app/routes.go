@@ -46,8 +46,8 @@ func (a *app) router() *httpx.Router {
 	})
 	// The built web app (production only). Unknown paths fall back to
 	// index.html so client-side routes still load the app.
-	if a.cfg.StaticDir != "" {
-		r.Public().Handle("/app/", staticFiles(a.cfg.StaticDir))
+	if a.static != nil {
+		r.Public().Handle("/app/", a.static)
 	}
 	return r
 }
@@ -68,16 +68,26 @@ func (a *app) health(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, status, body)
 }
 
-// staticFiles serves the built web app from dir under /app/. A path that is
-// not a file gets index.html, so client-side routes load the app.
-func staticFiles(dir string) http.Handler {
+// openStatic opens the built web app in dir (empty: none, returns a nil
+// handler). The returned close func releases the directory handle; Serve calls
+// it when it stops, because Windows can't delete a directory that is still open.
+func openStatic(dir string) (http.Handler, func()) {
+	if dir == "" {
+		return nil, func() {}
+	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		// Reported when the first request comes; the API still works.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, apperr.Internal(err))
-		})
+		}), func() {}
 	}
+	return staticFiles(root), func() { _ = root.Close() }
+}
+
+// staticFiles serves the built web app from root under /app/. A path that is
+// not a file gets index.html, so client-side routes load the app.
+func staticFiles(root *os.Root) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")

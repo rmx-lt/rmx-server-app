@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/http"
 	"slices"
 	"testing"
 
@@ -22,11 +23,15 @@ var publicRoutes = []string{
 }
 
 func testApp(staticDir string) *app {
-	return &app{
+	a := &app{
 		cfg:  &config.Config{StaticDir: staticDir},
 		auth: auth.New(nil),
 		ws:   ws.New(context.Background(), nil),
 	}
+	if staticDir != "" {
+		a.static = http.NotFoundHandler()
+	}
+	return a
 }
 
 func TestPublicRoutes(t *testing.T) {
