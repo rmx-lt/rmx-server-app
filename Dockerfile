@@ -14,7 +14,7 @@ RUN bun run build
 
 # ---- 2. Server: a static Go binary ------------------------------------------
 # The Go version must match the go directive in go.mod.
-FROM golang:1.27.2-trixie AS server
+FROM golang:1.27.4-trixie AS server
 WORKDIR /src
 # Dependencies first, so this layer is cached until go.mod or go.sum change.
 COPY go.mod go.sum ./
