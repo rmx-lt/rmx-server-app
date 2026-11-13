@@ -3,13 +3,11 @@
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
 for the browser, and firmware images to the mower's devices over MQTT; the
-mower features build on that. It started as a probe that rehearsed the
-production workflow on a toy CRUD table; that table and its code are gone
-(rmx-server-app#54).
+mower features build on that.
 
 The stack: a Go server (`net/http`, pgx, goose, paho.golang,
 coder/websocket), a TypeScript + React client on Bun's bundler, TimescaleDB,
-Mosquitto, GitHub Actions, images on GHCR. The probe was written in Rust first
+Mosquitto, GitHub Actions, images on GHCR. The server was written in Rust first
 and ported to Go in November 2026, when the backend language was decided
 (rmx-server-app#24).
 
@@ -28,8 +26,8 @@ and ported to Go in November 2026, when the backend language was decided
 ## How it works
 
 ```
-browser ──HTTPS/WSS :443──▶ Caddy ──▶ probe-server :8080 ──▶ TimescaleDB
-          /probe/api, /probe/ws             ▲
+browser ──HTTPS/WSS :443──▶ Caddy ──▶ rmx-server :8080 ──▶ TimescaleDB
+          /app/api, /app/ws                 ▲
                                             │ mqtt:1883 (plain, internal)
 device ──MQTT over TLS :8883──────────▶ Mosquitto
 ```
@@ -39,9 +37,9 @@ This is the production layout: **browsers never speak MQTT**. Only devices
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **HTTPS**: login and logout under `/probe/api/auth`, `/probe/health`, and
-  the built client under `/probe/`.
-- **WSS**: `/probe/ws`, JSON request/response with a `request_id`. The only
+- **HTTPS**: login and logout under `/app/api/auth`, `/app/health`, and
+  the built client under `/app/`.
+- **WSS**: `/app/ws`, JSON request/response with a `request_id`. The only
   request today is `ping`; the connection (session check, keep-alive, close
   codes) is what later features build on.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
@@ -84,12 +82,12 @@ REST:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/probe/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
-| GET | `/probe/api/auth/me` | | 200 `{"username"}` / 401 |
-| POST | `/probe/api/auth/logout` | | 204, clears the cookie (also without a session) |
-| POST | `/probe/api/auth/logout-all` | | 204: ends every session of the user |
+| POST | `/app/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
+| GET | `/app/api/auth/me` | | 200 `{"username"}` / 401 |
+| POST | `/app/api/auth/logout` | | 204, clears the cookie (also without a session) |
+| POST | `/app/api/auth/logout-all` | | 204: ends every session of the user |
 
-Everything except login, logout and `/probe/health` needs the session cookie
+Everything except login, logout and `/app/health` needs the session cookie
 (else 401). Every request that changes something, and the WebSocket handshake,
 needs an allowed `Origin` (else 403).
 
@@ -270,48 +268,48 @@ the output buffer. One request in flight matches a small LTE uplink.
 
 The app container does not have the firmware directory until
 `rmx-server-infra` mounts it. That change is not in this repo. In
-`services/probe/compose.yaml`, on `probe-app`:
+`services/app/compose.yaml`, on `app`:
 
 ```yaml
 environment:
   FIRMWARE_DIR: /firmware
 volumes:
-  - ../caddy/firmware/probe:/firmware:ro
+  - <host directory of the images>:/firmware:ro
 ```
 
-`services/caddy/firmware/probe` is the host directory of the images
-(`firmware/probe/<version>.bin`; Caddy no longer serves it). The container runs as uid
+The host directory of the images is in `rmx-server-infra` (Caddy no longer
+serves it; its name follows the stack's rename in
+[rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)). The container runs as uid
 65532, so that directory needs to be readable by it (directories `0755` and
-files `0644` are enough). No Mosquitto ACL change: `probe-app` already has
+files `0644` are enough). No Mosquitto ACL change: `app` already has
 readwrite `mower/#`, and each device already has `mower/<its username>/#`,
 which covers `fw/req`, `fw/chunk` and `fw/res`.
 
 ## Login and sessions
 
-The probe rehearses how production (`rmx-server-app`) should log
-people in. Code: `internal/auth/` and
+How the app logs people in. Code: `internal/auth/` and
 `client/src/components/LoginForm.tsx`.
 
 ```
-browser                                   probe-server                     TimescaleDB
-  │ POST /probe/api/auth/login {user,pw}     │                                 │
+browser                                   rmx-server                       TimescaleDB
+  │ POST /app/api/auth/login {user,pw}       │                                 │
   │ ───────────────────────────────────────▶ │ Argon2id check (slow, 19 MiB)   │
   │                                          │ token = 32 random bytes         │
   │                                          │ INSERT sessions(sha256(token))  │──▶
-  │ ◀── Set-Cookie: __Secure-probe_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/probe
+  │ ◀── Set-Cookie: __Secure-app_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/app
   │                                          │                                 │
-  │ GET /probe/api/auth/me  (the browser adds the cookie)                      │
-  │ GET /probe/ws + Upgrade (the cookie too) │ look up sha256(cookie):         │
+  │ GET /app/api/auth/me  (the browser adds the cookie)                        │
+  │ GET /app/ws + Upgrade (the cookie too)   │ look up sha256(cookie):         │
   │ ───────────────────────────────────────▶ │ exists, not idle, not expired?  │──▶
   │ ◀── 200 / 101 Switching Protocols, or 401                                  │
-  │ POST /probe/api/auth/logout              │ DELETE the row                  │──▶
+  │ POST /app/api/auth/logout                │ DELETE the row                  │──▶
 ```
 
 **Why a session cookie, and not basic auth or a token in JavaScript**
 
 - *Basic auth* (what Caddy did before): the browser sends the password itself
   with every request, there is no real logout, and iOS WebKit doesn't send it
-  on WebSocket handshakes (the probe's WSS failed on iPhones). Browsers do
+  on WebSocket handshakes (the WSS of the first, Caddy-protected version failed on iPhones). Browsers do
   send cookies on WebSocket handshakes, so checking the cookie there fixes it.
 - *A token kept by JavaScript* (localStorage, `Authorization: Bearer`, often a
   JWT): any script that runs on the page (an XSS bug, a compromised npm
@@ -326,7 +324,7 @@ browser                                   probe-server                     Times
 
 | What | Choice | Why |
 |---|---|---|
-| Password hash | Argon2id (m = 19 MiB, t = 2, p = 1), random salt | OWASP's recommendation. Slow and memory-hard, so stolen hashes are expensive to crack. The PHC string stores its parameters, so they can be raised later. One check at a time, because probe-app has a 64 MB memory limit. |
+| Password hash | Argon2id (m = 19 MiB, t = 2, p = 1), random salt | OWASP's recommendation. Slow and memory-hard, so stolen hashes are expensive to crack. The PHC string stores its parameters, so they can be raised later. One check at a time, because the app container has a 64 MB memory limit. |
 | Password rules | 12–256 characters, nothing else | NIST SP 800-63B: length matters, composition rules don't. |
 | Session id | 32 bytes from the OS random generator (64 hex characters) | 256 bits can't be guessed. |
 | Stored as | SHA-256 of the token | A leaked database dump has no working sessions. A fast hash is fine because the token is random (passwords need the slow one). |
@@ -336,14 +334,14 @@ browser                                   probe-server                     Times
 | `HttpOnly` | yes | Scripts can't read the cookie. |
 | `Secure` | yes | HTTPS only. (Browsers treat `http://localhost` as secure, so local development works.) |
 | `SameSite` | **Strict** | The cookie is never sent on requests that another site starts, so a foreign page can't use it (CSRF). Lax would also send it when someone follows a link here from another site; we don't need that, because the page (static files) is public and only its own same-site API calls need the cookie. |
-| `Path` | `/probe` | The probe shares `api.rmx.lt` with the future production backend; its cookie stays under `/probe`. |
-| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. **Production** should own a whole origin and use `__Host-session; Path=/`. |
+| `Path` | `/app` | The app shares `api.rmx.lt` with other services; its cookie stays under `/app`. |
+| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. If the app ever gets an origin of its own, it should use `__Host-session; Path=/`. |
 | CSRF | SameSite **plus** an `Origin` check | SameSite works per *site* (all of `rmx.lt`), and not every browser enforces it. Every request that isn't GET/HEAD/OPTIONS, and every WebSocket handshake, must have an `Origin` from `ALLOWED_ORIGINS`, or it gets 403. The login too (no "log the victim into the attacker's account"). WebSockets matter most: CORS doesn't cover them, so without this any website could open one with the user's cookie ("cross-site WebSocket hijacking"). |
 | Password guessing | in-memory backoff per username and per IP | 5 free failures per username (20 per IP), then 1 s, 2 s, 4 s … up to 15 min; while waiting, even the right password gets 429. Unknown usernames are checked against a dummy hash, so they take as long and get the same answer. A restart forgets the counters; several instances would need a shared store. |
 | Client IP | last `X-Forwarded-For` entry, else the TCP peer | Caddy sets that header; the app's port is not published, so only Caddy reaches it. |
 | Caching | `Cache-Control: no-store` behind the login | No copy of user data in a shared cache, or in the back button after logout. |
 
-**What's public:** `/probe/health` (only up/down and the version, for the
+**What's public:** `/app/health` (only up/down and the version, for the
 deploy script and monitoring), login and logout, and the client's static files
 (the same code as in this repository, no data). All other routes are in the
 router's `protected` group (`internal/server/routes.go`), which requires
@@ -353,9 +351,8 @@ the public group.
 **MQTT is for devices only.** Browsers don't talk to Mosquitto: they go
 through the server's WebSocket with their session, so there is one login for
 people and one place that checks it. Devices have their own broker logins
-(e.g. `probe-device` on the VPS), limited by the broker's ACL to their own
-topics. (Until 2026-10-20 the page also spoke MQTT over WebSockets as
-`probe-web`; that was removed to match production.)
+(one per device on the VPS), limited by the broker's ACL to their own
+topics.
 
 ### Users
 
@@ -367,16 +364,16 @@ process list.
 
 ```powershell
 # Local development (DATABASE_URL comes from .env):
-go run ./cmd/probe-server create-user alice      # asks for the password
-go run ./cmd/probe-server set-password alice     # new password, ends all sessions
-go run ./cmd/probe-server delete-user alice      # also deletes the sessions
+go run ./cmd/rmx-server create-user alice      # asks for the password
+go run ./cmd/rmx-server set-password alice     # new password, ends all sessions
+go run ./cmd/rmx-server delete-user alice      # also deletes the sessions
 ```
 
 On the VPS, inside the running container (distroless: no shell, so the
 password is piped in from the host):
 
 ```bash
-docker compose exec -T probe-app /app/probe-server create-user probe < password-file
+docker compose exec -T app /app/rmx-server create-user admin < password-file
 ```
 
 Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
@@ -386,7 +383,7 @@ Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
 
 ```
 go.mod, go.sum                    Go module (go 1.26), staticcheck pinned as a tool
-cmd/probe-server/                 main: server, healthcheck, user commands
+cmd/rmx-server/                   main: server, healthcheck, user commands
 cmd/gen-ts/                       TypeScript type generator
 internal/protocol/                wire types, union codec, MQTT topic helpers
 internal/firmware/                firmware file names, chunk frames, directory reads
@@ -396,7 +393,7 @@ internal/server/                  routes, ws, mqtt, start/stop; integration_test
 migrations/                       goose SQL migrations (embedded)
 client/                           React 19 + TS on Bun (same toolchain as blade-terminal)
   public/index.html               HTML entry (Bun HTML import)
-  server/index.ts                 dev server: HMR + proxy to probe-server
+  server/index.ts                 dev server: HMR + proxy to rmx-server
   scripts/build.ts                production build → dist/
   src/generated/                  generated by cmd/gen-ts (do not edit)
 compose.dev.yaml, dev/mosquitto/  local/CI stack: TimescaleDB + Mosquitto
@@ -416,7 +413,7 @@ Copy-Item .env.example .env
 docker compose -f compose.dev.yaml up -d --wait
 
 # 3. The server (reads .env, runs migrations, listens on 127.0.0.1:8080).
-go run ./cmd/probe-server
+go run ./cmd/rmx-server
 
 # 4. The client dev server, in a second terminal.
 cd client
@@ -425,15 +422,15 @@ bun run dev
 ```
 
 Create a login once (the dev database keeps it), then open
-<http://localhost:3000/probe/> and log in:
+<http://localhost:3000/app/> and log in:
 
 ```powershell
-go run ./cmd/probe-server create-user dev     # any password of 12+ characters
+go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
 ```
 
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
-`probe-device` with the `PROBE_DEVICE_PASSWORD` from `.env`
-(`probe-device-dev`), publishing to `mower/<client-id>/fw/req` (needs
+`test-device` with the `TEST_DEVICE_PASSWORD` from `.env`
+(`test-device-dev`), publishing to `mower/<client-id>/fw/req` (needs
 `FIRMWARE_DIR`) or watching `mower/status/server`.
 
 Local ports (chosen so they don't clash with a Postgres or Mosquitto
@@ -442,17 +439,17 @@ installed on the PC):
 | Port | What |
 |---|---|
 | 3000 | Bun dev server (client with hot reload) |
-| 8080 | probe-server |
-| 55432 | TimescaleDB (`postgres://probe:probe-dev@127.0.0.1:55432/probe`) |
+| 8080 | rmx-server |
+| 55432 | TimescaleDB (`postgres://app:db-dev@127.0.0.1:55432/app`) |
 | 11883 | Mosquitto, plain MQTT (the server and test devices) |
 
 **How the dev server works.** `bun run dev` runs `client/server/index.ts`:
 `Bun.serve` with an HTML import of `public/index.html`, so Bun bundles the app
 on the fly with hot module reloading and Tailwind (`bun-plugin-tailwind` in
-`bunfig.toml`). The same server proxies `/probe/api/*`, `/probe/health`,
-and the `/probe/ws` WebSocket to probe-server (passing
-on the session cookie and `Origin`, which probe-server checks)
-(`PROBE_BACKEND_URL`, default `http://127.0.0.1:8080`). The browser sees a
+`bunfig.toml`). The same server proxies `/app/api/*`, `/app/health`,
+and the `/app/ws` WebSocket to rmx-server (passing
+on the session cookie and `Origin`, which rmx-server checks)
+(`BACKEND_URL`, default `http://127.0.0.1:8080`). The browser sees a
 single origin with the same paths as production, so there is no CORS and no
 environment-specific URL in the client code.
 
@@ -462,16 +459,16 @@ also delete the database volume).
 Run the production image against the dev stack:
 
 ```powershell
-docker build -t rmx-backend-probe:local .
+docker build -t rmx-server-app:local .
 docker run --rm -p 8080:8080 `
-  -e DATABASE_URL=postgres://probe:probe-dev@host.docker.internal:55432/probe `
+  -e DATABASE_URL=postgres://app:db-dev@host.docker.internal:55432/app `
   -e MQTT_HOST=host.docker.internal -e MQTT_PORT=11883 `
-  -e MQTT_USERNAME=probe-app -e MQTT_PASSWORD=probe-app-dev `
+  -e MQTT_USERNAME=app -e MQTT_PASSWORD=app-dev `
   -e ALLOWED_ORIGINS=http://localhost:8080 `
-  rmx-backend-probe:local
+  rmx-server-app:local
 ```
 
-Then open <http://localhost:8080/probe/>.
+Then open <http://localhost:8080/app/>.
 
 ## Tests and checks
 
@@ -520,7 +517,8 @@ Dockerfile's base images.
 
 This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 
-**Image:** `ghcr.io/rmx-lt/rmx-backend-probe`, public, linux/amd64.
+**Image:** `ghcr.io/rmx-lt/rmx-server-app`, public, linux/amd64. (Images up to
+2026-11-13 were published as `ghcr.io/rmx-lt/rmx-backend-probe`, the repo's old name.)
 
 | Tag | Meaning |
 |---|---|
@@ -534,7 +532,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
   unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
-- `HEALTHCHECK` built in (`/app/probe-server healthcheck` → `GET /probe/health`).
+- `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /app/health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
   a time). `mem_limit: 64m` is enough: the image sets `GOMEMLIMIT=40MiB` so the
@@ -546,15 +544,15 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 
 | Variable | Required | Example (VPS) | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | yes | `postgres://probe:…@probe-db:5432/probe` | migrations run at start. No TLS (internal network). |
+| `DATABASE_URL` | yes | `postgres://app:…@db:5432/app` | migrations run at start. No TLS (internal network). |
 | `MQTT_HOST` | yes | `mosquitto` | plain MQTT on the internal network |
 | `MQTT_PORT` | no | `1883` | default 1883 |
-| `MQTT_USERNAME` | yes | `probe-app` | ACL: `probe/#` |
+| `MQTT_USERNAME` | yes | `app` | ACL: readwrite `mower/#` |
 | `MQTT_PASSWORD` | yes | (secret, server-side `.env`) | never logged |
 | `ALLOWED_ORIGINS` | **yes** | `https://api.rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`. The Rust version's `RUST_LOG` is ignored |
 | `BIND_ADDR` | no | `0.0.0.0:8080` | already set in the image |
-| `MQTT_CLIENT_ID` | no | `probe-server` | must be unique on the broker |
+| `MQTT_CLIENT_ID` | no | `rmx-server` | must be unique on the broker |
 | `MQTT_TOPIC_PREFIX` | no | `mower` | |
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
@@ -566,18 +564,18 @@ or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS
 timescaledb`, so the database user must own the database and either be a
 superuser (the image's `POSTGRES_USER` is) or the extension must already exist.
 
-**Routes the app serves itself** (Caddy proxies `api.rmx.lt/probe/*` as-is and
-must **not** strip the `/probe` prefix). The app does its own login, so Caddy
+**Routes the app serves itself** (Caddy proxies `api.rmx.lt/app` and `api.rmx.lt/app/*` as-is and
+must **not** strip the `/app` prefix). The app does its own login, so Caddy
 needs no `basic_auth` in front of it:
 
 | Path | Login | What |
 |---|---|---|
-| `/probe` | public | 308 redirect to `/probe/` |
-| `/probe/` and other unknown `/probe/*` | public | the client (static files, `index.html` fallback); it shows the login form |
-| `/probe/api/auth/login`, `/probe/api/auth/logout` | public | login, logout |
-| `/probe/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
-| `/probe/api/auth/me`, `/probe/api/auth/logout-all` | session | REST |
-| `/probe/ws` | session | WebSocket (Caddy proxies upgrades by default) |
+| `/app` | public | 308 redirect to `/app/` |
+| `/app/` and other unknown `/app/*` | public | the client (static files, `index.html` fallback); it shows the login form |
+| `/app/api/auth/login`, `/app/api/auth/logout` | public | login, logout |
+| `/app/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
+| `/app/api/auth/me`, `/app/api/auth/logout-all` | session | REST |
+| `/app/ws` | session | WebSocket (Caddy proxies upgrades by default) |
 
 **Proxy requirements:** pass on `Host`, `Origin` and `Cookie` unchanged (Caddy
 does by default) and set `X-Forwarded-For` (Caddy does; the login rate limit
@@ -585,25 +583,25 @@ uses it). **First user:** see [Users](#users).
 
 **MQTT devices** connect to the broker's public TLS listener (VPS:
 `mqtts://mqtt.rmx.lt:8883`, `use_username_as_clientid`), so a device's client
-id is its login, e.g. `probe-device`. Its ACL needs: its own `mower/<login>/#` (covered by the broker's
+id is its login. Its ACL needs: its own `mower/<login>/#` (covered by the broker's
 `pattern readwrite mower/%u/#`) plus read
 `mower/status/server`. The broker needs no WebSocket listener and Caddy no MQTT
-route: browsers don't use MQTT. `MQTT_WS_URL` and `/probe/config.json` were
-removed (an old `MQTT_WS_URL` in the environment is ignored).
+route: browsers don't use MQTT. An old `MQTT_WS_URL` in the
+environment is ignored.
 
 **Deploy job:** every push to `production` deploys automatically (`feat/…` → PR → `development` → PR → `production`). After the `image`
 job, the `deploy` job in `ci.yml` connects over SSH as the VPS user `deploy`
 and sends only the tag `sha-<short>`. That user's key is restricted to one
-forced command, the script `rmx-deploy-probe` (source:
-[rmx-server-infra `services/probe/deploy/`](https://github.com/rmx-lt/rmx-server-infra/tree/development/services/probe/deploy)).
-It checks the tag, pulls the image, restarts `probe-app`, waits for
-`/probe/health`, and rolls back to the previous tag if the new one isn't
-healthy (the job then fails). If the probe is switched off on the VPS, the
-tag is only recorded, not started.
+forced command, the deploy script in `rmx-server-infra` (it moves from the old
+probe stack to `services/app/` in
+[rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)).
+It checks the tag, pulls the image, restarts `app`, waits for
+`/app/health`, and rolls back to the previous tag if the new one isn't
+healthy (the job then fails).
 
 Repository secrets: `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (the private key),
 `DEPLOY_KNOWN_HOSTS` (the VPS's ed25519 host-key line, pinned). Rotating the
-key is described on the wiki page [Server-Infra](Server-Infra#probe-rmx-server-app) (§10, "Probe").
+key is described on the wiki page [Server-Infra](Server-Infra) (§10).
 
 ## License
 

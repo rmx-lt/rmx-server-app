@@ -37,21 +37,21 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/config"
-	"github.com/rmx-lt/rmx-backend-probe/internal/db"
-	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
-	"github.com/rmx-lt/rmx-backend-probe/internal/server"
+	"github.com/rmx-lt/rmx-server-app/internal/auth"
+	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/db"
+	"github.com/rmx-lt/rmx-server-app/internal/firmware"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/server"
 )
 
 const (
 	wait = 5 * time.Second
 	// origin is the page origin the tests pretend to be (in ALLOWED_ORIGINS).
-	origin   = "http://probe.test"
+	origin   = "http://app.test"
 	user     = "tester"
 	password = "correct horse battery staple"
-	cookie   = "__Secure-probe_session"
+	cookie   = "__Secure-app_session"
 )
 
 func TestMain(m *testing.M) {
@@ -80,7 +80,7 @@ func newDatabase(t *testing.T) *pgxpool.Pool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	name := "probe_it_" + randomHex(6)
+	name := "app_it_" + randomHex(6)
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+name); err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func (a *testApp) shutdown() {
 	}
 }
 
-func (a *testApp) url(path string) string { return a.base + "/probe" + path }
+func (a *testApp) url(path string) string { return a.base + "/app" + path }
 
 func (a *testApp) waitHealthy() {
 	deadline := time.Now().Add(wait)
@@ -230,7 +230,7 @@ func (a *testApp) waitHealthy() {
 	}
 }
 
-// login does POST /probe/api/auth/login from an allowed origin, without a cookie.
+// login does POST /app/api/auth/login from an allowed origin, without a cookie.
 func (a *testApp) login(username, pw string) *http.Response {
 	a.t.Helper()
 	return a.loginAs(a.anon, username, pw)
@@ -385,7 +385,7 @@ type message struct {
 	payload []byte
 }
 
-// mqttDevice is a device-like MQTT client (like the LTE gateway) logged in as probe-device.
+// mqttDevice is a device-like MQTT client (like the LTE gateway) logged in as test-device.
 type mqttDevice struct {
 	t        *testing.T
 	cm       *autopaho.ConnectionManager
@@ -403,8 +403,8 @@ func (a *testApp) mqttConnect() *mqttDevice {
 	up := make(chan struct{}, 1)
 	cm, err := autopaho.NewConnection(context.Background(), autopaho.ClientConfig{
 		ServerUrls:                    []*url.URL{{Scheme: "mqtt", Host: net.JoinHostPort(os.Getenv("MQTT_HOST"), strconv.Itoa(port))}},
-		ConnectUsername:               "probe-device",
-		ConnectPassword:               []byte(os.Getenv("PROBE_DEVICE_PASSWORD")),
+		ConnectUsername:               "test-device",
+		ConnectPassword:               []byte(os.Getenv("TEST_DEVICE_PASSWORD")),
 		KeepAlive:                     30,
 		CleanStartOnInitialConnection: true,
 		OnConnectionUp:                func(*autopaho.ConnectionManager, *paho.Connack) { up <- struct{}{} },
@@ -671,24 +671,24 @@ func TestServesClientFilesUnderPrefix(t *testing.T) {
 		b, _ := io.ReadAll(res.Body)
 		return res, string(b)
 	}
-	res, _ := get("/probe")
+	res, _ := get("/app")
 	eq(t, res.StatusCode, 308)
-	eq(t, res.Header.Get("Location"), "/probe/")
+	eq(t, res.Header.Get("Location"), "/app/")
 
-	for _, path := range []string{"/probe/", "/probe/some/client/route", "/probe/assets"} {
+	for _, path := range []string{"/app/", "/app/some/client/route", "/app/assets"} {
 		res, body := get(path)
 		if res.StatusCode != 200 || body != "<!doctype html>index" {
 			t.Errorf("%s: %d %q", path, res.StatusCode, body)
 		}
 	}
 	// Path traversal: the mux cleans the path and redirects, nothing is read outside the directory.
-	res, body := get("/probe/../../etc/passwd")
+	res, body := get("/app/../../etc/passwd")
 	if res.StatusCode == 200 || strings.Contains(body, "root:") {
 		t.Errorf("traversal: %d %q", res.StatusCode, body)
 	}
-	_, body = get("/probe/app.js")
+	_, body = get("/app/app.js")
 	eq(t, body, "console.log(1)")
-	res, _ = get("/probe/api/nope")
+	res, _ = get("/app/api/nope")
 	eq(t, res.StatusCode, 404)
 	res, _ = get("/elsewhere")
 	eq(t, res.StatusCode, 404)
@@ -705,7 +705,7 @@ func TestLoginMeAndLogout(t *testing.T) {
 	eq(t, res.StatusCode, 200)
 	eq(t, res.Header.Get("Cache-Control"), "no-store")
 	set := res.Header.Get("Set-Cookie")
-	for _, attr := range []string{"Path=/probe", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
+	for _, attr := range []string{"Path=/app", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
 		if !strings.Contains(set, attr) {
 			t.Errorf("%s lacks %s", set, attr)
 		}
@@ -827,7 +827,7 @@ func TestForeignOriginsAreRejected(t *testing.T) {
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 
-	for _, o := range []string{"https://evil.example", "http://probe.test.evil.example", "null", ""} {
+	for _, o := range []string{"https://evil.example", "http://app.test.evil.example", "null", ""} {
 		// Logged in, but the request comes from another site's page (CSRF).
 		c := client(app.cookie, o)
 		status, _, body := app.req(c, "POST", "/api/auth/logout-all", nil)
@@ -978,7 +978,7 @@ func TestUserCommands(t *testing.T) {
 
 // ---- Migrations ---------------------------------------------------------------------------
 
-// A database the Rust version of the probe migrated (recorded in _sqlx_migrations)
+// A database the earlier Rust version of this server migrated (recorded in _sqlx_migrations)
 // is adopted without running the migrations again.
 func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 	pool := newDatabase(t) // fully migrated by goose

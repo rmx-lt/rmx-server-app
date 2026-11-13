@@ -7,12 +7,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/apperr"
-	"github.com/rmx-lt/rmx-backend-probe/internal/clientip"
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/apperr"
+	"github.com/rmx-lt/rmx-server-app/internal/clientip"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
-// The HTTP side of the login: the /probe/api/auth/* handlers, the session
+// The HTTP side of the login: the /app/api/auth/* handlers, the session
 // middleware, and the Origin check against cross-site requests.
 
 type userKey struct{}
@@ -26,7 +26,7 @@ func UserFrom(ctx context.Context) (CurrentUser, bool) {
 // Responses that carry session data must not be stored by any cache.
 func noStore(w http.ResponseWriter) { w.Header().Set("Cache-Control", "no-store") }
 
-// HandleLogin handles POST /probe/api/auth/login with {"username", "password"}:
+// HandleLogin handles POST /app/api/auth/login with {"username", "password"}:
 // 200 + Set-Cookie + Me; 401 for a wrong username or password (the same
 // answer for both, so it doesn't reveal which names exist); 429 + Retry-After
 // after too many failures.
@@ -58,7 +58,7 @@ func (s *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	apperr.WriteJSON(w, http.StatusOK, protocol.Me{Username: user.Username})
 }
 
-// HandleLogout handles POST /probe/api/auth/logout: ends this session. Always 204
+// HandleLogout handles POST /app/api/auth/logout: ends this session. Always 204
 // and clears the cookie, even if there was no valid session.
 func (s *Service) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if token, state := SessionCookie(r.Header); state == CookieFound {
@@ -70,7 +70,7 @@ func (s *Service) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	loggedOut(w)
 }
 
-// HandleLogoutAll handles POST /probe/api/auth/logout-all: ends every session of this user.
+// HandleLogoutAll handles POST /app/api/auth/logout-all: ends every session of this user.
 func (s *Service) HandleLogoutAll(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
 	n, err := s.LogoutEverywhere(r.Context(), user.UserID)
@@ -82,7 +82,7 @@ func (s *Service) HandleLogoutAll(w http.ResponseWriter, r *http.Request) {
 	loggedOut(w)
 }
 
-// HandleMe handles GET /probe/api/auth/me: who is logged in (401 if nobody). The
+// HandleMe handles GET /app/api/auth/me: who is logged in (401 if nobody). The
 // client asks this at start to choose between the login form and the app.
 func HandleMe(w http.ResponseWriter, r *http.Request) {
 	user, _ := UserFrom(r.Context())
@@ -122,7 +122,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 	})
 }
 
-// CheckOrigin is the middleware for everything under /probe: requests that
+// CheckOrigin is the middleware for everything under /app: requests that
 // change something (any method but GET/HEAD/OPTIONS) and WebSocket handshakes
 // must come from one of the allowed origins, else 403.
 //

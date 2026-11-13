@@ -10,11 +10,11 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/auth"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
-// WebSocket transport at /probe/ws.
+// WebSocket transport at /app/ws.
 //
 // Client to server: RequestEnvelope JSON text frames.
 // Server to client: ServerMessage JSON, the response to each request.

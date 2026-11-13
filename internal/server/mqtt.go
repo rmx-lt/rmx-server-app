@@ -13,9 +13,9 @@ import (
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/config"
-	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/firmware"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
 // MQTT transport (paho.golang, plain TCP to the broker on the internal network).

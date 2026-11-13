@@ -1,4 +1,4 @@
-// Package server wires the probe together: the HTTP routes (login, health,
+// Package server wires the server together: the HTTP routes (login, health,
 // the built client), the WebSocket, the MQTT client (firmware for devices,
 // the server's status), and the start and stop of it all.
 package server
@@ -15,13 +15,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/config"
-	"github.com/rmx-lt/rmx-backend-probe/internal/db"
-	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
+	"github.com/rmx-lt/rmx-server-app/internal/auth"
+	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/db"
+	"github.com/rmx-lt/rmx-server-app/internal/firmware"
 )
 
-// Version is reported by /probe/health. The release build sets it with -ldflags.
+// Version is reported by /app/health. The release build sets it with -ldflags.
 var Version = "0.1.0"
 
 // Server is shared by all request handlers.

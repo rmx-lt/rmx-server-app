@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/firmware"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
 // firmwareGate allows one firmware request per device at a time. A second

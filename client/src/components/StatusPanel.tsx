@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ping } from "@/app/probe";
+import { ping } from "@/app/connections";
 import { useConnectionStore } from "@/stores/connectionStore";
 
 type Tone = "good" | "warn" | "bad" | "idle";

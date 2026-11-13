@@ -72,12 +72,12 @@ func TestServerMessageJSONShape(t *testing.T) {
 }
 
 func TestLoginRequestHidesPassword(t *testing.T) {
-	req := LoginRequest{Username: "probe", Password: "hunter2"}
+	req := LoginRequest{Username: "admin", Password: "hunter2"}
 	for _, s := range []string{
 		fmt.Sprintf("%v", req), fmt.Sprintf("%+v", req), fmt.Sprintf("%#v", req), fmt.Sprint(&req),
 		slog.GroupValue(slog.Any("req", req)).String(),
 	} {
-		if !strings.Contains(s, "probe") || strings.Contains(s, "hunter2") {
+		if !strings.Contains(s, "admin") || strings.Contains(s, "hunter2") {
 			t.Errorf("%s", s)
 		}
 	}

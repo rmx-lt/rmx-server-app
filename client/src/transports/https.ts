@@ -8,7 +8,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 export const SESSION_ENDED = "Your session has ended. Please log in again.";
 
-/** GET /probe/health (public). Resolves with the body even on 503 (degraded). */
+/** GET /app/health (public). Resolves with the body even on 503 (degraded). */
 export async function fetchHealth(): Promise<Health> {
   const res = await fetch(`${BASE}/health`, { cache: "no-store" });
   if (res.status !== 200 && res.status !== 503) throw new Error(`HTTP ${res.status}`);
@@ -27,7 +27,7 @@ export async function checkSession(): Promise<void> {
       const s = useAuthStore.getState();
       if (s.state !== "logged-out") s.setLoggedOut(s.state === "logged-in" ? SESSION_ENDED : undefined);
     }
-    // Other errors (server down, 502 while the probe is off): leave the state alone.
+    // Other errors (server down, 502 while the server is restarting): leave the state alone.
   } catch {
     // Network error: same.
   }

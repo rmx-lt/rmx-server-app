@@ -10,9 +10,9 @@ import (
 
 func base() map[string]string {
 	return map[string]string{
-		"DATABASE_URL":    "postgres://u:p@db/probe",
+		"DATABASE_URL":    "postgres://u:p@db/app",
 		"MQTT_HOST":       "mosquitto",
-		"MQTT_USERNAME":   "probe-app",
+		"MQTT_USERNAME":   "app",
 		"MQTT_PASSWORD":   "secret",
 		"ALLOWED_ORIGINS": "https://api.rmx.lt",
 	}
@@ -27,7 +27,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "probe-server" ||
+	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "rmx-server" ||
 		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
 		c.FirmwareDir != "" || c.FirmwareChunkBytes != 4096 ||
 		!slices.Equal(c.AllowedOrigins, []string{"https://api.rmx.lt"}) {
@@ -75,7 +75,7 @@ func TestMissingRequired(t *testing.T) {
 func TestInvalidValues(t *testing.T) {
 	for key, bad := range map[string]string{
 		"MQTT_PORT":            "abc",
-		"MQTT_TOPIC_PREFIX":    "probe/#",
+		"MQTT_TOPIC_PREFIX":    "app/#",
 		"BIND_ADDR":            "8080",
 		"DB_MAX_CONNECTIONS":   "-1",
 		"FIRMWARE_CHUNK_BYTES": "100",

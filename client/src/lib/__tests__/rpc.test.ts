@@ -39,7 +39,7 @@ describe("PendingRequests", () => {
 
 describe("addresses", () => {
   test("WebSocket URL follows the page scheme", () => {
-    expect(wsUrl({ protocol: "https:", host: "api.rmx.lt" })).toBe("wss://api.rmx.lt/probe/ws");
-    expect(wsUrl({ protocol: "http:", host: "localhost:3000" })).toBe("ws://localhost:3000/probe/ws");
+    expect(wsUrl({ protocol: "https:", host: "api.rmx.lt" })).toBe("wss://api.rmx.lt/app/ws");
+    expect(wsUrl({ protocol: "http:", host: "localhost:3000" })).toBe("ws://localhost:3000/app/ws");
   });
 });

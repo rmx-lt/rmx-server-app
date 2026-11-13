@@ -1,4 +1,4 @@
-// probe-server: the backend for the browser app and the mower's devices.
+// rmx-server: the backend for the browser app and the mower's devices.
 // Login and sessions, a WebSocket for the browser, and firmware images for
 // devices over MQTT.
 package main
@@ -20,21 +20,21 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/config"
-	"github.com/rmx-lt/rmx-backend-probe/internal/db"
-	"github.com/rmx-lt/rmx-backend-probe/internal/server"
+	"github.com/rmx-lt/rmx-server-app/internal/auth"
+	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/db"
+	"github.com/rmx-lt/rmx-server-app/internal/server"
 )
 
 const usage = `usage:
-  probe-server                      run the server (settings from the environment)
-  probe-server healthcheck          exit 0 if GET /probe/health answers 200
-  probe-server create-user <name>   add a login; the password is read from stdin
-  probe-server set-password <name>  new password from stdin; logs the user out everywhere
-  probe-server delete-user <name>   remove a login and all its sessions
+  rmx-server                      run the server (settings from the environment)
+  rmx-server healthcheck          exit 0 if GET /app/health answers 200
+  rmx-server create-user <name>   add a login; the password is read from stdin
+  rmx-server set-password <name>  new password from stdin; logs the user out everywhere
+  rmx-server delete-user <name>   remove a login and all its sessions
 
 The user commands need only DATABASE_URL. On the VPS, for example:
-  docker compose exec -T probe-app /app/probe-server create-user probe < password-file
+  docker compose exec -T app /app/rmx-server create-user admin < password-file
 On a terminal the password is asked twice and not shown.`
 
 func main() {
@@ -172,14 +172,14 @@ func readNewPassword() (string, error) {
 	return password, nil
 }
 
-// healthcheck does GET /probe/health on our own port; the exit code is 0 only on HTTP 200.
+// healthcheck does GET /app/health on our own port; the exit code is 0 only on HTTP 200.
 func healthcheck() int {
 	port := uint16(8080)
 	if addr, err := netip.ParseAddrPort(os.Getenv("BIND_ADDR")); err == nil {
 		port = addr.Port()
 	}
 	client := http.Client{Timeout: 3 * time.Second}
-	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/probe/health", port))
+	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/app/health", port))
 	if err != nil {
 		return 1
 	}

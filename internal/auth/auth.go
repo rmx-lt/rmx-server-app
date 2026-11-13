@@ -2,8 +2,8 @@
 //
 //   - Users live in the users table, with an Argon2id password hash. There is
 //     no sign-up: users are created on the server with
-//     `probe-server create-user <name>` (see CreateUser).
-//   - Login (POST /probe/api/auth/login) checks the password and creates a row
+//     `rmx-server create-user <name>` (see CreateUser).
+//   - Login (POST /app/api/auth/login) checks the password and creates a row
 //     in sessions. The browser gets a random 256-bit token in an HttpOnly
 //     cookie; the database keeps only its SHA-256.
 //   - Every protected request (REST and the WebSocket handshake) sends the
@@ -34,7 +34,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/apperr"
+	"github.com/rmx-lt/rmx-server-app/internal/apperr"
 )
 
 const (
@@ -46,7 +46,7 @@ const (
 	touchAfter = 60 * time.Second
 
 	// parallelHashes: password checks running at once. Each one needs 19 MiB,
-	// and probe-app has a 64 MB memory limit; more logins at the same moment
+	// and the app container has a 64 MB memory limit; more logins at the same moment
 	// wait their turn.
 	parallelHashes = 1
 	// hashQueueTimeout: a login that can't start its password check within
@@ -233,7 +233,7 @@ func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
 	return tag.RowsAffected(), err
 }
 
-// ---- User management (the `probe-server create-user` etc. commands) ---------
+// ---- User management (the `rmx-server create-user` etc. commands) ---------
 
 // CreateUser creates a user. It fails if the name is taken or the password too short.
 func CreateUser(ctx context.Context, pool *pgxpool.Pool, username, password string) error {

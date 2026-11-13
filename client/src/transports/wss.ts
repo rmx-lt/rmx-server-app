@@ -11,7 +11,7 @@ export type WsHandlers = {
 };
 
 /**
- * One WebSocket to probe-server, reconnecting with backoff. Carries
+ * One WebSocket to rmx-server, reconnecting with backoff. Carries
  * request/response pairs.
  */
 export class WssConnection {

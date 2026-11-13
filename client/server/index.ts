@@ -1,20 +1,20 @@
 /**
- * Development server only (`bun dev`). In production probe-server serves the
+ * Development server only (`bun dev`). In production rmx-server serves the
  * built files from `dist/`, and this file is not used.
  *
- * - Serves the app at /probe/ with hot module reloading (Bun HTML import).
- * - Proxies the backend routes to probe-server, so the browser sees one
+ * - Serves the app at /app/ with hot module reloading (Bun HTML import).
+ * - Proxies the backend routes to rmx-server, so the browser sees one
  *   origin exactly like in production (no CORS, same relative URLs).
  */
 
 import { serve, type Server, type ServerWebSocket } from "bun";
 import index from "../public/index.html";
 
-const BACKEND = process.env.PROBE_BACKEND_URL ?? "http://127.0.0.1:8080";
+const BACKEND = process.env.BACKEND_URL ?? "http://127.0.0.1:8080";
 const BACKEND_WS = BACKEND.replace(/^http/, "ws");
 const PORT = Number(process.env.PORT ?? 3000);
 
-/** Forwards one HTTP request to probe-server and returns its response. */
+/** Forwards one HTTP request to rmx-server and returns its response. */
 async function proxy(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const headers = new Headers(req.headers);
@@ -28,15 +28,15 @@ async function proxy(req: Request): Promise<Response> {
     });
   } catch {
     return Response.json(
-      { code: "internal", message: `probe-server is not reachable at ${BACKEND}` },
+      { code: "internal", message: `rmx-server is not reachable at ${BACKEND}` },
       { status: 502 },
     );
   }
 }
 
 /**
- * Per-browser-socket state: the matching socket to probe-server, and the
- * headers probe-server checks on the handshake (session cookie, Origin).
+ * Per-browser-socket state: the matching socket to rmx-server, and the
+ * headers rmx-server checks on the handshake (session cookie, Origin).
  */
 type WsData = {
   upstream?: WebSocket;
@@ -50,7 +50,7 @@ type WsData = {
  */
 const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket;
 
-/** The handshake headers passed on to probe-server. */
+/** The handshake headers passed on to rmx-server. */
 function forwardedHeaders(req: Request): Record<string, string> {
   const headers: Record<string, string> = {};
   for (const name of ["cookie", "origin", "user-agent"]) {
@@ -70,22 +70,22 @@ function sendableCode(code: number): number {
 const server = serve<WsData>({
   port: PORT,
   routes: {
-    "/": Response.redirect("/probe/", 302),
-    "/probe": Response.redirect("/probe/", 302),
-    "/probe/api/*": proxy,
-    "/probe/health": proxy,
-    "/probe/ws": (req: Request, server: Server<WsData>) => {
+    "/": Response.redirect("/app/", 302),
+    "/app": Response.redirect("/app/", 302),
+    "/app/api/*": proxy,
+    "/app/health": proxy,
+    "/app/ws": (req: Request, server: Server<WsData>) => {
       if (server.upgrade(req, { data: { queue: [], headers: forwardedHeaders(req) } })) return undefined;
       return new Response("WebSocket upgrade expected", { status: 400 });
     },
-    // The app itself, for every other path under /probe/.
-    "/probe/*": index,
+    // The app itself, for every other path under /app/.
+    "/app/*": index,
   },
 
-  // Relays WebSocket frames both ways between the browser and probe-server.
+  // Relays WebSocket frames both ways between the browser and rmx-server.
   websocket: {
     open(ws: ServerWebSocket<WsData>) {
-      const upstream = new BunWebSocket(`${BACKEND_WS}/probe/ws`, { headers: ws.data.headers });
+      const upstream = new BunWebSocket(`${BACKEND_WS}/app/ws`, { headers: ws.data.headers });
       ws.data.upstream = upstream;
       upstream.onopen = () => {
         for (const msg of ws.data.queue) upstream.send(msg);
@@ -93,7 +93,7 @@ const server = serve<WsData>({
       };
       upstream.onmessage = (e) => ws.send(e.data as string);
       upstream.onclose = (e) => ws.close(sendableCode(e.code), e.reason);
-      upstream.onerror = () => ws.close(1011, "probe-server is not reachable");
+      upstream.onerror = () => ws.close(1011, "rmx-server is not reachable");
     },
     message(ws, raw) {
       const msg = typeof raw === "string" ? raw : new Uint8Array(raw);
@@ -115,4 +115,4 @@ const server = serve<WsData>({
   },
 });
 
-console.log(`🚀 Probe client dev server at ${server.url}probe/ (backend: ${BACKEND})`);
+console.log(`🚀 Client dev server at ${server.url}app/ (backend: ${BACKEND})`);

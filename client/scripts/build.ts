@@ -5,7 +5,7 @@
  * Bun.build() API, because the CLI does not load the Tailwind plugin from
  * bunfig.toml (only the dev server does) and would ship unprocessed CSS.
  *
- * Asset URLs get the /probe/ prefix, where probe-server serves the files.
+ * Asset URLs get the /app/ prefix, where rmx-server serves the files.
  */
 
 import tailwind from "bun-plugin-tailwind";
@@ -20,7 +20,7 @@ const result = await Bun.build({
   target: "browser",
   minify: true,
   sourcemap: "linked",
-  publicPath: "/probe/",
+  publicPath: "/app/",
   env: "BUN_PUBLIC_*",
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
   plugins: [tailwind],

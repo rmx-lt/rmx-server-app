@@ -28,7 +28,7 @@ func TestHashAndVerify(t *testing.T) {
 }
 
 // A hash made by another Argon2 implementation (argon2-cffi, the same
-// parameters and PHC format as the Rust argon2 crate the probe used before),
+// parameters and PHC format as the Rust argon2 crate the earlier Rust version used),
 // so existing users keep working.
 func TestVerifiesHashesFromOtherImplementations(t *testing.T) {
 	const phc = "$argon2id$v=19$m=19456,t=2,p=1$KMhcaFQ1uqiAIPzuW5DMRA$JSSEM3AjRBG1wqfeBlITkE43uPemkTOh4sYE5+pz7S4"
@@ -44,15 +44,15 @@ func TestVerifiesHashesFromOtherImplementations(t *testing.T) {
 }
 
 func TestUsernameRules(t *testing.T) {
-	if NormalizeUsername("  Probe ") != "probe" {
+	if NormalizeUsername("  Admin ") != "admin" {
 		t.Fatal()
 	}
-	for _, ok := range []string{"probe", "a", "user.name_1-x", strings.Repeat("a", 32)} {
+	for _, ok := range []string{"admin", "a", "user.name_1-x", strings.Repeat("a", 32)} {
 		if CheckUsername(ok) != nil {
 			t.Errorf("%q refused", ok)
 		}
 	}
-	for _, bad := range []string{"", "-x", ".x", "Probe", "a b", "ž", strings.Repeat("a", 33)} {
+	for _, bad := range []string{"", "-x", ".x", "Admin", "a b", "ž", strings.Repeat("a", 33)} {
 		if CheckUsername(bad) == nil {
 			t.Errorf("%q accepted", bad)
 		}
@@ -105,7 +105,7 @@ func TestFindsTheSessionCookie(t *testing.T) {
 	if _, st := SessionCookie(cookies()); st != CookieMissing {
 		t.Fatal(st)
 	}
-	if _, st := SessionCookie(cookies("probe_session=x")); st != CookieMissing {
+	if _, st := SessionCookie(cookies("app_session=x")); st != CookieMissing {
 		t.Fatal(st)
 	}
 	twice := CookieName + "=" + string(tok) + "; " + CookieName + "=" + string(tok)
@@ -123,7 +123,7 @@ func TestCookieAttributes(t *testing.T) {
 	if !strings.HasPrefix(set, CookieName+"="+string(tok)+";") {
 		t.Fatal(set)
 	}
-	for _, attr := range []string{"Path=/probe", "Max-Age=60", "HttpOnly", "Secure", "SameSite=Strict"} {
+	for _, attr := range []string{"Path=/app", "Max-Age=60", "HttpOnly", "Secure", "SameSite=Strict"} {
 		if !strings.Contains(set, attr) {
 			t.Errorf("%s lacks %s", set, attr)
 		}

@@ -52,7 +52,7 @@ async function checkHealth() {
  * Starts the WebSocket and health polling. Returns a stop function. Runs only
  * while logged in: the app unmounts on logout, which stops everything.
  */
-export function startProbe(): () => void {
+export function startConnections(): () => void {
   wss.start();
   void checkHealth();
   const timer = setInterval(checkHealth, HEALTH_INTERVAL_MS);

@@ -137,7 +137,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/rmx-lt/rmx-backend-probe
+          images: ghcr.io/rmx-lt/rmx-server-app
           tags: |
             type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/production' }}
             type=raw,value=production,enable=${{ github.ref == 'refs/heads/production' }}
@@ -159,9 +159,10 @@ jobs:
 
   # Deploy every push to production (a merged development -> production PR).
   # The SSH key's authorized_keys entry on the VPS
-  # forces one script (/usr/local/sbin/rmx-deploy-probe, source in rmx-server-infra:
-  # services/probe/deploy/), so the only thing this job can send is the tag.
-  # The script pulls the image, restarts probe-app, waits for /probe/health
+  # forces one deploy script (source in rmx-server-infra; it moves from the old
+  # probe stack to services/app/ in https://github.com/rmx-lt/rmx-server-infra/issues/85),
+  # so the only thing this job can send is the tag.
+  # The script pulls the image, restarts the app container, waits for /app/health
   # and rolls back if it isn't healthy (then this job fails).
   # Secrets: DEPLOY_HOST, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS
   # (the VPS host key line, pinned, so no trust-on-first-use).

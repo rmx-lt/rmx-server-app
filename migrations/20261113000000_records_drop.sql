@@ -1,5 +1,5 @@
 -- +goose Up
--- The records feature (the probe's CRUD toy problem) is gone: drop its tables
+-- The records feature (the CRUD toy problem from the server's early days) is gone: drop its tables
 -- and types. Dropping the record_events hypertable also removes its chunks and
 -- its compression and retention policies.
 -- The migrations that created them stay as they are, so a fresh database still

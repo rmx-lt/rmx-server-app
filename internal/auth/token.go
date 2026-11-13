@@ -14,13 +14,13 @@ import (
 // __Secure-: browsers accept this cookie only with Secure and only from an
 // HTTPS page, so a plain-HTTP response can never set or overwrite it. The
 // stronger __Host- prefix would also forbid Domain (no cookie set by a sibling
-// like rmx.lt could shadow it), but it requires Path=/, and the probe shares
-// api.rmx.lt with the future production backend, so its cookie stays under
-// /probe. A cookie of our own name sent twice is rejected (see SessionCookie).
-const CookieName = "__Secure-probe_session"
+// like rmx.lt could shadow it), but it requires Path=/, and the app shares
+// api.rmx.lt with other services, so its cookie stays under /app. A cookie of
+// our own name sent twice is rejected (see SessionCookie).
+const CookieName = "__Secure-app_session"
 
 // CookiePath: the cookie is sent only to URLs under this path.
-const CookiePath = "/probe"
+const CookiePath = "/app"
 
 // tokenBytes: 32 random bytes = 256 bits, written as 64 lower-case hex characters.
 const tokenBytes = 32
@@ -111,7 +111,7 @@ func SessionCookie(h http.Header) (SessionToken, CookieState) {
 //     blocks CSRF in all current browsers. Lax would also send it when someone
 //     follows a link here from another site; we don't need that, because the
 //     page itself is public and only its own API calls (same-site) need it.
-//   - Path=/probe: not sent to the rest of api.rmx.lt.
+//   - Path=/app: not sent to the rest of api.rmx.lt.
 //   - Max-Age: the browser keeps it until the absolute timeout; the server
 //     enforces the idle timeout on its own.
 func SetCookie(t SessionToken, maxAgeSecs int) string {

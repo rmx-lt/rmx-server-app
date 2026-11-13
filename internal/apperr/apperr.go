@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
 // Error is an error with a code the client understands.

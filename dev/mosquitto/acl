@@ -2,9 +2,9 @@
 # only use mower/<its username>/#, plus read
 # mower/status/server); here both may use mower/#, because the integration
 # tests give every test its own topic prefix (mower/it-<random>).
-user probe-app
+user app
 topic readwrite mower/#
 
 # A device (like the LTE gateway), used by the integration tests.
-user probe-device
+user test-device
 topic readwrite mower/#
