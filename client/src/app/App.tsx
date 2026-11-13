@@ -4,7 +4,7 @@ import { StatusPanel } from "@/components/StatusPanel";
 import { UserMenu } from "@/components/UserMenu";
 import { useAuthStore } from "@/stores/authStore";
 import { checkSession } from "@/transports/https";
-import { startProbe } from "./probe";
+import { startConnections } from "./connections";
 
 /** Login form or the app, depending on whether the server knows our session. */
 export function App() {
@@ -27,11 +27,11 @@ export function App() {
 
   if (state === "checking") return <p className="p-4 text-sm text-zinc-400">Connecting to the server…</p>;
   if (state === "logged-out") return <LoginForm />;
-  return <Probe />;
+  return <Connected />;
 }
 
-function Probe() {
-  useEffect(() => startProbe(), []);
+function Connected() {
+  useEffect(() => startConnections(), []);
 
   return (
     <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-4 p-4">

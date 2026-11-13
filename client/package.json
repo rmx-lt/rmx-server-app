@@ -1,5 +1,5 @@
 {
-  "name": "rmx-backend-probe-client",
+  "name": "rmx-server-app-client",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",

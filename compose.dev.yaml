@@ -2,21 +2,21 @@
 #   docker compose -f compose.dev.yaml up -d --wait
 # Ports bind to 127.0.0.1 only, on unusual numbers so they don't clash with a
 # Postgres or Mosquitto already installed on the PC.
-name: rmx-probe-dev
+name: rmx-server-dev
 
 services:
   db:
     image: timescale/timescaledb:2.30.2-pg17
     environment:
-      POSTGRES_USER: probe
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-probe-dev}
-      POSTGRES_DB: probe
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db-dev}
+      POSTGRES_DB: app
     ports:
       - "127.0.0.1:55432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U probe -d probe"]
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -34,14 +34,14 @@ services:
       - |
         set -e
         rm -f /mosquitto/data/passwd
-        mosquitto_passwd -c -b /mosquitto/data/passwd probe-app "$$PROBE_APP_PASSWORD"
-        mosquitto_passwd -b /mosquitto/data/passwd probe-device "$$PROBE_DEVICE_PASSWORD"
+        mosquitto_passwd -c -b /mosquitto/data/passwd app "$$APP_PASSWORD"
+        mosquitto_passwd -b /mosquitto/data/passwd test-device "$$TEST_DEVICE_PASSWORD"
         chown mosquitto:mosquitto /mosquitto/data/passwd
         chmod 0600 /mosquitto/data/passwd
         exec mosquitto -c /mosquitto/config/mosquitto.conf
     environment:
-      PROBE_APP_PASSWORD: ${MQTT_PASSWORD:-probe-app-dev}
-      PROBE_DEVICE_PASSWORD: ${PROBE_DEVICE_PASSWORD:-probe-device-dev}
+      APP_PASSWORD: ${MQTT_PASSWORD:-app-dev}
+      TEST_DEVICE_PASSWORD: ${TEST_DEVICE_PASSWORD:-test-device-dev}
     ports:
       - "127.0.0.1:11883:1883"
     volumes:

@@ -26,7 +26,7 @@ Copy-Item .env.example .env
 docker compose -f compose.dev.yaml up -d --wait
 
 # 2. The server (runs migrations, listens on 127.0.0.1:8080).
-go run ./cmd/probe-server
+go run ./cmd/rmx-server
 
 # 3. The client dev server, in a second terminal.
 cd client
@@ -34,8 +34,8 @@ bun install
 bun run dev
 ```
 
-Create a login once (`go run ./cmd/probe-server create-user dev`, any
-password of 12+ characters), then open <http://localhost:3000/probe/> and log in. Ports, MQTT testing and
+Create a login once (`go run ./cmd/rmx-server create-user dev`, any
+password of 12+ characters), then open <http://localhost:3000/app/> and log in. Ports, MQTT testing and
 the checks CI runs: see the wiki page Server-App.
 
 Checks before a pull request:

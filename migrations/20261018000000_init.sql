@@ -1,5 +1,5 @@
 -- +goose Up
--- Initial schema for the probe.
+-- Initial schema.
 -- goose runs each migration in a transaction and records it in goose_db_version.
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;

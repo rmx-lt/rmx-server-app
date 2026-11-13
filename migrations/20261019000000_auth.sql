@@ -2,7 +2,7 @@
 -- Login with server-side sessions.
 --
 -- users: one row per person who may log in. There is no sign-up page; users
--- are created with `probe-server create-user <name>` (README, "Users").
+-- are created with `rmx-server create-user <name>` (README, "Users").
 -- sessions: one row per logged-in browser. The cookie holds a random 256-bit
 -- token; only its SHA-256 is stored here, so someone who can read this table
 -- (a leaked dump, a backup) still can't use it to log in.

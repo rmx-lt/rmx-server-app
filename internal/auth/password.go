@@ -21,7 +21,7 @@ import (
 // salt, and the result is a PHC string
 // ($argon2id$v=19$m=19456,t=2,p=1$salt$hash) that records the parameters, so
 // they can be raised later without breaking existing hashes. The strings are
-// the same format the Rust version of the probe wrote, so its users keep working.
+// the same format the earlier Rust version of this server wrote, so its users keep working.
 const (
 	MinPasswordChars = 12
 	// MaxPasswordChars: longer input is refused before hashing, so nobody can

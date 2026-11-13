@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"github.com/rmx-lt/rmx-backend-probe/migrations"
+	"github.com/rmx-lt/rmx-server-app/migrations"
 )
 
 // Connect opens a connection pool and checks that the database answers.
@@ -36,7 +36,7 @@ func Connect(ctx context.Context, url string, maxConns int32) (*pgxpool.Pool, er
 
 // Migrate applies the pending migrations.
 //
-// The Rust version of the probe applied the same files with sqlx and recorded
+// The earlier Rust version of this server applied the same files with sqlx and recorded
 // them in _sqlx_migrations. A database that has that table but no goose table
 // yet is adopted first: its versions are copied over, so nothing runs twice.
 // The old table stays, which keeps a rollback to the Rust image possible.

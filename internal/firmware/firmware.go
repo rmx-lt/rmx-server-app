@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
 const (

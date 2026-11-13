@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
+	"github.com/rmx-lt/rmx-server-app/internal/protocol"
 )
 
 func TestInvalidRequestKeepsRequestID(t *testing.T) {

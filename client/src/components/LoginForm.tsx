@@ -4,7 +4,7 @@ import { login } from "@/transports/https";
 
 /**
  * The page's own login. There is no sign-up: users are created on the server
- * (`probe-server create-user`). The password goes to the server once, over
+ * (`rmx-server create-user`). The password goes to the server once, over
  * HTTPS; afterwards the browser holds only the session cookie.
  */
 export function LoginForm() {
@@ -35,7 +35,7 @@ export function LoginForm() {
     <div className="flex min-h-full items-center justify-center p-4">
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3 rounded-md border border-zinc-800 p-5">
         <div>
-          <h1 className="text-lg font-semibold">Backend probe</h1>
+          <h1 className="text-lg font-semibold">Blade of Grass</h1>
           <p className="text-sm text-zinc-400">Blade of Grass · log in to continue</p>
         </div>
         {notice && !error && <p className="text-sm text-zinc-300">{notice}</p>}
