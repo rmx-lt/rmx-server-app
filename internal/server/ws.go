@@ -11,16 +11,16 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/clientip"
 	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
-	"github.com/rmx-lt/rmx-backend-probe/internal/records"
 )
 
 // WebSocket transport at /probe/ws.
 //
 // Client to server: RequestEnvelope JSON text frames.
-// Server to client: ServerMessage JSON, either the response to a request or a
-// change event pushed whenever any transport changes a record.
+// Server to client: ServerMessage JSON, the response to each request.
+//
+// The only request today is a ping; the connection itself (session check,
+// keep-alive, close codes) is what the next features build on.
 
 const (
 	// pingInterval keeps idle connections alive through proxies and detects dead peers.
@@ -50,18 +50,14 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return // Accept has answered the client
 	}
 	conn.SetReadLimit(maxMessageSize)
-	// Every change over this socket is recorded with the handshake's IP.
-	src := records.Source{Via: protocol.ConnWSS, IP: clientip.Of(r)}
-	s.serveSocket(conn, user, src)
+	s.serveSocket(conn, user)
 }
 
-func (s *Server) serveSocket(conn *websocket.Conn, user auth.CurrentUser, src records.Source) {
+func (s *Server) serveSocket(conn *websocket.Conn, user auth.CurrentUser) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	defer conn.CloseNow()
 
-	events := s.records.Subscribe()
-	defer events.Close()
 	slog.Debug("websocket connected", "username", user.Username)
 	defer slog.Debug("websocket disconnected")
 
@@ -102,21 +98,8 @@ func (s *Server) serveSocket(conn *websocket.Conn, user auth.CurrentUser, src re
 	for {
 		select {
 		case text := <-texts:
-			response := s.respond(ctx, src, text)
+			response := respond(text)
 			if !send(protocol.ServerMessage{V: protocol.MsgResponse{Response: response}}) {
-				return
-			}
-
-		case event, ok := <-events.C:
-			if !ok {
-				if events.Lagged() {
-					// The client misses some events. Closing makes it reconnect and list again.
-					slog.Warn("websocket client lagged, closing")
-					closeWithin(conn, cancel, websocket.StatusTryAgainLater, "lagged, reconnect")
-				}
-				return
-			}
-			if !send(protocol.ServerMessage{V: protocol.MsgEvent{Event: event}}) {
 				return
 			}
 
@@ -146,16 +129,24 @@ func (s *Server) serveSocket(conn *websocket.Conn, user auth.CurrentUser, src re
 	}
 }
 
-func (s *Server) respond(ctx context.Context, src records.Source, text []byte) protocol.ResponseEnvelope {
+// respond answers one request.
+func respond(text []byte) protocol.ResponseEnvelope {
 	env, failure := ParseRequest(text)
 	if failure != nil {
 		return *failure
 	}
-	return protocol.ResponseEnvelope{RequestID: env.RequestID, Result: s.records.Handle(ctx, src, env.Request)}
+	var result protocol.RpcResult
+	switch env.Request.V.(type) {
+	case protocol.RequestPing:
+		result.V = protocol.RpcOk{Data: protocol.RpcData{V: protocol.RpcPong{}}}
+	default: // a variant added to the union but not handled here
+		result.V = protocol.RpcError{Error: protocol.ApiError{Code: protocol.CodeInternal, Message: "request not supported"}}
+	}
+	return protocol.ResponseEnvelope{RequestID: env.RequestID, Result: result}
 }
 
 // ParseRequest parses a RequestEnvelope. On failure it returns the error
-// response to send, keeping the request_id if the message had one. Shared with MQTT.
+// response to send, keeping the request_id if the message had one.
 func ParseRequest(payload []byte) (protocol.RequestEnvelope, *protocol.ResponseEnvelope) {
 	var env protocol.RequestEnvelope
 	err := protocol.Unmarshal(payload, &env)

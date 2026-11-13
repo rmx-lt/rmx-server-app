@@ -1,6 +1,6 @@
 // gen-ts writes the TypeScript copies of the wire types in internal/protocol
 // to client/src/generated, one file per type, the way the client imports them
-// (import type { RecordRow } from "@/generated/RecordRow").
+// (import type { Me } from "@/generated/Me").
 //
 //	go run ./cmd/gen-ts            # from the repository root
 //
@@ -189,7 +189,7 @@ func (g *generator) generate() error {
 func unionType(u *protocol.Union) reflect.Type {
 	for _, t := range []reflect.Type{
 		reflect.TypeFor[protocol.Request](), reflect.TypeFor[protocol.RpcResult](), reflect.TypeFor[protocol.RpcData](),
-		reflect.TypeFor[protocol.ChangeEvent](), reflect.TypeFor[protocol.ServerMessage](),
+		reflect.TypeFor[protocol.ServerMessage](),
 	} {
 		if t.Name() == u.Name {
 			return t

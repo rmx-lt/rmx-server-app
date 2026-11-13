@@ -1,16 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { wsUrl } from "@/lib/paths";
-import { expectRecords, PendingRequests, RpcError } from "@/lib/rpc";
+import { expectPong, PendingRequests, RpcError } from "@/lib/rpc";
 
 describe("PendingRequests", () => {
   test("resolves the matching request with its data", async () => {
     const pending = new PendingRequests();
     const { requestId, promise } = pending.start();
-    expect(pending.settle({ request_id: "other", result: { status: "ok", data: { kind: "deleted", id: 1 } } })).toBe(
-      false,
-    );
-    pending.settle({ request_id: requestId, result: { status: "ok", data: { kind: "records", records: [] } } });
-    expect(expectRecords(await promise)).toEqual([]);
+    expect(pending.settle({ request_id: "other", result: { status: "ok", data: { kind: "pong" } } })).toBe(false);
+    pending.settle({ request_id: requestId, result: { status: "ok", data: { kind: "pong" } } });
+    const data = await promise;
+    expect(() => expectPong(data)).not.toThrow();
     expect(pending.size).toBe(0);
   });
 
@@ -19,11 +18,11 @@ describe("PendingRequests", () => {
     const { requestId, promise } = pending.start();
     pending.settle({
       request_id: requestId,
-      result: { status: "error", error: { code: "not_found", message: "record 9 not found" } },
+      result: { status: "error", error: { code: "bad_request", message: "invalid request" } },
     });
     const err = await promise.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(RpcError);
-    expect((err as RpcError).code).toBe("not_found");
+    expect((err as RpcError).code).toBe("bad_request");
   });
 
   test("times out and fails all on disconnect", async () => {

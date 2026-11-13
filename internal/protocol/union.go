@@ -10,7 +10,7 @@ import (
 )
 
 // A union is a JSON object whose "tag" member says which variant it is, like
-// {"op": "update", "id": 3, "value": null}. In Go it is a struct holding the
+// {"status": "error", "error": {...}}. In Go it is a struct holding the
 // variant in V. The same Union description drives the JSON codec here and the
 // TypeScript generator (cmd/gen-ts), so the two cannot drift apart.
 
@@ -35,33 +35,22 @@ func variant[T any](tag string) Variant { return Variant{Tag: tag, Type: reflect
 
 var (
 	requestUnion = &Union{Name: "Request", Tag: "op", Variants: []Variant{
-		variant[RequestList]("list"),
-		variant[RequestCreate]("create"),
-		variant[RequestUpdate]("update"),
-		variant[RequestDelete]("delete"),
+		variant[RequestPing]("ping"),
 	}}
 	rpcResultUnion = &Union{Name: "RpcResult", Tag: "status", Variants: []Variant{
 		variant[RpcOk]("ok"),
 		variant[RpcError]("error"),
 	}}
 	rpcDataUnion = &Union{Name: "RpcData", Tag: "kind", Variants: []Variant{
-		variant[RpcRecords]("records"),
-		variant[RpcRecord]("record"),
-		variant[RpcDeleted]("deleted"),
-	}}
-	changeEventUnion = &Union{Name: "ChangeEvent", Tag: "op", Variants: []Variant{
-		variant[EventCreate]("create"),
-		variant[EventUpdate]("update"),
-		variant[EventDelete]("delete"),
+		variant[RpcPong]("pong"),
 	}}
 	serverMessageUnion = &Union{Name: "ServerMessage", Tag: "type", Variants: []Variant{
 		variant[MsgResponse]("response"),
-		variant[MsgEvent]("event"),
 	}}
 )
 
 // Unions lists every union, for the TypeScript generator.
-var Unions = []*Union{requestUnion, rpcResultUnion, rpcDataUnion, changeEventUnion, serverMessageUnion}
+var Unions = []*Union{requestUnion, rpcResultUnion, rpcDataUnion, serverMessageUnion}
 
 // Enum is a string type with a fixed set of values.
 type Enum struct {
@@ -72,8 +61,6 @@ type Enum struct {
 
 // Enums lists every enum, for the TypeScript generator.
 var Enums = []Enum{
-	{"ConnectionType", reflect.TypeFor[ConnectionType](), []string{"https", "wss", "mqtt"}},
-	{"RecordOp", reflect.TypeFor[RecordOp](), []string{"create", "update", "delete"}},
 	{"ErrorCode", reflect.TypeFor[ErrorCode](), []string{
 		"bad_request", "not_found", "internal", "unauthorized", "forbidden", "too_many_requests",
 	}},
@@ -81,8 +68,6 @@ var Enums = []Enum{
 
 // Structs lists every plain struct, for the TypeScript generator.
 var Structs = []reflect.Type{
-	reflect.TypeFor[RecordRow](),
-	reflect.TypeFor[RecordInput](),
 	reflect.TypeFor[RequestEnvelope](),
 	reflect.TypeFor[ResponseEnvelope](),
 	reflect.TypeFor[ApiError](),
@@ -161,12 +146,6 @@ func (r *RpcResult) UnmarshalJSON(b []byte) (err error) {
 
 func (r RpcData) MarshalJSON() ([]byte, error)        { return rpcDataUnion.marshal(r.V) }
 func (r *RpcData) UnmarshalJSON(b []byte) (err error) { r.V, err = rpcDataUnion.unmarshal(b); return }
-
-func (e ChangeEvent) MarshalJSON() ([]byte, error) { return changeEventUnion.marshal(e.V) }
-func (e *ChangeEvent) UnmarshalJSON(b []byte) (err error) {
-	e.V, err = changeEventUnion.unmarshal(b)
-	return
-}
 
 func (m ServerMessage) MarshalJSON() ([]byte, error) { return serverMessageUnion.marshal(m.V) }
 func (m *ServerMessage) UnmarshalJSON(b []byte) (err error) {

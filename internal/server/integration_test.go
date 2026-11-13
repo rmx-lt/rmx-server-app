@@ -297,17 +297,6 @@ func decode[T any](t *testing.T, data []byte) T {
 	return v
 }
 
-func str(s string) *string { return &s }
-
-func sameJSON(t *testing.T, got, want any) {
-	t.Helper()
-	g, _ := json.Marshal(got)
-	w, _ := json.Marshal(want)
-	if string(g) != string(w) {
-		t.Fatalf("got  %s\nwant %s", g, w)
-	}
-}
-
 func eq[T comparable](t *testing.T, got, want T) {
 	t.Helper()
 	if got != want {
@@ -378,25 +367,15 @@ func (w *ws) next() protocol.ServerMessage {
 	return decode[protocol.ServerMessage](w.t, data)
 }
 
-// response is the result for requestID, skipping events.
+// response is the result for requestID.
 func (w *ws) response(requestID string) protocol.RpcResult {
 	w.t.Helper()
-	for {
-		if m, ok := w.next().V.(protocol.MsgResponse); ok {
-			eq(w.t, m.Response.RequestID, requestID)
-			return m.Response.Result
-		}
+	m, ok := w.next().V.(protocol.MsgResponse)
+	if !ok {
+		w.t.Fatal("expected a response")
 	}
-}
-
-// event is the next change event, skipping responses.
-func (w *ws) event() protocol.ChangeEvent {
-	w.t.Helper()
-	for {
-		if m, ok := w.next().V.(protocol.MsgEvent); ok {
-			return m.Event
-		}
-	}
+	eq(w.t, m.Response.RequestID, requestID)
+	return m.Response.Result
 }
 
 // ---- MQTT client ------------------------------------------------------------------
@@ -406,7 +385,7 @@ type message struct {
 	payload []byte
 }
 
-// mqttDevice is a device-like MQTT client (like the LTE modem probe) logged in as probe-device.
+// mqttDevice is a device-like MQTT client (like the LTE gateway) logged in as probe-device.
 type mqttDevice struct {
 	t        *testing.T
 	cm       *autopaho.ConnectionManager
@@ -456,25 +435,11 @@ func (a *testApp) mqttConnect() *mqttDevice {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	for _, topic := range []string{
-		protocol.ResponseTopic(a.prefix, d.id), protocol.EventsTopic(a.prefix), protocol.StatusTopic(a.prefix),
-	} {
-		if _, err := cm.Subscribe(ctx, &paho.Subscribe{Subscriptions: []paho.SubscribeOptions{{Topic: topic, QoS: 1}}}); err != nil {
-			t.Fatal(err)
-		}
+	subs := []paho.SubscribeOptions{{Topic: protocol.StatusTopic(a.prefix), QoS: 1}}
+	if _, err := cm.Subscribe(ctx, &paho.Subscribe{Subscriptions: subs}); err != nil {
+		t.Fatal(err)
 	}
 	return d
-}
-
-func (d *mqttDevice) send(requestID string, req any) {
-	d.t.Helper()
-	body, _ := json.Marshal(protocol.RequestEnvelope{RequestID: requestID, Request: protocol.Request{V: req}})
-	d.sendRaw(body)
-}
-
-func (d *mqttDevice) sendRaw(payload []byte) {
-	d.t.Helper()
-	d.publish(protocol.RequestTopic(d.prefix, d.id), payload)
 }
 
 func (d *mqttDevice) publish(topic string, payload []byte) {
@@ -520,63 +485,11 @@ func (d *mqttDevice) nextOn(topic string) []byte {
 	}
 }
 
-func (d *mqttDevice) response() protocol.ResponseEnvelope {
-	d.t.Helper()
-	return decode[protocol.ResponseEnvelope](d.t, d.nextOn(protocol.ResponseTopic(d.prefix, d.id)))
-}
-
-func (d *mqttDevice) event() protocol.ChangeEvent {
-	d.t.Helper()
-	return decode[protocol.ChangeEvent](d.t, d.nextOn(protocol.EventsTopic(d.prefix)))
-}
-
 // ---- helpers ------------------------------------------------------------------------
-
-func record(t *testing.T, r protocol.RpcResult) protocol.RecordRow {
-	t.Helper()
-	if ok, isOk := r.V.(protocol.RpcOk); isOk {
-		if rec, isRec := ok.Data.V.(protocol.RpcRecord); isRec {
-			return rec.Record
-		}
-	}
-	t.Fatalf("expected a record, got %+v", r)
-	return protocol.RecordRow{}
-}
-
-func records(t *testing.T, r protocol.RpcResult) []protocol.RecordRow {
-	t.Helper()
-	if ok, isOk := r.V.(protocol.RpcOk); isOk {
-		if list, isList := ok.Data.V.(protocol.RpcRecords); isList {
-			return list.Records
-		}
-	}
-	t.Fatalf("expected a list, got %+v", r)
-	return nil
-}
 
 func isError(r protocol.RpcResult) bool {
 	_, ok := r.V.(protocol.RpcError)
 	return ok
-}
-
-// eventOps returns "op connection_type" for every logged event of the record, oldest first.
-func eventOps(t *testing.T, pool *pgxpool.Pool, id int64) []string {
-	t.Helper()
-	rows, err := pool.Query(context.Background(),
-		`SELECT op::text || ' ' || connection_type::text FROM record_events WHERE record_id = $1 ORDER BY time`, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	var ops []string
-	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
-			t.Fatal(err)
-		}
-		ops = append(ops, s)
-	}
-	return ops
 }
 
 func count(t *testing.T, pool *pgxpool.Pool, table string) int {
@@ -588,16 +501,10 @@ func count(t *testing.T, pool *pgxpool.Pool, table string) int {
 	return n
 }
 
-func sameStrings(t *testing.T, got, want []string) {
-	t.Helper()
-	eq(t, strings.Join(got, ", "), strings.Join(want, ", "))
-}
-
 // ---- Tests --------------------------------------------------------------------------
 
-func TestRESTCRUDHealthAndConfig(t *testing.T) {
-	pool := newDatabase(t)
-	app := startApp(t, pool)
+func TestHealthAndConfig(t *testing.T) {
+	app := startApp(t, newDatabase(t))
 
 	// Health is public: no cookie needed.
 	status, _, body := app.req(app.anon, "GET", "/health", nil)
@@ -607,131 +514,67 @@ func TestRESTCRUDHealthAndConfig(t *testing.T) {
 
 	// config.json (the browser's MQTT settings) is gone with browser MQTT.
 	eq(t, app.status(app.http, "GET", "/config.json", nil), 404)
-
-	// Create
-	status, _, body = app.req(app.http, "POST", "/api/records", map[string]any{"value": "hello"})
-	eq(t, status, 201)
-	created := decode[protocol.RecordRow](t, body)
-	eq(t, *created.Value, "hello")
-	eq(t, created.ConnectionType, protocol.ConnHTTPS)
-
-	// List
-	_, _, body = app.req(app.http, "GET", "/api/records", nil)
-	sameJSON(t, decode[[]protocol.RecordRow](t, body), []protocol.RecordRow{created})
-
-	// Update (to null)
-	status, _, body = app.req(app.http, "PUT", fmt.Sprintf("/api/records/%d", created.ID), map[string]any{"value": nil})
-	eq(t, status, 200)
-	updated := decode[protocol.RecordRow](t, body)
-	if updated.Value != nil || !updated.UpdatedAt.After(created.UpdatedAt) {
-		t.Fatalf("%+v", updated)
-	}
-
-	// Delete, then the record is gone
-	path := fmt.Sprintf("/api/records/%d", created.ID)
-	eq(t, app.status(app.http, "DELETE", path, nil), 204)
-	eq(t, app.status(app.http, "DELETE", path, nil), 404)
-	status, _, body = app.req(app.http, "PUT", path, map[string]any{"value": "x"})
-	eq(t, status, 404)
-	eq(t, decode[map[string]string](t, body)["code"], "not_found")
-
-	// Validation
-	eq(t, app.status(app.http, "POST", "/api/records", map[string]any{"value": strings.Repeat("a", 1001)}), 400)
-	eq(t, app.status(app.http, "POST", "/api/records", "not an object"), 400)
-	eq(t, app.status(app.http, "PUT", "/api/records/abc", map[string]any{"value": "x"}), 400)
-
-	// Every change is in the hypertable log
-	sameStrings(t, eventOps(t, pool, created.ID), []string{"create https", "update https", "delete https"})
 }
 
-func TestWSSCRUDAndLiveEvents(t *testing.T) {
+func TestRecordsAreGone(t *testing.T) {
 	pool := newDatabase(t)
 	app := startApp(t, pool)
-	a, b := app.ws(), app.ws()
 
-	a.send("c1", protocol.RequestCreate{Value: str("ws")})
-	created := record(t, a.response("c1"))
-	eq(t, created.ConnectionType, protocol.ConnWSS)
-	// The other client sees the change live.
-	sameJSON(t, b.event(), protocol.ChangeEvent{V: protocol.EventCreate{Record: created}})
-
-	a.send("u1", protocol.RequestUpdate{ID: created.ID, Value: str("ws2")})
-	updated := record(t, a.response("u1"))
-	sameJSON(t, b.event(), protocol.ChangeEvent{V: protocol.EventUpdate{Record: updated}})
-
-	a.send("l1", protocol.RequestList{})
-	eq(t, len(records(t, a.response("l1"))), 1)
-
-	a.send("d1", protocol.RequestDelete{ID: created.ID})
-	if _, ok := a.response("d1").V.(protocol.RpcOk); !ok {
-		t.Fatal("delete failed")
+	// No route: a plain 404, even when logged in.
+	eq(t, app.status(app.http, "GET", "/api/records", nil), 404)
+	eq(t, app.status(app.http, "POST", "/api/records", map[string]any{"value": "x"}), 404)
+	// No tables or types: the last migration dropped them.
+	var left []string
+	rows, err := pool.Query(context.Background(),
+		`SELECT name FROM unnest(ARRAY['records', 'record_events', 'record_op', 'connection_type']) AS name
+		 WHERE to_regclass(name) IS NOT NULL OR to_regtype(name) IS NOT NULL`)
+	if err != nil {
+		t.Fatal(err)
 	}
-	sameJSON(t, b.event(), protocol.ChangeEvent{V: protocol.EventDelete{ID: created.ID, ConnectionType: protocol.ConnWSS}})
-
-	// A missing record and a malformed message are reported, not fatal.
-	a.send("d2", protocol.RequestDelete{ID: created.ID})
-	if !isError(a.response("d2")) {
-		t.Fatal("deleting a missing record worked")
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		left = append(left, name)
 	}
-	a.sendRaw([]byte(`{"request_id":"bad","request":{"op":"nope"}}`))
-	if !isError(a.response("bad")) {
+	if len(left) > 0 {
+		t.Fatalf("still in the database: %v", left)
+	}
+}
+
+func TestWebSocketPing(t *testing.T) {
+	app := startApp(t, newDatabase(t))
+	sock := app.ws()
+
+	sock.send("p1", protocol.RequestPing{})
+	ok, isOk := sock.response("p1").V.(protocol.RpcOk)
+	if !isOk || ok.Data.V != (protocol.RpcPong{}) {
+		t.Fatalf("%+v", ok)
+	}
+
+	// A malformed message and a records request are reported, not fatal.
+	sock.sendRaw([]byte(`{"request_id":"bad","request":{"op":"nope"}}`))
+	if !isError(sock.response("bad")) {
 		t.Fatal("a malformed request worked")
 	}
-
-	// A change over REST also reaches WebSocket clients.
-	_, _, body := app.req(app.http, "POST", "/api/records", map[string]any{"value": "from rest"})
-	rest := decode[protocol.RecordRow](t, body)
-	sameJSON(t, b.event(), protocol.ChangeEvent{V: protocol.EventCreate{Record: rest}})
-
-	sameStrings(t, eventOps(t, pool, created.ID), []string{"create wss", "update wss", "delete wss"})
+	sock.sendRaw([]byte(`{"request_id":"l1","request":{"op":"list"}}`))
+	if !isError(sock.response("l1")) {
+		t.Fatal("a records request worked")
+	}
+	sock.send("p2", protocol.RequestPing{})
+	if isError(sock.response("p2")) {
+		t.Fatal("the socket broke after an error")
+	}
 }
 
-func TestMQTTCRUDAndLiveEvents(t *testing.T) {
-	pool := newDatabase(t)
-	app := startApp(t, pool)
+func TestMQTTServerStatus(t *testing.T) {
+	app := startApp(t, newDatabase(t))
 	dev := app.mqttConnect()
-	sock := app.ws()
 
 	// The server's retained status.
 	eq(t, string(dev.nextOn(protocol.StatusTopic(app.prefix))), "online")
-
-	dev.send("c1", protocol.RequestCreate{})
-	res := dev.response()
-	eq(t, res.RequestID, "c1")
-	created := record(t, res.Result)
-	eq(t, created.ConnectionType, protocol.ConnMQTT)
-	// Broadcast on the MQTT events topic and over the WebSocket.
-	sameJSON(t, dev.event(), protocol.ChangeEvent{V: protocol.EventCreate{Record: created}})
-	sameJSON(t, sock.event(), protocol.ChangeEvent{V: protocol.EventCreate{Record: created}})
-
-	dev.send("u1", protocol.RequestUpdate{ID: created.ID, Value: str("m")})
-	updated := record(t, dev.response().Result)
-	eq(t, *updated.Value, "m")
-	sameJSON(t, dev.event(), protocol.ChangeEvent{V: protocol.EventUpdate{Record: updated}})
-
-	dev.send("l1", protocol.RequestList{})
-	eq(t, len(records(t, dev.response().Result)), 1)
-
-	dev.send("d1", protocol.RequestDelete{ID: created.ID})
-	if _, ok := dev.response().Result.V.(protocol.RpcOk); !ok {
-		t.Fatal("delete failed")
-	}
-	sameJSON(t, dev.event(), protocol.ChangeEvent{V: protocol.EventDelete{ID: created.ID, ConnectionType: protocol.ConnMQTT}})
-
-	// Malformed payload: an error response, keeping the request id.
-	dev.sendRaw([]byte(`{"request_id":"bad","request":{}}`))
-	res = dev.response()
-	eq(t, res.RequestID, "bad")
-	if !isError(res.Result) {
-		t.Fatal("a malformed request worked")
-	}
-
-	// A WebSocket change reaches MQTT clients.
-	sock.send("w1", protocol.RequestCreate{Value: str("from ws")})
-	fromWS := record(t, sock.response("w1"))
-	sameJSON(t, dev.event(), protocol.ChangeEvent{V: protocol.EventCreate{Record: fromWS}})
-
-	sameStrings(t, eventOps(t, pool, created.ID), []string{"create mqtt", "update mqtt", "delete mqtt"})
 
 	// On a clean shutdown the server marks itself offline.
 	app.shutdown()
@@ -897,7 +740,6 @@ func TestLoginMeAndLogout(t *testing.T) {
 	if !strings.Contains(hdr.Get("Set-Cookie"), "Max-Age=0") {
 		t.Fatal(hdr)
 	}
-	eq(t, app.status(app.http, "GET", "/api/records", nil), 401)
 	_, wsStatus := app.wsWith(app.cookie, origin)
 	eq(t, wsStatus, 401)
 
@@ -927,18 +769,15 @@ func TestProtectedRoutesNeedASession(t *testing.T) {
 
 	for _, c := range []string{"", forged, malformed, twice} {
 		cl := client(c, origin)
-		for _, path := range []string{"/api/records", "/api/auth/me"} {
-			status, _, body := app.req(cl, "GET", path, nil)
-			eq(t, status, 401)
-			eq(t, decode[map[string]string](t, body)["code"], "unauthorized")
-		}
-		eq(t, app.status(cl, "POST", "/api/records", map[string]any{"value": "x"}), 401)
+		status, _, body := app.req(cl, "GET", "/api/auth/me", nil)
+		eq(t, status, 401)
+		eq(t, decode[map[string]string](t, body)["code"], "unauthorized")
 		eq(t, app.status(cl, "POST", "/api/auth/logout-all", nil), 401)
 		_, wsStatus := app.wsWith(c, origin)
 		eq(t, wsStatus, 401)
 	}
-	// Nothing was created by the refused requests.
-	eq(t, count(t, pool, "records"), 0)
+	// The refused requests ended no session.
+	eq(t, app.status(app.http, "GET", "/api/auth/me", nil), 200)
 
 	// Health is public.
 	eq(t, app.status(app.anon, "GET", "/health", nil), 200)
@@ -991,10 +830,10 @@ func TestForeignOriginsAreRejected(t *testing.T) {
 	for _, o := range []string{"https://evil.example", "http://probe.test.evil.example", "null", ""} {
 		// Logged in, but the request comes from another site's page (CSRF).
 		c := client(app.cookie, o)
-		status, _, body := app.req(c, "POST", "/api/records", map[string]any{"value": "csrf"})
+		status, _, body := app.req(c, "POST", "/api/auth/logout-all", nil)
 		eq(t, status, 403)
 		eq(t, decode[map[string]string](t, body)["code"], "forbidden")
-		eq(t, app.status(c, "DELETE", "/api/records/1", nil), 403)
+		eq(t, app.status(c, "POST", "/api/auth/logout", nil), 403)
 		// Login CSRF (logging the victim into the attacker's account) too.
 		body2, _ := json.Marshal(map[string]string{"username": user, "password": password})
 		req, _ := http.NewRequest("POST", app.url("/api/auth/login"), bytes.NewReader(body2))
@@ -1011,15 +850,20 @@ func TestForeignOriginsAreRejected(t *testing.T) {
 		_, wsStatus := app.wsWith(app.cookie, o)
 		eq(t, wsStatus, 403)
 	}
-	eq(t, count(t, pool, "records"), 0)
+	// The refused requests logged nobody out.
+	eq(t, app.status(app.http, "GET", "/api/auth/me", nil), 200)
 
 	// Reading needs no Origin (browsers don't always send it on GET), and
 	// every origin in ALLOWED_ORIGINS works.
-	eq(t, app.status(client(app.cookie, ""), "GET", "/api/records", nil), 200)
-	eq(t, app.status(client(app.cookie, "http://other.allowed.test"), "POST", "/api/records", map[string]any{"value": "ok"}), 201)
+	eq(t, app.status(client(app.cookie, ""), "GET", "/api/auth/me", nil), 200)
+	other := app.loginAs(client("", "http://other.allowed.test"), user, password)
+	other.Body.Close()
+	eq(t, other.StatusCode, 200)
 	sock := app.ws()
-	sock.send("l1", protocol.RequestList{})
-	records(t, sock.response("l1"))
+	sock.send("p1", protocol.RequestPing{})
+	if isError(sock.response("p1")) {
+		t.Fatal("ping failed")
+	}
 }
 
 func TestFailedLoginsAreRateLimited(t *testing.T) {
@@ -1132,73 +976,6 @@ func TestUserCommands(t *testing.T) {
 	}
 }
 
-// ---- Who created a record --------------------------------------------------------------
-
-func TestRecordsRememberTheCreatorIP(t *testing.T) {
-	pool := newDatabase(t)
-	app := startApp(t, pool)
-	ipOf := func(id int64) []string {
-		rows, err := pool.Query(context.Background(),
-			`SELECT op::text || ' ' || coalesce(host(ip), '-') FROM record_events WHERE record_id = $1 ORDER BY time`, id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer rows.Close()
-		var out []string
-		for rows.Next() {
-			var s string
-			_ = rows.Scan(&s)
-			out = append(out, s)
-		}
-		return out
-	}
-	create := func(hdr ...string) protocol.RecordRow {
-		_, _, body := app.req(app.http, "POST", "/api/records", map[string]any{"value": "x"}, hdr...)
-		return decode[protocol.RecordRow](t, body)
-	}
-
-	// REST without a proxy: the TCP peer.
-	direct := create()
-	eq(t, *direct.CreatedIP, "127.0.0.1")
-
-	// REST behind Caddy: the last X-Forwarded-For entry (what Caddy saw).
-	proxied := create("X-Forwarded-For", "198.51.100.1, 203.0.113.7")
-	eq(t, *proxied.CreatedIP, "203.0.113.7")
-
-	// An update by someone else keeps the creator's IP in the record, and the
-	// event log has who did what.
-	_, _, body := app.req(app.http, "PUT", fmt.Sprintf("/api/records/%d", proxied.ID),
-		map[string]any{"value": "changed"}, "X-Forwarded-For", "2001:db8::5")
-	eq(t, *decode[protocol.RecordRow](t, body).CreatedIP, "203.0.113.7")
-	sameStrings(t, ipOf(proxied.ID), []string{"create 203.0.113.7", "update 2001:db8::5"})
-
-	// WSS: the IP of the handshake.
-	sock := app.ws()
-	sock.send("c1", protocol.RequestCreate{Value: str("ws")})
-	eq(t, *record(t, sock.response("c1")).CreatedIP, "127.0.0.1")
-
-	// MQTT: unknown (the broker doesn't pass on the client's address).
-	dev := app.mqttConnect()
-	dev.send("m1", protocol.RequestCreate{})
-	overMQTT := record(t, dev.response().Result)
-	if overMQTT.CreatedIP != nil {
-		t.Fatal("an MQTT record has an IP")
-	}
-	sameStrings(t, ipOf(overMQTT.ID), []string{"create -"})
-
-	// The list carries it too.
-	_, _, body = app.req(app.http, "GET", "/api/records", nil)
-	var ips []string
-	for _, r := range decode[[]protocol.RecordRow](t, body) {
-		if r.CreatedIP == nil {
-			ips = append(ips, "-")
-		} else {
-			ips = append(ips, *r.CreatedIP)
-		}
-	}
-	sameStrings(t, ips, []string{"-", "127.0.0.1", "203.0.113.7", "127.0.0.1"})
-}
-
 // ---- Migrations ---------------------------------------------------------------------------
 
 // A database the Rust version of the probe migrated (recorded in _sqlx_migrations)
@@ -1226,7 +1003,8 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM goose_db_version WHERE is_applied AND version_id > 0`).Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	eq(t, applied, 3)
+	// The three it adopted, plus the ones after them.
+	eq(t, applied, 4)
 	// Running again does nothing, and the old table is still there.
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)

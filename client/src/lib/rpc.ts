@@ -1,5 +1,3 @@
-import type { RecordRow } from "@/generated/RecordRow";
-import type { Request } from "@/generated/Request";
 import type { ResponseEnvelope } from "@/generated/ResponseEnvelope";
 import type { RpcData } from "@/generated/RpcData";
 
@@ -19,10 +17,7 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 
-/**
- * Matches responses to requests by `request_id`. Used by both the WSS and the
- * MQTT transport, which share the same envelopes.
- */
+/** Matches responses to requests by `request_id`, on the WebSocket. */
 export class PendingRequests {
   private readonly pending = new Map<string, Pending>();
 
@@ -66,21 +61,7 @@ export class PendingRequests {
   }
 }
 
-/** The three data shapes, checked so callers get the type they asked for. */
-export function expectRecords(data: RpcData): RecordRow[] {
-  if (data.kind !== "records") throw new RpcError("internal", `unexpected ${data.kind} response`);
-  return data.records;
+/** Checks that the answer is a pong. */
+export function expectPong(data: RpcData): void {
+  if (data.kind !== "pong") throw new RpcError("internal", `unexpected ${String(data.kind)} response`);
 }
-
-export function expectRecord(data: RpcData): RecordRow {
-  if (data.kind !== "record") throw new RpcError("internal", `unexpected ${data.kind} response`);
-  return data.record;
-}
-
-export function expectDeleted(data: RpcData): number {
-  if (data.kind !== "deleted") throw new RpcError("internal", `unexpected ${data.kind} response`);
-  return data.id;
-}
-
-/** Sends one request over a message channel and resolves with its data. */
-export type RequestSender = (request: Request) => Promise<RpcData>;
