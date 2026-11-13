@@ -62,21 +62,24 @@ jobs:
           fi
       - run: go vet ./...
       - run: go tool staticcheck ./...
+      # Includes internal/arch (the import rules) and the public-route allow-list.
       - run: go test -race ./...
       - name: Generated TypeScript types are up to date
         run: |
           go run ./cmd/gen-ts
           # Any difference means the committed copy is stale.
-          # Fix: go run ./cmd/gen-ts, then commit client/src/generated.
-          git add -N client/src/generated
-          git diff --exit-code -- client/src/generated
+          # Fix: go run ./cmd/gen-ts, then commit web/src/data/api/generated.
+          git add -N web/src/data/api/generated
+          git diff --exit-code -- web/src/data/api/generated
 
+  # The job and its name stay "client": the name is a required check in the
+  # org rulesets. The code lives in web/.
   client:
     name: Client (eslint, tsc, bun test, build)
     runs-on: ubuntu-24.04
     defaults:
       run:
-        working-directory: client
+        working-directory: web
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -85,7 +88,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - run: bun run lint
