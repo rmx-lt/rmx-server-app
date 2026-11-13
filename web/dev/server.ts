@@ -1,0 +1,118 @@
+/**
+ * Development server only (`bun dev`). In production rmx-server serves the
+ * built files from `dist/`, and this file is not used.
+ *
+ * - Serves the app at /app/ with hot module reloading (Bun HTML import).
+ * - Proxies the backend routes to rmx-server, so the browser sees one
+ *   origin exactly like in production (no CORS, same relative URLs).
+ */
+
+import { serve, type Server, type ServerWebSocket } from "bun";
+import index from "../public/index.html";
+
+const BACKEND = process.env.BACKEND_URL ?? "http://127.0.0.1:8080";
+const BACKEND_WS = BACKEND.replace(/^http/, "ws");
+const PORT = Number(process.env.PORT ?? 3000);
+
+/** Forwards one HTTP request to rmx-server and returns its response. */
+async function proxy(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const headers = new Headers(req.headers);
+  headers.delete("host");
+  try {
+    return await fetch(new URL(url.pathname + url.search, BACKEND), {
+      method: req.method,
+      headers,
+      body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
+      redirect: "manual",
+    });
+  } catch {
+    return Response.json(
+      { code: "internal", message: `rmx-server is not reachable at ${BACKEND}` },
+      { status: 502 },
+    );
+  }
+}
+
+/**
+ * Per-browser-socket state: the matching socket to rmx-server, and the
+ * headers rmx-server checks on the handshake (session cookie, Origin).
+ */
+type WsData = {
+  upstream?: WebSocket;
+  queue: (string | Uint8Array<ArrayBuffer>)[];
+  headers: Record<string, string>;
+};
+
+/**
+ * Bun's WebSocket client, which (unlike a browser's) takes handshake headers.
+ * With the DOM lib loaded, TypeScript only knows the browser's constructor.
+ */
+const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket;
+
+/** The handshake headers passed on to rmx-server. */
+function forwardedHeaders(req: Request): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const name of ["cookie", "origin", "user-agent"]) {
+    const value = req.headers.get(name);
+    if (value !== null) headers[name] = value;
+  }
+  return headers;
+}
+
+/** Close codes that may not be sent in a close frame are replaced. */
+function sendableCode(code: number): number {
+  return code === 1000 || (code >= 3000 && code <= 4999) || (code >= 1001 && code <= 1014 && code !== 1005 && code !== 1006)
+    ? code
+    : 1011;
+}
+
+const server = serve<WsData>({
+  port: PORT,
+  routes: {
+    "/": Response.redirect("/app/", 302),
+    "/app": Response.redirect("/app/", 302),
+    "/app/api/*": proxy,
+    "/app/health": proxy,
+    "/app/ws": (req: Request, server: Server<WsData>) => {
+      if (server.upgrade(req, { data: { queue: [], headers: forwardedHeaders(req) } })) return undefined;
+      return new Response("WebSocket upgrade expected", { status: 400 });
+    },
+    // The app itself, for every other path under /app/.
+    "/app/*": index,
+  },
+
+  // Relays WebSocket frames both ways between the browser and rmx-server.
+  websocket: {
+    open(ws: ServerWebSocket<WsData>) {
+      const upstream = new BunWebSocket(`${BACKEND_WS}/app/ws`, { headers: ws.data.headers });
+      ws.data.upstream = upstream;
+      upstream.onopen = () => {
+        for (const msg of ws.data.queue) upstream.send(msg);
+        ws.data.queue = [];
+      };
+      upstream.onmessage = (e) => ws.send(e.data as string);
+      upstream.onclose = (e) => ws.close(sendableCode(e.code), e.reason);
+      upstream.onerror = () => ws.close(1011, "rmx-server is not reachable");
+    },
+    message(ws, raw) {
+      const msg = typeof raw === "string" ? raw : new Uint8Array(raw);
+      const upstream = ws.data.upstream;
+      if (upstream?.readyState === WebSocket.OPEN) upstream.send(msg);
+      else ws.data.queue.push(msg);
+    },
+    close(ws) {
+      ws.data.upstream?.close();
+    },
+  },
+
+  development: process.env.NODE_ENV !== "production" && {
+    // Enable browser hot reloading in development
+    hmr: true,
+
+    // Echo console logs from the browser to the server
+    console: true,
+  },
+});
+
+console.log(`🚀 Web dev server at ${server.url}app/ (backend: ${BACKEND})`);

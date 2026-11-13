@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
 #
-# rmx-server image: the Go binary plus the built client, nothing else.
+# rmx-server image: the Go binary plus the built web app, nothing else.
 #   docker build -t rmx-server-app .
 # Bun is only a build tool here; the runtime image has no Bun, shell or package manager.
 
-# ---- 1. Client: bun build -> /client/dist ---------------------------------
-FROM oven/bun:1.4.3 AS client
-WORKDIR /client
-COPY client/package.json client/bun.lock ./
+# ---- 1. Web app: bun build -> /web/dist -------------------------------------
+FROM oven/bun:1.4.3 AS web
+WORKDIR /web
+COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
-COPY client/ ./
+COPY web/ ./
 RUN bun run build
 
 # ---- 2. Server: a static Go binary ------------------------------------------
@@ -24,7 +24,7 @@ COPY . .
 # -s -w keep it small.
 ARG VERSION=0.1.0
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/rmx-lt/rmx-server-app/internal/server.Version=${VERSION}" \
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/rmx-lt/rmx-server-app/internal/buildinfo.Version=${VERSION}" \
     -o /out/rmx-server ./cmd/rmx-server
 
 # ---- 3. Runtime: distroless (CA certs, no libc), runs as uid 65532 ---------
@@ -34,7 +34,7 @@ LABEL org.opencontainers.image.source="https://github.com/rmx-lt/rmx-server-app"
       org.opencontainers.image.licenses="Apache-2.0"
 WORKDIR /app
 COPY --from=server /out/rmx-server /app/rmx-server
-COPY --from=client /client/dist /app/static
+COPY --from=web /web/dist /app/static
 # The app container runs with a 64 MB memory limit and a password check needs 19 MiB:
 # a soft limit makes the Go garbage collector give memory back before the
 # container is killed.

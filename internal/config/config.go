@@ -11,8 +11,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+)
 
-	"github.com/rmx-lt/rmx-server-app/internal/firmware"
+// FIRMWARE_CHUNK_BYTES: the default and the bounds. The firmware domain
+// uses the same constants; the maximum fits the uint16 length of its chunk header.
+const (
+	DefaultFirmwareChunkBytes = 4096
+	MinFirmwareChunkBytes     = 256
+	MaxFirmwareChunkBytes     = 16384
 )
 
 // Config holds every setting of the server.
@@ -106,7 +112,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		},
 		StaticDir:          get("STATIC_DIR"),
 		FirmwareDir:        strings.TrimSpace(get("FIRMWARE_DIR")),
-		FirmwareChunkBytes: firmware.DefaultChunkBytes,
+		FirmwareChunkBytes: DefaultFirmwareChunkBytes,
 	}
 	if v := get("BIND_ADDR"); v != "" {
 		if _, err := netip.ParseAddrPort(strings.TrimSpace(v)); err != nil {
@@ -125,9 +131,9 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		c.MQTT.TopicPrefix = v
 	}
 	if v := get("FIRMWARE_CHUNK_BYTES"); v != "" {
-		n := number("FIRMWARE_CHUNK_BYTES", uint64(firmware.DefaultChunkBytes), 16)
-		if n < uint64(firmware.MinChunkBytes) || n > uint64(firmware.MaxChunkBytes) {
-			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", firmware.MinChunkBytes, firmware.MaxChunkBytes))
+		n := number("FIRMWARE_CHUNK_BYTES", uint64(DefaultFirmwareChunkBytes), 16)
+		if n < uint64(MinFirmwareChunkBytes) || n > uint64(MaxFirmwareChunkBytes) {
+			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", MinFirmwareChunkBytes, MaxFirmwareChunkBytes))
 		}
 		c.FirmwareChunkBytes = int(n)
 	}
