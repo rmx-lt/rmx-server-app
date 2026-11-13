@@ -2,8 +2,9 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
-for the browser, and firmware images to the mower's devices over MQTT; the
-mower features build on that.
+for the browser, firmware images to the mower's devices over MQTT, and the web
+app: the planning workbench ported from blade-terminal (see [Web app](#web-app));
+the mower features build on that.
 
 The stack: a Go server (`net/http`, pgx, goose, paho.golang,
 coder/websocket), a TypeScript + React client on Bun's bundler, TimescaleDB,
@@ -16,6 +17,7 @@ and ported to Go in November 2026, when the backend language was decided
 - [How it works](#how-it-works)
 - [Firmware over MQTT](#firmware-over-mqtt)
 - [Login and sessions](#login-and-sessions)
+- [Web app](#web-app)
 - [Repository layout](#repository-layout)
 - [Local development](#local-development)
 - [Tests and checks](#tests-and-checks)
@@ -382,6 +384,28 @@ docker compose exec -T app /app/rmx-server create-user admin < password-file
 Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
 12–256 characters. There is no default user and no default password.
 
+## Web app
+
+The web app in `web/` is the blade-terminal workbench, ported from
+[jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
+`65d23b7` (rmx-server-app#51): draw an environment (zones, obstacles, start and
+end points) on a canvas, inspect it, and save it. It opens on the login form
+when there is no session; after login the workbench loads, with the user menu
+(log out, log out everywhere) at the right of its header. While logged in the
+app keeps the WebSocket open; when it closes, the app asks `/app/api/auth/me`
+whether the session still exists and shows the login form if not.
+
+- **Data stays in the browser.** Environments, objects, layers and settings are
+  stored in IndexedDB through Dexie (database name `blade-terminal`, code in
+  `web/src/data/local/`), per browser profile, not on the server. Moving them
+  to the server is rmx-server-app#53.
+- **Saving.** The status bar shows the save state; File → Save (Ctrl+S) or a
+  click on "Unsaved changes" saves. A page load starts a new blank environment;
+  saved ones open with File → Open (Ctrl+O).
+- **Algorithm providers.** The provider features (Computation Provider panel,
+  Run menu, benchmark, performance monitor) still call external providers and
+  fail when none runs; they are removed by rmx-server-app#52.
+
 ## Repository layout
 
 The layout keeps boundaries checked by tests and lint, not by convention, so
@@ -446,9 +470,9 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
   dev/server.ts         dev server: HMR + proxy to rmx-server
   scripts/build.ts      production build → dist/
   src/
-    app/                main, App, providers, login gate, connection status
+    app/                main, App, login gate, WebSocket keep-alive
     layouts/            shell regions; compose features
-    features/<name>/    {components,hooks,stores,data,utils,types}; today: auth
+    features/<name>/    {components,hooks,stores,data,utils,types}; auth + the blade-terminal features
     model/              state several features share
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
@@ -473,6 +497,12 @@ eslint-plugin-boundaries):
 - No `index.ts` re-export files; imports use the `@/` alias; tests sit in
   `__tests__/` next to the code.
 - When data moves between the browser and the server, only `data/` changes.
+
+Lint errors that blade-terminal brought along (layer boundaries and React
+Compiler rules of eslint-plugin-react-hooks) are recorded in
+`web/eslint-suppressions.json` (ESLint bulk suppressions): `bun run lint`
+fails only on new ones. They are burned down in rmx-server-app#66; after
+fixing some, run `bun --bun eslint . --prune-suppressions`.
 
 ### Other files
 
@@ -503,7 +533,7 @@ bun run dev
 ```
 
 Create a login once (the dev database keeps it), then open
-<http://localhost:3000/app/> and log in:
+<http://localhost:3000/app/> and log in; the workbench loads:
 
 ```powershell
 go run ./cmd/rmx-server create-user dev     # any password of 12+ characters

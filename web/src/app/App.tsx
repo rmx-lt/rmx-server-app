@@ -1,12 +1,16 @@
 import { useEffect } from "react";
+import ShortcutManager from "@/components/shortcut-manager/ShortcutManager";
+import { startCoverageCacheSync } from "@/features/coverage-planning/data/coverageCacheService";
 import { LoginForm } from "@/features/auth/components/LoginForm";
-import { UserMenu } from "@/features/auth/components/UserMenu";
 import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
-import { StatusPanel } from "./components/StatusPanel";
+import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
+import { initializeWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
+import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
 import { startConnections } from "./connections";
 
-/** Login form or the app, depending on whether the server knows our session. */
+/** Login form or the workbench, depending on whether the server knows our session. */
 export function App() {
   const state = useAuthStore((s) => s.state);
   useEffect(() => {
@@ -25,28 +29,31 @@ export function App() {
     };
   }, []);
 
-  if (state === "checking") return <p className="p-4 text-sm text-zinc-400">Connecting to the server…</p>;
+  if (state === "checking") return <p className="min-h-full bg-zinc-950 p-4 text-sm text-zinc-400">Connecting to the server…</p>;
   if (state === "logged-out") return <LoginForm />;
-  return <Connected />;
+  return <Workbench />;
 }
 
-function Connected() {
-  useEffect(() => startConnections(), []);
+/** blade-terminal's workbench; mounted only while logged in. */
+function Workbench() {
+  useBeforeUnload();
+
+  useEffect(() => {
+    const stopConnections = startConnections();
+    const stopCoverageSync = startCoverageCacheSync();
+    useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
+    initializeWorkspace().catch(console.error);
+    return () => {
+      stopCoverageSync();
+      stopConnections();
+    };
+  }, []);
 
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Blade of Grass</h1>
-          <p className="text-sm text-zinc-400">Server connections (devices: MQTT)</p>
-        </div>
-        <UserMenu />
-      </header>
-
-      <main className="flex min-w-0 flex-col gap-4">
-        <StatusPanel />
-      </main>
-    </div>
+    <>
+      <ShortcutManager />
+      <WorkbenchWindow />
+    </>
   );
 }
 
