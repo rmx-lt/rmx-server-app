@@ -2,8 +2,10 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a
-WebSocket for the browser, and firmware images to the mower's devices over
-MQTT; the mower features build on that.
+WebSocket for the browser, firmware images to the mower's devices over
+MQTT, and the web app: the planning workbench ported from
+[blade-terminal](https://github.com/jRmx0/blade-terminal) (environments are
+stored in the browser for now); the mower features build on that.
 
 The stack: a Go server (`net/http`, pgx, goose,
 paho.golang, coder/websocket), a TypeScript + React web app (`web/`) on Bun's
@@ -36,7 +38,7 @@ bun run dev
 ```
 
 Create a login once (`go run ./cmd/rmx-server create-user dev`, any
-password of 12+ characters), then open <http://localhost:3000/app/> and log in. Ports, MQTT testing and
+password of 12+ characters), then open <http://localhost:3000/app/> and log in; the workbench loads. Ports, MQTT testing and
 the checks CI runs: see the wiki page Server-App.
 
 Checks before a pull request:
