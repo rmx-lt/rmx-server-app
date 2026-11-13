@@ -30,6 +30,8 @@ type app struct {
 	auth *auth.Service
 	mqtt *mqtt.Client
 	ws   *ws.Server
+	// static serves the built web app; nil when STATIC_DIR is not set.
+	static http.Handler
 }
 
 // Run connects to the database (applying pending migrations) and the broker,
@@ -65,8 +67,11 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	if fw != nil {
 		firmware.RegisterMQTT(mq, fw)
 	}
+	static, closeStatic := openStatic(cfg.StaticDir)
+	defer closeStatic()
+
 	mq.Start()
-	a := &app{cfg: cfg, pool: pool, auth: authSvc, mqtt: mq, ws: ws.New(ctx, authSvc.SessionValid)}
+	a := &app{cfg: cfg, pool: pool, auth: authSvc, mqtt: mq, ws: ws.New(ctx, authSvc.SessionValid), static: static}
 
 	var background sync.WaitGroup
 	background.Add(1)
