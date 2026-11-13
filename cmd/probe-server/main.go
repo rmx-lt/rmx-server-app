@@ -1,6 +1,6 @@
-// probe-server: a small rehearsal of the production backend.
-// CRUD on records over HTTPS (REST), WSS and MQTT, with every change logged to
-// a TimescaleDB hypertable and pushed live to all clients.
+// probe-server: the backend for the browser app and the mower's devices.
+// Login and sessions, a WebSocket for the browser, and firmware images for
+// devices over MQTT.
 package main
 
 import (

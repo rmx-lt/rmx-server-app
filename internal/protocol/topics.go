@@ -6,27 +6,12 @@ import "strings"
 // id in the topic (mower/<id>/...), so a broker ACL scopes each login to
 // mower/<its username>/#.
 //
-//   - <prefix>/<client-id>/req: client to server, payload RequestEnvelope
-//   - <prefix>/<client-id>/res: server to client, payload ResponseEnvelope
 //   - <prefix>/<client-id>/fw/req: client to server, firmware request (JSON)
 //   - <prefix>/<client-id>/fw/chunk: server to client, one firmware chunk (binary)
 //   - <prefix>/<client-id>/fw/res: server to client, firmware info or error (JSON)
-//   - <prefix>/events/records: server to all, payload ChangeEvent
 //   - <prefix>/status/server: retained "online" / "offline" (last will)
 //
-// "events" and "status" are therefore not usable as client ids.
-
-// RequestTopic is where a client publishes its requests.
-func RequestTopic(prefix, clientID string) string { return prefix + "/" + clientID + "/req" }
-
-// RequestFilter is a subscription filter that matches every client's requests.
-func RequestFilter(prefix string) string { return prefix + "/+/req" }
-
-// ResponseTopic is where the server answers a client.
-func ResponseTopic(prefix, clientID string) string { return prefix + "/" + clientID + "/res" }
-
-// EventsTopic is where the server publishes every change.
-func EventsTopic(prefix string) string { return prefix + "/events/records" }
+// "status" is therefore not usable as a client id.
 
 // StatusTopic carries the retained "online" / "offline" of the server.
 func StatusTopic(prefix string) string { return prefix + "/status/server" }
@@ -52,32 +37,14 @@ func FirmwareResponseTopic(prefix, clientID string) string {
 
 // ParseFirmwareRequestTopic extracts the device id from a firmware request
 // topic. It returns false for any other topic, or for an id that is not a
-// single plain topic level. "events" and "status" are not device ids.
+// single plain topic level. "status" is not a device id.
 func ParseFirmwareRequestTopic(prefix, topic string) (string, bool) {
 	rest, ok := strings.CutPrefix(topic, prefix+"/")
 	if !ok {
 		return "", false
 	}
 	id, ok := strings.CutSuffix(rest, "/fw/req")
-	if !ok || !ValidClientID(id) || id == "events" || id == "status" {
-		return "", false
-	}
-	return id, true
-}
-
-// ParseRequestTopic extracts the client id from a request topic. It returns
-// false for any other topic, or for an id that is not a single plain topic level.
-func ParseRequestTopic(prefix, topic string) (string, bool) {
-	rest, ok := strings.CutPrefix(topic, prefix)
-	if !ok {
-		return "", false
-	}
-	rest, ok = strings.CutPrefix(rest, "/")
-	if !ok {
-		return "", false
-	}
-	id, ok := strings.CutSuffix(rest, "/req")
-	if !ok || !ValidClientID(id) || id == "events" || id == "status" {
+	if !ok || !ValidClientID(id) || id == "status" {
 		return "", false
 	}
 	return id, true

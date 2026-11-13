@@ -1,4 +1,3 @@
-import type { ChangeEvent } from "@/generated/ChangeEvent";
 import type { Request } from "@/generated/Request";
 import type { RequestEnvelope } from "@/generated/RequestEnvelope";
 import type { RpcData } from "@/generated/RpcData";
@@ -9,12 +8,11 @@ export type WsState = "connecting" | "open" | "closed";
 
 export type WsHandlers = {
   onState: (state: WsState, detail?: string) => void;
-  onEvent: (event: ChangeEvent) => void;
 };
 
 /**
  * One WebSocket to probe-server, reconnecting with backoff. Carries
- * request/response pairs and the server's change events.
+ * request/response pairs.
  */
 export class WssConnection {
   private socket?: WebSocket;
@@ -61,7 +59,6 @@ export class WssConnection {
     socket.onmessage = (e) => {
       const msg = JSON.parse(e.data as string) as ServerMessage;
       if (msg.type === "response") this.pending.settle(msg.response);
-      else this.handlers.onEvent(msg.event);
     };
     socket.onclose = (e) => {
       this.pending.failAll("WebSocket closed");

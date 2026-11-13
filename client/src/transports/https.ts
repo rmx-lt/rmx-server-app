@@ -2,43 +2,11 @@ import type { ApiError } from "@/generated/ApiError";
 import type { Health } from "@/generated/Health";
 import type { LoginRequest } from "@/generated/LoginRequest";
 import type { Me } from "@/generated/Me";
-import type { RecordInput } from "@/generated/RecordInput";
-import type { RecordRow } from "@/generated/RecordRow";
 import { loginErrorMessage } from "@/lib/auth";
 import { BASE } from "@/lib/paths";
-import { RpcError } from "@/lib/rpc";
 import { useAuthStore } from "@/stores/authStore";
-import type { RecordsTransport } from "./types";
 
 export const SESSION_ENDED = "Your session has ended. Please log in again.";
-
-/**
- * One request to probe-server. The browser adds the session cookie by itself
- * (same origin), and the Origin header the server checks. A 401 means the
- * session is gone (logout elsewhere, timeout): back to the login form.
- */
-async function call<T>(method: string, path: string, body?: RecordInput): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: body ? { "content-type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-    cache: "no-store",
-  });
-  if (res.status === 401) useAuthStore.getState().setLoggedOut(SESSION_ENDED);
-  if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as ApiError | null;
-    throw new RpcError(err?.code ?? "http", err?.message ?? `HTTP ${res.status}`);
-  }
-  return (res.status === 204 ? undefined : await res.json()) as T;
-}
-
-export const httpsTransport: RecordsTransport = {
-  kind: "https",
-  list: () => call<RecordRow[]>("GET", "/api/records"),
-  create: (value) => call<RecordRow>("POST", "/api/records", { value }),
-  update: (id, value) => call<RecordRow>("PUT", `/api/records/${id}`, { value }),
-  remove: (id) => call<void>("DELETE", `/api/records/${id}`),
-};
 
 /** GET /probe/health (public). Resolves with the body even on 503 (degraded). */
 export async function fetchHealth(): Promise<Health> {

@@ -1,4 +1,4 @@
-// Package apperr is the error type of the records and login code. Each
+// Package apperr is the error type of the login code. Each
 // transport turns it into its own format: an HTTP status plus a JSON body, or
 // an RpcError.
 package apperr
@@ -37,11 +37,6 @@ func (e *Error) Unwrap() error { return e.Err }
 // BadRequest is an input the client has to fix.
 func BadRequest(format string, args ...any) *Error {
 	return &Error{Code: protocol.CodeBadRequest, Message: fmt.Sprintf(format, args...)}
-}
-
-// NotFound is a missing record.
-func NotFound(id int64) *Error {
-	return &Error{Code: protocol.CodeNotFound, Message: fmt.Sprintf("record %d not found", id)}
 }
 
 // DB is a database failure. The details stay in the server log, not in the response.
@@ -139,8 +134,8 @@ func Write(w http.ResponseWriter, err error) {
 	WriteJSON(w, e.Status(), e.API())
 }
 
-// maxBody is the largest request body read; the biggest legitimate one is a
-// record of 1000 characters.
+// maxBody is the largest request body read; the biggest legitimate one (a
+// login) is far smaller.
 const maxBody = 64 << 10
 
 // ReadJSON reads the request body into v (a struct pointer, see

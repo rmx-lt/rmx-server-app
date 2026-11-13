@@ -5,14 +5,11 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/rmx-lt/rmx-backend-probe/internal/apperr"
 	"github.com/rmx-lt/rmx-backend-probe/internal/auth"
-	"github.com/rmx-lt/rmx-backend-probe/internal/clientip"
 	"github.com/rmx-lt/rmx-backend-probe/internal/protocol"
-	"github.com/rmx-lt/rmx-backend-probe/internal/records"
 )
 
 // Handler returns the HTTP routes. Everything lives under /probe, because
@@ -31,10 +28,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /probe/api/auth/login", s.auth.HandleLogin)
 	mux.HandleFunc("POST /probe/api/auth/logout", s.auth.HandleLogout)
 
-	mux.Handle("GET /probe/api/records", protected(s.listRecords))
-	mux.Handle("POST /probe/api/records", protected(s.createRecord))
-	mux.Handle("PUT /probe/api/records/{id}", protected(s.updateRecord))
-	mux.Handle("DELETE /probe/api/records/{id}", protected(s.deleteRecord))
 	mux.Handle("GET /probe/api/auth/me", protected(auth.HandleMe))
 	mux.Handle("POST /probe/api/auth/logout-all", protected(s.auth.HandleLogoutAll))
 	// The handshake is a normal GET with the cookie, checked here before the
@@ -55,72 +48,6 @@ func (s *Server) Handler() http.Handler {
 
 	// CSRF: state-changing requests and WebSocket handshakes only from our own pages.
 	return auth.CheckOrigin(s.cfg.AllowedOrigins, mux)
-}
-
-func (s *Server) listRecords(w http.ResponseWriter, r *http.Request) {
-	list, err := s.records.List(r.Context())
-	if err != nil {
-		apperr.Write(w, err)
-		return
-	}
-	apperr.WriteJSON(w, http.StatusOK, list)
-}
-
-func (s *Server) createRecord(w http.ResponseWriter, r *http.Request) {
-	var in protocol.RecordInput
-	if e := apperr.ReadJSON(w, r, &in); e != nil {
-		apperr.Write(w, e)
-		return
-	}
-	rec, err := s.records.Create(r.Context(), httpsSource(r), in)
-	if err != nil {
-		apperr.Write(w, err)
-		return
-	}
-	apperr.WriteJSON(w, http.StatusCreated, rec)
-}
-
-func (s *Server) updateRecord(w http.ResponseWriter, r *http.Request) {
-	id, ok := recordID(w, r)
-	if !ok {
-		return
-	}
-	var in protocol.RecordInput
-	if e := apperr.ReadJSON(w, r, &in); e != nil {
-		apperr.Write(w, e)
-		return
-	}
-	rec, err := s.records.Update(r.Context(), httpsSource(r), id, in)
-	if err != nil {
-		apperr.Write(w, err)
-		return
-	}
-	apperr.WriteJSON(w, http.StatusOK, rec)
-}
-
-func (s *Server) deleteRecord(w http.ResponseWriter, r *http.Request) {
-	id, ok := recordID(w, r)
-	if !ok {
-		return
-	}
-	if err := s.records.Delete(r.Context(), httpsSource(r), id); err != nil {
-		apperr.Write(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func recordID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		apperr.Write(w, apperr.BadRequest("record id must be a number"))
-		return 0, false
-	}
-	return id, true
-}
-
-func httpsSource(r *http.Request) records.Source {
-	return records.Source{Via: protocol.ConnHTTPS, IP: clientip.Of(r)}
 }
 
 // health answers 200 when the database answers and the MQTT connection is up, else 503.

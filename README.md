@@ -1,16 +1,11 @@
 # rmx-server-app
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
-(Go backend, React frontend). It is currently a small working stack that rehearses
-the full production workflow on a toy problem:
+(Go backend, React frontend). Today it serves login and sessions, a
+WebSocket for the browser, and firmware images to the mower's devices over
+MQTT; the mower features build on that.
 
-> A web page with a live table `records(time, connection_type, value)` and full
-> CRUD over a selectable transport (**HTTPS REST** or **WSS**), plus the same
-> CRUD for devices over **MQTT** (like the LTE modem in
-> `rmx-mower-gateway`). Every change is logged to a TimescaleDB hypertable
-> and pushed live to every open page, whatever transport made it.
-
-The same stack as production: a Go server (`net/http`, pgx, goose,
+The stack: a Go server (`net/http`, pgx, goose,
 paho.golang, coder/websocket), a TypeScript + React client on Bun's bundler,
 TimescaleDB, Mosquitto, GitHub Actions, images on GHCR. The TypeScript types in
 `client/src/generated` are generated from the Go types in `internal/protocol`.

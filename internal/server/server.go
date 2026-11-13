@@ -1,8 +1,6 @@
-// Package server wires the probe together: the HTTP routes, the WebSocket and
-// MQTT transports, and the start and stop of it all.
-//
-// CRUD on records over HTTPS (REST), WSS and MQTT, with every change logged
-// to a TimescaleDB hypertable and pushed live to all clients.
+// Package server wires the probe together: the HTTP routes (login, health,
+// the built client), the WebSocket, the MQTT client (firmware for devices,
+// the server's status), and the start and stop of it all.
 package server
 
 import (
@@ -21,7 +19,6 @@ import (
 	"github.com/rmx-lt/rmx-backend-probe/internal/config"
 	"github.com/rmx-lt/rmx-backend-probe/internal/db"
 	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
-	"github.com/rmx-lt/rmx-backend-probe/internal/records"
 )
 
 // Version is reported by /probe/health. The release build sets it with -ldflags.
@@ -29,11 +26,10 @@ var Version = "0.1.0"
 
 // Server is shared by all request handlers.
 type Server struct {
-	cfg     *config.Config
-	pool    *pgxpool.Pool
-	records *records.Service
-	auth    *auth.Service
-	mqtt    *mqttClient
+	cfg  *config.Config
+	pool *pgxpool.Pool
+	auth *auth.Service
+	mqtt *mqttClient
 
 	// ctx ends when the server is asked to stop; WebSockets close then.
 	ctx context.Context
@@ -61,7 +57,6 @@ func Run(ctx context.Context, cfg *config.Config, ln net.Listener) error {
 // when it stops.
 func Serve(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, ln net.Listener) error {
 	defer pool.Close()
-	recs := records.New(pool)
 	fw, err := openFirmware(cfg)
 	if err != nil {
 		return err
@@ -69,8 +64,8 @@ func Serve(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, ln net.L
 	if fw != nil {
 		defer fw.Close()
 	}
-	mq := startMQTT(cfg.MQTT, recs, fw)
-	s := &Server{cfg: cfg, pool: pool, records: recs, auth: auth.New(pool), mqtt: mq, ctx: ctx}
+	mq := startMQTT(cfg.MQTT, fw)
+	s := &Server{cfg: cfg, pool: pool, auth: auth.New(pool), mqtt: mq, ctx: ctx}
 
 	var background sync.WaitGroup
 	background.Add(1)

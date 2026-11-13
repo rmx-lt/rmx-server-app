@@ -1,9 +1,8 @@
 // Package protocol defines the wire types shared by probe-server and the
 // browser client.
 //
-// Everything here is plain JSON over the wire. The same request and response
-// envelopes are used on WSS and MQTT, so a client can switch transports
-// without changing its message handling. The TypeScript copies in
+// Everything here is plain JSON over the wire: REST bodies and the request
+// and response envelopes of the WebSocket. The TypeScript copies in
 // client/src/generated are generated from these types by cmd/gen-ts
 // (run `go run ./cmd/gen-ts`).
 //
@@ -14,29 +13,6 @@ package protocol
 import (
 	"fmt"
 	"log/slog"
-	"time"
-	"unicode/utf8"
-)
-
-// MaxValueChars is the longest accepted value, in characters.
-const MaxValueChars = 1000
-
-// ConnectionType is the transport that created or last changed a record.
-type ConnectionType string
-
-const (
-	ConnHTTPS ConnectionType = "https"
-	ConnWSS   ConnectionType = "wss"
-	ConnMQTT  ConnectionType = "mqtt"
-)
-
-// RecordOp is the kind of change logged in record_events.
-type RecordOp string
-
-const (
-	OpCreate RecordOp = "create"
-	OpUpdate RecordOp = "update"
-	OpDelete RecordOp = "delete"
 )
 
 // ErrorCode says what went wrong, in an ApiError.
@@ -54,57 +30,15 @@ const (
 	CodeTooManyRequests ErrorCode = "too_many_requests"
 )
 
-// RecordRow is one row of the records table.
-type RecordRow struct {
-	ID int64 `json:"id"`
-	// When the record was created.
-	Time           time.Time      `json:"time"`
-	ConnectionType ConnectionType `json:"connection_type"`
-	Value          *string        `json:"value"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	// The client IP that created the record (an update keeps it). Null for
-	// records created over MQTT: the broker doesn't pass on the client's
-	// address, so the server can't know it.
-	CreatedIP *string `json:"created_ip"`
-}
+// ---- Requests (client to server, over the WebSocket) ------------------------
 
-// RecordInput is the body of POST /probe/api/records and PUT /probe/api/records/{id}.
-type RecordInput struct {
-	Value *string `json:"value"`
-}
+// RequestPing asks the server to answer with an RpcPong. It is the only
+// request today: a client can use it to check that the connection works.
+type RequestPing struct{}
 
-// Validate checks the input. The error message is suitable for the client.
-func (in RecordInput) Validate() error {
-	if in.Value != nil && utf8.RuneCountInString(*in.Value) > MaxValueChars {
-		return fmt.Errorf("value is longer than %d characters", MaxValueChars)
-	}
-	return nil
-}
-
-// ---- Requests (client to server, over WSS and MQTT) -------------------------
-
-// RequestList lists the newest records.
-type RequestList struct{}
-
-// RequestCreate creates a record.
-type RequestCreate struct {
-	Value *string `json:"value"`
-}
-
-// RequestUpdate changes the value of a record.
-type RequestUpdate struct {
-	ID    int64   `json:"id"`
-	Value *string `json:"value"`
-}
-
-// RequestDelete deletes a record.
-type RequestDelete struct {
-	ID int64 `json:"id"`
-}
-
-// Request is a CRUD operation, sent by the client over WSS or MQTT.
+// Request is an operation, sent by the client over the WebSocket.
 type Request struct {
-	// V is a RequestList, RequestCreate, RequestUpdate or RequestDelete.
+	// V is a RequestPing.
 	V any
 }
 
@@ -123,24 +57,12 @@ type ApiError struct {
 	Message string    `json:"message"`
 }
 
-// RpcRecords answers a list.
-type RpcRecords struct {
-	Records []RecordRow `json:"records"`
-}
-
-// RpcRecord answers a create or update.
-type RpcRecord struct {
-	Record RecordRow `json:"record"`
-}
-
-// RpcDeleted answers a delete.
-type RpcDeleted struct {
-	ID int64 `json:"id"`
-}
+// RpcPong answers a ping.
+type RpcPong struct{}
 
 // RpcData is the payload of a successful answer.
 type RpcData struct {
-	// V is an RpcRecords, RpcRecord or RpcDeleted.
+	// V is an RpcPong.
 	V any
 }
 
@@ -167,58 +89,14 @@ type ResponseEnvelope struct {
 	Result    RpcResult `json:"result"`
 }
 
-// ---- Events -----------------------------------------------------------------
-
-// EventCreate: a record was created.
-type EventCreate struct {
-	Record RecordRow `json:"record"`
-}
-
-// EventUpdate: a record was changed.
-type EventUpdate struct {
-	Record RecordRow `json:"record"`
-}
-
-// EventDelete: a record was deleted.
-type EventDelete struct {
-	ID             int64          `json:"id"`
-	ConnectionType ConnectionType `json:"connection_type"`
-}
-
-// ChangeEvent is a change to records, broadcast to every client whatever
-// transport caused it. Sent on WSS (inside a ServerMessage) and on the MQTT events
-// topic.
-type ChangeEvent struct {
-	// V is an EventCreate, EventUpdate or EventDelete.
-	V any
-}
-
-// RecordID is the id of the record the event is about.
-func (e ChangeEvent) RecordID() int64 {
-	switch v := e.V.(type) {
-	case EventCreate:
-		return v.Record.ID
-	case EventUpdate:
-		return v.Record.ID
-	case EventDelete:
-		return v.ID
-	}
-	return 0
-}
-
 // MsgResponse is the answer to a request.
 type MsgResponse struct {
 	Response ResponseEnvelope `json:"response"`
 }
 
-// MsgEvent is a pushed change.
-type MsgEvent struct {
-	Event ChangeEvent `json:"event"`
-}
-
 // ServerMessage is every message the server sends on the WebSocket.
 type ServerMessage struct {
-	// V is a MsgResponse or MsgEvent.
+	// V is a MsgResponse.
 	V any
 }
 

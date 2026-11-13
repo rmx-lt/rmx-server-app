@@ -14,9 +14,6 @@ func TestDBErrorsHideDetails(t *testing.T) {
 	if e.API().Code != protocol.CodeInternal || e.API().Message != "database error" || e.Status() != 500 {
 		t.Fatalf("%+v", e.API())
 	}
-	if NotFound(3).API().Message != "record 3 not found" {
-		t.Fatal(NotFound(3).API())
-	}
 	if From(errors.New("secret detail")).API().Message != "internal error" {
 		t.Fatal("details leaked")
 	}
@@ -24,7 +21,7 @@ func TestDBErrorsHideDetails(t *testing.T) {
 
 func TestStatusAndRetryAfter(t *testing.T) {
 	if Unauthorized().Status() != 401 || InvalidCredentials().Status() != 401 || Forbidden("x").Status() != 403 ||
-		BadRequest("x").Status() != 400 || NotFound(1).Status() != 404 {
+		BadRequest("x").Status() != 400 || (&Error{Code: protocol.CodeNotFound}).Status() != 404 {
 		t.Fatal("wrong status")
 	}
 	rec := httptest.NewRecorder()

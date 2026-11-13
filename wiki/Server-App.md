@@ -1,16 +1,13 @@
 # Server-App (rmx-server-app)
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
-(Go backend, React frontend). It is currently a small working stack that rehearses
-the full production workflow on a toy problem:
+(Go backend, React frontend). Today it serves login and sessions, a WebSocket
+for the browser, and firmware images to the mower's devices over MQTT; the
+mower features build on that. It started as a probe that rehearsed the
+production workflow on a toy CRUD table; that table and its code are gone
+(rmx-server-app#54).
 
-> A web page with a live table `records(time, connection_type, value)` and full
-> CRUD over a selectable transport (**HTTPS REST** or **WSS**), plus the same
-> CRUD for devices over **MQTT** (like the LTE modem in
-> `rmx-mower-gateway`). Every change is logged to a TimescaleDB hypertable
-> and pushed live to every open page, whatever transport made it.
-
-The same stack as production: a Go server (`net/http`, pgx, goose, paho.golang,
+The stack: a Go server (`net/http`, pgx, goose, paho.golang,
 coder/websocket), a TypeScript + React client on Bun's bundler, TimescaleDB,
 Mosquitto, GitHub Actions, images on GHCR. The probe was written in Rust first
 and ported to Go in November 2026, when the backend language was decided
@@ -38,26 +35,21 @@ device ──MQTT over TLS :8883──────────▶ Mosquitto
 ```
 
 This is the production layout: **browsers never speak MQTT**. Only devices
-(mowers, the modem probe) and the server do, directly with Mosquitto on 8883;
+(mowers, the LTE gateway) and the server do, directly with Mosquitto on 8883;
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **One records service** (`internal/records`) does every
-  create/update/delete in a transaction that also appends to `record_events`,
-  then broadcasts a `ChangeEvent` in-process (a small hub; a subscriber that falls 256 events behind is dropped, and a WebSocket then closes with 1013 so the page reconnects and lists again).
-- **HTTPS**: REST under `/probe/api/records`.
-- **WSS**: `/probe/ws`, JSON request/response with a `request_id`, plus
-  server-pushed change events.
-- **MQTT** (devices): the server subscribes to `mower/+/req` and answers on
-  `mower/<client-id>/res`; change events go to `mower/events/records`.
-  Firmware images go out as binary chunks on `mower/<client-id>/fw/chunk`
-  (see [Firmware over MQTT](#firmware-over-mqtt)).
+- **HTTPS**: login and logout under `/probe/api/auth`, `/probe/health`, and
+  the built client under `/probe/`.
+- **WSS**: `/probe/ws`, JSON request/response with a `request_id`. The only
+  request today is `ping`; the connection (session check, keep-alive, close
+  codes) is what later features build on.
+- **MQTT** (devices): the server keeps a retained `online`/`offline` on
+  `mower/status/server`, and sends firmware images as binary chunks on
+  `mower/<client-id>/fw/chunk` (see [Firmware over MQTT](#firmware-over-mqtt)).
 - **Login**: the app's own login page and server-side sessions in a cookie
   protect the API and the WebSocket (see
   [Login and sessions](#login-and-sessions)).
-- **Live updates**: every change goes to every WebSocket and to the MQTT
-  events topic, so the page sees a device's changes live (over WSS), and
-  devices see the page's.
 
 ### Database
 
@@ -68,25 +60,11 @@ stays, so nothing runs twice.
 
 | Table | Kind | Columns |
 |---|---|---|
-| `records` | plain table (rows change in place) | `id`, `time` (created), `connection_type` (`https`/`wss`/`mqtt`, who created or last changed it), `value` (nullable), `updated_at`, `created_ip` (`inet`, who created it) |
-| `record_events` | hypertable, 1-day chunks | `time`, `connection_type`, `op` (`create`/`update`/`delete`), `record_id`, `value`, `ip` (`inet`, who made this change) |
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
 
-`record_events` is compressed after 1 day and dropped after 7 days
-(TimescaleDB background jobs). It has no foreign key, so deleted records keep
-their history.
-
-**Client IPs.** Every change stores the client's IP: `records.created_ip` for
-whoever created the row (an update keeps it; the UI shows it as "Created by
-IP"), and `record_events.ip` for each create, update and delete. Over
-HTTPS it's the request's IP, over WSS the IP of the WebSocket handshake.
-Behind Caddy that is the last `X-Forwarded-For` entry, the address Caddy saw;
-locally it's the TCP peer. Over MQTT it is `NULL` ("unknown" in the UI): the
-request reaches the server through the broker, which doesn't pass on the
-client's address. IP addresses are personal data. Only logged-in users see
-them, and the event log drops them with its chunks after 7 days, but
-`records` keeps `created_ip` as long as the row exists.
+The first migrations still create the old `records` and `record_events`
+tables; a later one drops them, so every database runs the same sequence.
 
 ### Wire protocol
 
@@ -95,8 +73,7 @@ TypeScript by `cmd/gen-ts` into `client/src/generated/`, one file per type.
 
 **Why generated, and why committed:** the Go types are the single source of
 truth. Structs and enums are read by reflection and the doc comments from the
-source; unions (`Request`, `RpcResult`, `RpcData`, `ChangeEvent`,
-`ServerMessage`) come from the table in `internal/protocol/union.go`, which also
+source; unions (`Request`, `RpcResult`, `RpcData`, `ServerMessage`) come from the table in `internal/protocol/union.go`, which also
 drives the JSON codec, so the two cannot drift apart. The generated files are
 committed so the client builds without a Go toolchain (the Bun stage in the
 Dockerfile, the client CI job). CI regenerates them and fails if the committed
@@ -107,10 +84,6 @@ REST:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| GET | `/probe/api/records` | | `RecordRow[]` (newest 500) |
-| POST | `/probe/api/records` | `{"value": string \| null}` | 201 `RecordRow` |
-| PUT | `/probe/api/records/{id}` | `{"value": string \| null}` | 200 `RecordRow` / 404 |
-| DELETE | `/probe/api/records/{id}` | | 204 / 404 |
 | POST | `/probe/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
 | GET | `/probe/api/auth/me` | | 200 `{"username"}` / 401 |
 | POST | `/probe/api/auth/logout` | | 204, clears the cookie (also without a session) |
@@ -121,33 +94,25 @@ Everything except login, logout and `/probe/health` needs the session cookie
 needs an allowed `Origin` (else 403).
 
 Errors: `{"code": "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests", "message": "..."}`.
-`value` is at most 1000 characters.
 
-WSS and MQTT share one envelope:
+The WebSocket carries one envelope:
 
 ```jsonc
 // client → server
-{ "request_id": "uuid", "request": { "op": "list" } }
-{ "request_id": "uuid", "request": { "op": "create", "value": "hi" } }
-{ "request_id": "uuid", "request": { "op": "update", "id": 7, "value": null } }
-{ "request_id": "uuid", "request": { "op": "delete", "id": 7 } }
+{ "request_id": "uuid", "request": { "op": "ping" } }
 
-// server → client (MQTT: this object; WSS: wrapped as {"type":"response","response":{...}})
-{ "request_id": "uuid", "result": { "status": "ok", "data": { "kind": "record", "record": { ... } } } }
-{ "request_id": "uuid", "result": { "status": "error", "error": { "code": "not_found", "message": "..." } } }
-
-// change event (MQTT events topic: this object; WSS: {"type":"event","event":{...}})
-{ "op": "create", "record": { ... } }
-{ "op": "delete", "id": 7, "connection_type": "mqtt" }
+// server → client
+{ "type": "response", "response": { "request_id": "uuid", "result": { "status": "ok", "data": { "kind": "pong" } } } }
+{ "type": "response", "response": { "request_id": "uuid", "result": { "status": "error", "error": { "code": "bad_request", "message": "..." } } } }
 ```
+
+An unknown or malformed request gets a `bad_request` error with its
+`request_id` (empty if the message was not JSON); the socket stays open.
 
 MQTT topics (`<prefix>` is `mower`):
 
 | Topic | Direction | Payload |
 |---|---|---|
-| `<prefix>/<client-id>/req` | client → server | request envelope |
-| `<prefix>/<client-id>/res` | server → client | response envelope |
-| `<prefix>/events/records` | server → all | change event |
 | `<prefix>/status/server` | server → all, **retained** | `online` / `offline` (last will) |
 | `<prefix>/<client-id>/fw/req` | client → server | firmware request (JSON) |
 | `<prefix>/<client-id>/fw/chunk` | server → client | one firmware chunk (binary) |
@@ -156,10 +121,10 @@ MQTT topics (`<prefix>` is `mower`):
 The byte layout of a chunk, and the firmware request, are in
 [Firmware over MQTT](#firmware-over-mqtt). Nothing on the `fw` topics is retained.
 
-The client id travels in the topic (like `mower/<id>/cmd`; `events` and `status` are reserved and cannot be client ids), not in
+The client id travels in the topic (like `mower/<id>/cmd`; `status` is reserved and cannot be a client id), not in
 MQTT 5 properties, so the scheme works on MQTT 3.1.1 and on small device
 clients, and a broker ACL can scope each login to its own topics. The server
-answers only on `<prefix>/<id>/res` for the id it got the request on.
+answers only on the topics of the id it got the request on.
 
 ## Firmware over MQTT
 
@@ -181,7 +146,7 @@ This section is the contract that firmware is written against.
 
 The device publishes a JSON object on `<prefix>/<name>/fw/req`. `<name>` is
 the device id, the same rules as any other client id (1–64 of
-`[A-Za-z0-9_-]`; `events` and `status` are not ids).
+`[A-Za-z0-9_-]`; `status` is not an id).
 
 ```json
 { "request_id": "c0", "file": "1.2.3.bin", "chunk": 0 }
@@ -246,8 +211,8 @@ typedef struct __attribute__((packed)) {
 
 ### Info and errors
 
-`info`, and every error, is JSON on `<prefix>/<name>/fw/res` (not on the
-records `res` topic, and not on `fw/chunk`).
+`info`, and every error, is JSON on `<prefix>/<name>/fw/res` (not on
+`fw/chunk`).
 
 ```json
 {
@@ -335,7 +300,7 @@ browser                                   probe-server                     Times
   │                                          │ INSERT sessions(sha256(token))  │──▶
   │ ◀── Set-Cookie: __Secure-probe_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/probe
   │                                          │                                 │
-  │ GET /probe/api/records  (the browser adds the cookie)                      │
+  │ GET /probe/api/auth/me  (the browser adds the cookie)                      │
   │ GET /probe/ws + Upgrade (the cookie too) │ look up sha256(cookie):         │
   │ ───────────────────────────────────────▶ │ exists, not idle, not expired?  │──▶
   │ ◀── 200 / 101 Switching Protocols, or 401                                  │
@@ -427,7 +392,6 @@ internal/protocol/                wire types, union codec, MQTT topic helpers
 internal/firmware/                firmware file names, chunk frames, directory reads
 internal/{config,apperr,clientip,db}/  settings, errors, client IP, connection + migrations
 internal/auth/                    passwords, sessions, rate limit, login routes, Origin check
-internal/records/                 records service and the event hub
 internal/server/                  routes, ws, mqtt, start/stop; integration_test.go
 migrations/                       goose SQL migrations (embedded)
 client/                           React 19 + TS on Bun (same toolchain as blade-terminal)
@@ -469,7 +433,8 @@ go run ./cmd/probe-server create-user dev     # any password of 12+ characters
 
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
 `probe-device` with the `PROBE_DEVICE_PASSWORD` from `.env`
-(`probe-device-dev`), publishing to `mower/<client-id>/req`.
+(`probe-device-dev`), publishing to `mower/<client-id>/fw/req` (needs
+`FIRMWARE_DIR`) or watching `mower/status/server`.
 
 Local ports (chosen so they don't clash with a Postgres or Mosquitto
 installed on the PC):
@@ -521,11 +486,11 @@ Then open <http://localhost:8080/probe/>.
 
 The integration tests (`internal/server/integration_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
-its own MQTT topic prefix, so they run in parallel. They cover REST, WSS and MQTT CRUD,
-a firmware download (every chunk, including a resume from the middle, checked
-against the file's SHA-256),
-cross-transport live events, health, the `record_events` log,
-the retained server status and graceful shutdown, and the login: wrong
+its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
+ping, a firmware download (every chunk, including a resume from the middle,
+checked against the file's SHA-256), health, that the records routes and
+tables are gone, the retained server status and graceful shutdown, and the
+login: wrong
 password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
@@ -611,7 +576,7 @@ needs no `basic_auth` in front of it:
 | `/probe/` and other unknown `/probe/*` | public | the client (static files, `index.html` fallback); it shows the login form |
 | `/probe/api/auth/login`, `/probe/api/auth/logout` | public | login, logout |
 | `/probe/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
-| `/probe/api/records[/{id}]`, `/probe/api/auth/me`, `/probe/api/auth/logout-all` | session | REST |
+| `/probe/api/auth/me`, `/probe/api/auth/logout-all` | session | REST |
 | `/probe/ws` | session | WebSocket (Caddy proxies upgrades by default) |
 
 **Proxy requirements:** pass on `Host`, `Origin` and `Cookie` unchanged (Caddy
@@ -621,7 +586,7 @@ uses it). **First user:** see [Users](#users).
 **MQTT devices** connect to the broker's public TLS listener (VPS:
 `mqtts://mqtt.rmx.lt:8883`, `use_username_as_clientid`), so a device's client
 id is its login, e.g. `probe-device`. Its ACL needs: its own `mower/<login>/#` (covered by the broker's
-`pattern readwrite mower/%u/#`) plus read `mower/events/#` and
+`pattern readwrite mower/%u/#`) plus read
 `mower/status/server`. The broker needs no WebSocket listener and Caddy no MQTT
 route: browsers don't use MQTT. `MQTT_WS_URL` and `/probe/config.json` were
 removed (an old `MQTT_WS_URL` in the environment is ignored).

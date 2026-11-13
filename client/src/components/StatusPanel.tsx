@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { reload } from "@/app/probe";
+import { ping } from "@/app/probe";
 import { useConnectionStore } from "@/stores/connectionStore";
 
 type Tone = "good" | "warn" | "bad" | "idle";
@@ -22,7 +22,7 @@ function Line({ label, tone, children }: { label: string; tone: Tone; children: 
 }
 
 export function StatusPanel() {
-  const { https, wss, selected, lastOp } = useConnectionStore();
+  const { https, wss, lastPing } = useConnectionStore();
 
   const httpsTone: Tone = https.state === "ok" ? "good" : https.state === "degraded" ? "warn" : https.state === "down" ? "bad" : "idle";
   const httpsText =
@@ -40,8 +40,13 @@ export function StatusPanel() {
     <section className="rounded-md border border-zinc-800 p-3 text-sm">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Connections</h2>
-        <button type="button" onClick={() => void reload()} className="rounded px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800">
-          Reload
+        <button
+          type="button"
+          onClick={() => void ping()}
+          disabled={wss.state !== "open"}
+          className="rounded px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          Ping
         </button>
       </div>
       <Line label="HTTPS" tone={httpsTone}>
@@ -55,18 +60,11 @@ export function StatusPanel() {
         {broker === undefined ? "unknown" : `server ↔ broker ${broker ? "up" : "down"}`} · devices only
       </Line>
 
-      <div className="mt-2 border-t border-zinc-800 pt-2 text-xs text-zinc-400">
-        <div>
-          Requests via <b className="text-zinc-200">{selected.toUpperCase()}</b>, live events via{" "}
-          <b className="text-zinc-200">WSS</b>
+      {lastPing && (
+        <div className={`mt-2 border-t border-zinc-800 pt-2 text-xs ${lastPing.error ? "text-red-400" : "text-zinc-400"}`}>
+          Last ping over WSS: {lastPing.ms.toFixed(0)} ms{lastPing.error ? ` — ${lastPing.error}` : ""}
         </div>
-        {lastOp && (
-          <div className={lastOp.error ? "text-red-400" : ""}>
-            Last: {lastOp.op} via {lastOp.transport.toUpperCase()} in {lastOp.ms.toFixed(0)} ms
-            {lastOp.error ? ` — ${lastOp.error}` : ""}
-          </div>
-        )}
-      </div>
+      )}
     </section>
   );
 }
