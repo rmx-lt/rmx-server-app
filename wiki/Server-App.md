@@ -164,9 +164,9 @@ answers only on `<prefix>/<id>/res` for the id it got the request on.
 ## Firmware over MQTT
 
 A device downloads a firmware image as binary chunks on the same MQTT
-connection it already uses. The image file is the same `*.bin` that Caddy
-serves today at `https://api.rmx.lt/fw/probe/<version>.bin`. The file stays
-signed; the device checks the signature. This transport adds a SHA-256 of the
+connection it already uses. The image file is a signed `<version>.bin` in the
+server's firmware folder (Caddy's HTTPS `/fw/` download was removed on
+2026-11-13). The file stays signed; the device checks the signature. This transport adds a SHA-256 of the
 whole file, and the device can resume from any chunk index.
 
 One firmware request is in flight per device. A second request that arrives
@@ -314,8 +314,8 @@ volumes:
   - ../caddy/firmware/probe:/firmware:ro
 ```
 
-`services/caddy/firmware/probe` is the host directory Caddy already serves as
-`/fw/probe/` (`firmware/probe/<version>.bin`). The container runs as uid
+`services/caddy/firmware/probe` is the host directory of the images
+(`firmware/probe/<version>.bin`; Caddy no longer serves it). The container runs as uid
 65532, so that directory needs to be readable by it (directories `0755` and
 files `0644` are enough). No Mosquitto ACL change: `probe-app` already has
 readwrite `mower/#`, and each device already has `mower/<its username>/#`,
