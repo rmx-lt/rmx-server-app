@@ -7,7 +7,7 @@ interface LayerSettingsState {
     layers: LayerWithSettings[];
     /** True when layer settings have been changed since the last save or load. */
     isLayerSettingsDirty: boolean;
-    /** Replaces all layer data. Used by workspace bridge after load or init. Does not mark dirty. */
+    /** Replaces all layer data. Used by map bridge after load or init. Does not mark dirty. */
     setLayers: (layers: LayerWithSettings[]) => void;
     setVisible: (pk: LayerPK, visible: boolean) => void;
     setParam: (layerKey: number, name: string, value: string) => void;
@@ -98,8 +98,8 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
 
 /** The stored values of the layer settings, as a map document holds them. */
 export function getLayerSettingParameters(layers: LayerWithSettings[]): LayerSettingParameter[] {
-    return layers.flatMap((l) => l.settings).map(({ id, layerId, algorithmId, providerId, environmentId, value }) => ({
-        id, layerId, algorithmId, providerId, environmentId, value,
+    return layers.flatMap((l) => l.settings).map(({ id, layerId, algorithmId, providerId, mapId, value }) => ({
+        id, layerId, algorithmId, providerId, mapId, value,
     }));
 }
 

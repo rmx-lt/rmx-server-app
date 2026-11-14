@@ -1,31 +1,31 @@
 import { create } from "zustand";
-import type { Object } from "@/data/planning/schemaTypes";
-import type { EnvPointType } from "@/data/planning/schemaTypes";
+import type { Zone } from "@/data/planning/schemaTypes";
+import type { MapPointType } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 
 interface CanvasSelectionState {
-    selectedObject: Object | null;
+    selectedObject: Zone | null;
     selectedVertexRefs: VertexRef[];
-    selectedEnvPointType: EnvPointType | null;
+    selectedMapPointType: MapPointType | null;
 
-    selectObject: (obj: Object) => void;
+    selectObject: (obj: Zone) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
     toggleVertexSelection: (ref: VertexRef, ctrl: boolean) => void;
-    selectEnvPoint: (type: EnvPointType) => void;
+    selectMapPoint: (type: MapPointType) => void;
 }
 
 export const useCanvasSelectionStore = create<CanvasSelectionState>((set) => ({
     selectedObject: null,
     selectedVertexRefs: [],
-    selectedEnvPointType: null,
+    selectedMapPointType: null,
 
     selectObject: (obj) =>
-        set({ selectedObject: obj, selectedVertexRefs: [], selectedEnvPointType: null }),
+        set({ selectedObject: obj, selectedVertexRefs: [], selectedMapPointType: null }),
 
     clearSelection: () =>
-        set({ selectedObject: null, selectedVertexRefs: [], selectedEnvPointType: null }),
+        set({ selectedObject: null, selectedVertexRefs: [], selectedMapPointType: null }),
 
     selectVertex: (ref) =>
         set({ selectedVertexRefs: ref !== null ? [ref] : [] }),
@@ -45,6 +45,6 @@ export const useCanvasSelectionStore = create<CanvasSelectionState>((set) => ({
             };
         }),
 
-    selectEnvPoint: (type) =>
-        set({ selectedEnvPointType: type, selectedObject: null, selectedVertexRefs: [] }),
+    selectMapPoint: (type) =>
+        set({ selectedMapPointType: type, selectedObject: null, selectedVertexRefs: [] }),
 }));

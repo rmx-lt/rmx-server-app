@@ -6,40 +6,37 @@ import {
     removeMap,
     type MapDetail,
     type MapDoc,
-    type Zone,
-    type ZoneCategory,
+    type Zone as ApiZone,
 } from "@/data/api/planning";
 import {
     COORD_SYSTEM,
-    ENV_FORMAT,
-    ENV_TYPE,
-    OBJECT_CATEGORY,
-    OBJECT_TYPE,
+    MAP_FORMAT,
+    MAP_TYPE,
+    ZONE_CATEGORY,
+    ZONE_TYPE,
     type CoordSystemType,
-    type EnvFormat,
-    type EnvType,
-    type ObjectCategory,
-    type ObjectType,
+    type MapFormat,
+    type MapType,
+    type ZoneCategory,
+    type ZoneType,
 } from "@/config/db-ops/enums";
-import { WORKSPACE_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
+import { MAP_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
 import { computePolygonArea } from "@/utils/geometry";
-import type { EnvPoint, Environment, GeoAnchor, Object as CanvasObject } from "./schemaTypes";
+import type { GeoAnchor, MapInfo, MapPoint, Zone } from "./schemaTypes";
 import type { LayerSettingParameter } from "./layerTypes";
 import { withMissingLayerSettings } from "./layerSettings";
 
 // The user's maps, stored on the server (wiki Server-App, "Planning API").
-// The rest of the app still speaks in environments and objects with the
-// categories "zone" and "obstacle"; this file translates to the server's
-// maps and zones ("mowing", "no_go", "navigation"). The web app can't draw
-// navigation zones yet (rmx-server-app#81), so they are kept here and written
-// back unchanged on every save of the same map.
+// The web app uses the server's zone categories ("mowing", "no_go") as they
+// are. It can't draw navigation zones yet (rmx-server-app#81), so they are
+// kept here and written back unchanged on every save of the same map.
 
 /** Everything the web app holds of one map. */
 export interface MapContent {
     /** id 0: not saved yet. */
-    env: Environment;
-    objects: CanvasObject[];
-    points: EnvPoint[];
+    map: MapInfo;
+    zones: Zone[];
+    points: MapPoint[];
     geoAnchor: GeoAnchor | undefined;
     layerSettings: LayerSettingParameter[];
 }
@@ -48,72 +45,67 @@ export interface MapContent {
 export interface MapListItem {
     id: number;
     name: string;
-    zoneCount: number;
-    obstacleCount: number;
+    mowingZoneCount: number;
+    noGoZoneCount: number;
     updatedAt: string;
 }
 
 /** The revision of each map as last loaded or saved, for the next save. */
 const revisions = new Map<number, number>();
 /** Zones the web app can't show (navigation zones), per map id. */
-const keptZones = new Map<number, Zone[]>();
+const keptZones = new Map<number, ApiZone[]>();
 
-const TO_WIRE: Record<ObjectCategory, ZoneCategory> = {
-    [OBJECT_CATEGORY.ZONE]: "mowing",
-    [OBJECT_CATEGORY.OBSTACLE]: "no_go",
-};
-const FROM_WIRE: Partial<Record<ZoneCategory, ObjectCategory>> = {
-    mowing: OBJECT_CATEGORY.ZONE,
-    no_go: OBJECT_CATEGORY.OBSTACLE,
-};
+/** Whether the web app draws zones of this category (navigation zones it doesn't yet). */
+function isDrawn(category: string): category is ZoneCategory {
+    return (Object.values(ZONE_CATEGORY) as string[]).includes(category);
+}
 
 function oneOf<T extends string>(values: Record<string, T>, value: string, fallback: T): T {
     return (Object.values(values) as string[]).includes(value) ? (value as T) : fallback;
 }
 
 function trimName(name: string): string {
-    return name.trim().slice(0, WORKSPACE_NAME_MAX_LENGTH) || "Untitled";
+    return name.trim().slice(0, MAP_NAME_MAX_LENGTH) || "Untitled";
 }
 
 // ---- Wire → app ----------------------------------------------------------------
 
-function fromWire(map: MapDetail): MapContent {
-    const id = map.id;
-    const objects: CanvasObject[] = [];
-    const kept: Zone[] = [];
-    for (const z of map.doc.zones) {
-        const category = FROM_WIRE[z.category];
-        if (!category) {
+function fromWire(detail: MapDetail): MapContent {
+    const id = detail.id;
+    const zones: Zone[] = [];
+    const kept: ApiZone[] = [];
+    for (const z of detail.doc.zones) {
+        if (!isDrawn(z.category)) {
             kept.push(z);
             continue;
         }
-        objects.push({
+        zones.push({
             id: z.id,
-            environmentId: id,
-            category,
-            type: oneOf<ObjectType>(OBJECT_TYPE, z.type, OBJECT_TYPE.EMPTY),
+            mapId: id,
+            category: z.category,
+            type: oneOf<ZoneType>(ZONE_TYPE, z.type, ZONE_TYPE.EMPTY),
             vertexCount: z.vertices.length,
             area: z.vertices.length >= 3 ? computePolygonArea(z.vertices) : 0,
             vertices: z.vertices.map((v) => ({ x: v.x, y: v.y })),
         });
     }
     keptZones.set(id, kept);
-    revisions.set(id, map.revision);
-    const doc = map.doc;
+    revisions.set(id, detail.revision);
+    const doc = detail.doc;
     return {
-        env: {
+        map: {
             id,
-            name: map.name,
-            format: oneOf<EnvFormat>(ENV_FORMAT, doc.format, ENV_FORMAT.POLYGON),
-            type: oneOf<EnvType>(ENV_TYPE, doc.type, ENV_TYPE.ANY_OFFLINE),
+            name: detail.name,
+            format: oneOf<MapFormat>(MAP_FORMAT, doc.format, MAP_FORMAT.POLYGON),
+            type: oneOf<MapType>(MAP_TYPE, doc.type, MAP_TYPE.ANY_OFFLINE),
             coordSystem: oneOf<CoordSystemType>(COORD_SYSTEM, doc.coord_system, COORD_SYSTEM.CARTESIAN),
             headlandEnabled: doc.headland_enabled,
             headlandWidth: doc.headland_width,
-            zoneCount: objects.filter((o) => o.category === OBJECT_CATEGORY.ZONE).length,
-            obstacleCount: objects.filter((o) => o.category === OBJECT_CATEGORY.OBSTACLE).length,
+            mowingZoneCount: zones.filter((z) => z.category === ZONE_CATEGORY.MOWING).length,
+            noGoZoneCount: zones.filter((z) => z.category === ZONE_CATEGORY.NO_GO).length,
         },
-        objects,
-        points: doc.points.map((p) => ({ environmentId: id, type: p.type, point: { x: p.point.x, y: p.point.y } })),
+        zones,
+        points: doc.points.map((p) => ({ mapId: id, type: p.type, point: { x: p.point.x, y: p.point.y } })),
         geoAnchor: doc.geo_anchor ? { lat: doc.geo_anchor.lat, lon: doc.geo_anchor.lon } : undefined,
         layerSettings: withMissingLayerSettings(
             doc.layer_settings.map((s) => ({
@@ -121,7 +113,7 @@ function fromWire(map: MapDetail): MapContent {
                 layerId: s.layer_id,
                 algorithmId: 0,
                 providerId: 0,
-                environmentId: id,
+                mapId: id,
                 value: s.value,
             })),
             id,
@@ -137,11 +129,11 @@ function fromWire(map: MapDetail): MapContent {
  * the drawn zones' when they collide.
  */
 function toWire(content: MapContent, keepFrom: number): MapDoc {
-    const zones: Zone[] = content.objects.map((o) => ({
-        id: o.id,
-        category: TO_WIRE[o.category],
-        type: o.type,
-        vertices: o.vertices.map((v) => ({ x: v.x, y: v.y })),
+    const zones: ApiZone[] = content.zones.map((z) => ({
+        id: z.id,
+        category: z.category,
+        type: z.type,
+        vertices: z.vertices.map((v) => ({ x: v.x, y: v.y })),
     }));
     const used = new Set(zones.map((z) => z.id));
     let next = Math.max(0, ...used) + 1;
@@ -150,13 +142,13 @@ function toWire(content: MapContent, keepFrom: number): MapDoc {
         used.add(id);
         zones.push({ ...z, id });
     }
-    const { env } = content;
+    const { map } = content;
     return {
-        format: env.format,
-        type: env.type,
-        coord_system: env.coordSystem,
-        headland_enabled: env.headlandEnabled,
-        headland_width: env.headlandWidth,
+        format: map.format,
+        type: map.type,
+        coord_system: map.coordSystem,
+        headland_enabled: map.headlandEnabled,
+        headland_width: map.headlandWidth,
         zones,
         points: content.points.map((p) => ({ type: p.type, point: { x: p.point.x, y: p.point.y } })),
         layer_settings: content.layerSettings.map((s) => ({ id: s.id, layer_id: s.layerId, value: s.value })),
@@ -167,7 +159,7 @@ function toWire(content: MapContent, keepFrom: number): MapDoc {
 function remember(saved: MapDetail): number {
     revisions.set(saved.id, saved.revision);
     // Keep the zones as the server now has them (ids possibly renumbered).
-    keptZones.set(saved.id, saved.doc.zones.filter((z) => !FROM_WIRE[z.category]));
+    keptZones.set(saved.id, saved.doc.zones.filter((z) => !isDrawn(z.category)));
     return saved.id;
 }
 
@@ -179,8 +171,8 @@ export async function listMaps(): Promise<MapListItem[]> {
     return maps.map((m) => ({
         id: m.id,
         name: m.name,
-        zoneCount: m.mowing_zone_count,
-        obstacleCount: m.no_go_zone_count,
+        mowingZoneCount: m.mowing_zone_count,
+        noGoZoneCount: m.no_go_zone_count,
         updatedAt: m.updated_at,
     }));
 }
@@ -191,23 +183,23 @@ export async function loadMap(id: number): Promise<MapContent> {
 }
 
 /**
- * Saves content as the map content.env.id: creates it when the id is 0,
+ * Saves content as the map content.map.id: creates it when the id is 0,
  * otherwise saves over the revision last loaded or saved. Returns the map's
  * id. Throws an ApiRequestError with code "conflict" (see isConflict) when
  * the map was saved elsewhere in between.
  */
 export async function saveMap(content: MapContent): Promise<number> {
-    const id = content.env.id;
-    if (id === 0) return createMap(content, content.env.name);
+    const id = content.map.id;
+    if (id === 0) return createMap(content, content.map.name);
     const revision = revisions.get(id);
     if (revision === undefined) throw new Error(`map ${id} was not loaded`);
-    const saved = await putMap(id, { name: trimName(content.env.name), revision, doc: toWire(content, id) });
+    const saved = await putMap(id, { name: trimName(content.map.name), revision, doc: toWire(content, id) });
     return remember(saved);
 }
 
 /** Saves content as a new map named name. Returns its id. */
 export async function createMap(content: MapContent, name: string): Promise<number> {
-    const keepFrom = content.env.id;
+    const keepFrom = content.map.id;
     const saved = await postMap({ name: trimName(name), doc: toWire(content, keepFrom) });
     return remember(saved);
 }
@@ -218,7 +210,7 @@ export async function createMap(content: MapContent, name: string): Promise<numb
  */
 export async function overwriteMap(id: number, content: MapContent, name: string): Promise<number> {
     const current = await fetchMap(id);
-    const saved = await putMap(id, { name: trimName(name), revision: current.revision, doc: toWire(content, content.env.id) });
+    const saved = await putMap(id, { name: trimName(name), revision: current.revision, doc: toWire(content, content.map.id) });
     return remember(saved);
 }
 

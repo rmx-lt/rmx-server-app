@@ -37,8 +37,8 @@ function settingKey(s: { id: number; layerId: number }): string {
 }
 
 /** The default value of every layer setting, for a new map. */
-export function initialLayerSettings(environmentId: number): LayerSettingParameter[] {
-    return withMissingLayerSettings([], environmentId);
+export function initialLayerSettings(mapId: number): LayerSettingParameter[] {
+    return withMissingLayerSettings([], mapId);
 }
 
 /**
@@ -46,14 +46,14 @@ export function initialLayerSettings(environmentId: number): LayerSettingParamet
  * setting added to the registry after the map was saved). Values of settings
  * that are no longer in the registry are dropped.
  */
-export function withMissingLayerSettings(stored: LayerSettingParameter[], environmentId: number): LayerSettingParameter[] {
+export function withMissingLayerSettings(stored: LayerSettingParameter[], mapId: number): LayerSettingParameter[] {
     const byKey = new Map(stored.map((s) => [settingKey(s), s]));
     return getAllLayerSettingsSetup().map((setup) => ({
         id: setup.id,
         layerId: setup.layerId,
         algorithmId: 0,
         providerId: 0,
-        environmentId,
+        mapId,
         value: byKey.get(settingKey(setup))?.value ?? buildInitialValue(setup),
     }));
 }

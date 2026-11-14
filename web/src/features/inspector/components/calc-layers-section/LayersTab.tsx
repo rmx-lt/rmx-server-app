@@ -1,5 +1,5 @@
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import LayerRow from "@/features/inspector/components/calc-layers-section/LayerRow";
 import type { LayerPK } from "@/data/planning/layerTypes";
@@ -13,7 +13,7 @@ export default function LayersTab() {
     const setVisible = useLayerSettingsStore((s) => s.setVisible);
     const setParam = useLayerSettingsStore((s) => s.setParam);
     const reorderLayers = useLayerSettingsStore((s) => s.reorderLayers);
-    const headlandEnabled = useEnvStore((s) => s.env.headlandEnabled);
+    const headlandEnabled = useMapStore((s) => s.map.headlandEnabled);
 
     if (layers.length === 0) {
         return (
@@ -27,7 +27,7 @@ export default function LayersTab() {
     const visible = layers.filter(
         (item) =>
             headlandEnabled ||
-            (item.layer.id !== LAYER_ID.SHRUNKEN_ZONES && item.layer.id !== LAYER_ID.EXPANDED_OBSTACLES),
+            (item.layer.id !== LAYER_ID.SHRUNKEN_MOWING_ZONES && item.layer.id !== LAYER_ID.EXPANDED_NO_GO_ZONES),
     );
 
     // ── Sort all layers by Z-Index descending ────────────────────────────────

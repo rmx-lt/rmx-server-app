@@ -3,11 +3,11 @@ import ControlsPanelSection from "@/components/controls-panel/ControlsPanelSecti
 import ControlsPanelSeparator from "@/components/controls-panel/ControlsPanelSeparator";
 import ControlsPanelSectionCheckbox from "@/components/controls-panel/ControlsPanelSectionCheckbox";
 import ControlsPanelSectionInput from "@/components/controls-panel/ControlsPanelSectionInput";
-import CoordinateSystemSelect from "@/features/coverage-planning/components/controls-panel/env-section/CoordinateSystemSelect";
-import FormatSelection from "@/features/coverage-planning/components/controls-panel/env-section/FormatSelect";
-import EnvTypeSelection from "@/features/coverage-planning/components/controls-panel/env-section/EnvTypeSelect";
+import CoordinateSystemSelect from "@/features/coverage-planning/components/controls-panel/map-section/CoordinateSystemSelect";
+import FormatSelection from "@/features/coverage-planning/components/controls-panel/map-section/FormatSelect";
+import MapTypeSelection from "@/features/coverage-planning/components/controls-panel/map-section/MapTypeSelect";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
 import { LAYER_ID } from "@/data/planning/layerRegistry";
 import { parseHeadlandWidth } from "@/features/canvas-editing/utils/headlandGeometry";
@@ -15,10 +15,10 @@ import { unitLabel } from "@/utils/unitOfMeasure";
 
 export default function CoveragePlanningControlsPanel() {
     const setLayerVisible = useLayerSettingsStore((state) => state.setVisible);
-    const headlandEnabled = useEnvStore((state) => state.env.headlandEnabled);
-    const headlandWidth = useEnvStore((state) => state.env.headlandWidth);
-    const setHeadlandEnabled = useEnvStore((state) => state.setHeadlandEnabled);
-    const setHeadlandWidth = useEnvStore((state) => state.setHeadlandWidth);
+    const headlandEnabled = useMapStore((state) => state.map.headlandEnabled);
+    const headlandWidth = useMapStore((state) => state.map.headlandWidth);
+    const setHeadlandEnabled = useMapStore((state) => state.setHeadlandEnabled);
+    const setHeadlandWidth = useMapStore((state) => state.setHeadlandWidth);
     // The width being edited while the input has focus; null shows the stored width.
     const [headlandWidthDraft, setHeadlandWidthDraft] = useState<string | null>(null);
     const selectedUnitOfMeasure = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
@@ -27,17 +27,17 @@ export default function CoveragePlanningControlsPanel() {
     const headlandWidthLabel = uom ? `Headland Width (${uom})` : "Headland Width";
 
     useEffect(() => {
-        const shrunkenZonesPK = { id: LAYER_ID.SHRUNKEN_ZONES, algorithmId: 0, providerId: 0 };
-        const expandedObstaclesPK = { id: LAYER_ID.EXPANDED_OBSTACLES, algorithmId: 0, providerId: 0 };
+        const shrunkenZonesPK = { id: LAYER_ID.SHRUNKEN_MOWING_ZONES, algorithmId: 0, providerId: 0 };
+        const expandedNoGoZonesPK = { id: LAYER_ID.EXPANDED_NO_GO_ZONES, algorithmId: 0, providerId: 0 };
         setLayerVisible(shrunkenZonesPK, headlandEnabled);
-        setLayerVisible(expandedObstaclesPK, headlandEnabled);
+        setLayerVisible(expandedNoGoZonesPK, headlandEnabled);
     }, [headlandEnabled, setLayerVisible]);
 
     return (
         <div>
-            <ControlsPanelSection sectionId="environment" title="Environment">
+            <ControlsPanelSection sectionId="map" title="Map">
                 <FormatSelection />
-                <EnvTypeSelection />
+                <MapTypeSelection />
                 <CoordinateSystemSelect />
             </ControlsPanelSection>
 

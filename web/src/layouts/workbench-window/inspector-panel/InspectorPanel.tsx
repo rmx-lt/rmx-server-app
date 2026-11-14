@@ -1,11 +1,11 @@
 import UiInspectorPanel from "@/features/ui-manager/components/side-panels/UiInspectorPanel";
 import InspectorPanelSection from "@/components/inspector-panel/InspectorPanelSection";
 import InspectorPanelTabBar from "@/components/inspector-panel/InspectorPanelTabBar";
-import ZoneSumField from "@/features/inspector/components/env-section/ZoneSumField";
-import ObstacleSumField from "@/features/inspector/components/env-section/ObstacleSumField";
-import VertexTotalField from "@/features/inspector/components/env-section/VertexTotalField";
-import PerimeterLengthField from "@/features/inspector/components/env-section/PerimeterLengthField";
-import DistanceBetweenVerticesField from "@/features/inspector/components/env-section/DistanceBetweenVerticesField";
+import MowingZoneSumField from "@/features/inspector/components/map-section/MowingZoneSumField";
+import NoGoZoneSumField from "@/features/inspector/components/map-section/NoGoZoneSumField";
+import VertexTotalField from "@/features/inspector/components/map-section/VertexTotalField";
+import PerimeterLengthField from "@/features/inspector/components/map-section/PerimeterLengthField";
+import DistanceBetweenVerticesField from "@/features/inspector/components/map-section/DistanceBetweenVerticesField";
 import CategoryField from "@/features/inspector/components/object-section/CategoryField";
 import TypeField from "@/features/inspector/components/object-section/TypeField";
 import VertexSumField from "@/features/inspector/components/object-section/VertexSumField";
@@ -26,7 +26,7 @@ const INSPECTOR_TABS: { id: InspectorTab; label: string }[] = [
 
 export default function InspectorPanel() {
   const hasSelection = useCanvasSelectionStore((s) => s.selectedObject !== null);
-  const hasEnvPointSelection = useCanvasSelectionStore((s) => s.selectedEnvPointType !== null);
+  const hasMapPointSelection = useCanvasSelectionStore((s) => s.selectedMapPointType !== null);
   const selectedVertexCount = useCanvasSelectionStore((s) => s.selectedVertexRefs.length);
   const hasAnyVertexSelection = useCanvasSelectionStore(
     (s) => s.selectedObject !== null && s.selectedVertexRefs.length > 0,
@@ -46,18 +46,18 @@ export default function InspectorPanel() {
 
       {activeTab === "details" && (
         <div>
-          {!hasSelection && !hasEnvPointSelection && !hasAnyVertexSelection && (
-            <InspectorPanelSection title="Environment">
-              <ZoneSumField />
-              <ObstacleSumField />
+          {!hasSelection && !hasMapPointSelection && !hasAnyVertexSelection && (
+            <InspectorPanelSection title="Map">
+              <MowingZoneSumField />
+              <NoGoZoneSumField />
               <VertexTotalField />
               <PerimeterLengthField />
               <DistanceBetweenVerticesField />
             </InspectorPanelSection>
           )}
 
-          {hasSelection && !hasEnvPointSelection && !hasAnyVertexSelection && (
-            <InspectorPanelSection title="Object">
+          {hasSelection && !hasMapPointSelection && !hasAnyVertexSelection && (
+            <InspectorPanelSection title="Zone">
               <CategoryField />
               <TypeField />
               <VertexSumField />
@@ -66,7 +66,7 @@ export default function InspectorPanel() {
             </InspectorPanelSection>
           )}
 
-          {hasEnvPointSelection && (
+          {hasMapPointSelection && (
             <InspectorPanelSection title="Point">
               <PointTypeField />
               <PointPositionField />

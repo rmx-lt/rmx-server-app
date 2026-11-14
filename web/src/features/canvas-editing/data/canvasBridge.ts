@@ -1,31 +1,31 @@
 import { saveMap, type MapContent } from "@/data/planning/maps";
 import { isConflict } from "@/data/api/planning";
-import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
-import type { Object } from "@/data/planning/schemaTypes";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import type { Zone } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore, selectIsDirty } from "../stores/canvasObjectStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { getLayerSettingParameters, useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { getEnvPoints, useEnvPointStore } from "@/model/envPointStore";
-import { getSavableEnvironmentGeoAnchor, useGeoAnchorStore } from "@/model/geoAnchorStore";
+import { getMapPoints, useMapPointStore } from "@/model/mapPointStore";
+import { getSavableMapGeoAnchor, useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { getSaveMode } from "@/model/saveModeStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 
 // ── Count synchronization ──────────────────────────────────────────────────
-// Reactively keeps envStore zone/obstacle counts derived from the canvas object
-// list. Lives here (not in either store) to avoid a circular import.
+// Reactively keeps the mapStore mowing and no-go zone counts derived from the
+// canvas zone list. Lives here (not in either store) to avoid a circular import.
 
-function countByCategory(objects: Object[], category: string): number {
+function countByCategory(objects: Zone[], category: string): number {
     return objects.filter((o) => o.category === category).length;
 }
 
-function syncEnvCounts(objects: Object[]): void {
-    const zoneObjectCount = countByCategory(objects, OBJECT_CATEGORY.ZONE);
-    const obstacleObjectCount = countByCategory(objects, OBJECT_CATEGORY.OBSTACLE);
-    useEnvStore.setState((s) => ({ env: { ...s.env, zoneCount: zoneObjectCount, obstacleCount: obstacleObjectCount } }));
+function syncMapCounts(objects: Zone[]): void {
+    const mowingZoneCount = countByCategory(objects, ZONE_CATEGORY.MOWING);
+    const noGoZoneCount = countByCategory(objects, ZONE_CATEGORY.NO_GO);
+    useMapStore.setState((s) => ({ map: { ...s.map, mowingZoneCount, noGoZoneCount } }));
 }
 
 useCanvasObjectStore.subscribe((next, prev) => {
-    if (next.objects !== prev.objects) syncEnvCounts(next.objects);
+    if (next.objects !== prev.objects) syncMapCounts(next.objects);
 });
 
 // ── The open map ───────────────────────────────────────────────────────────
@@ -33,10 +33,10 @@ useCanvasObjectStore.subscribe((next, prev) => {
 /** Everything the stores hold of the open map, as one map's content. */
 export function currentMapContent(): MapContent {
     return {
-        env: useEnvStore.getState().env,
-        objects: useCanvasObjectStore.getState().objects,
-        points: getEnvPoints(useEnvPointStore.getState()),
-        geoAnchor: getSavableEnvironmentGeoAnchor(useGeoAnchorStore.getState()),
+        map: useMapStore.getState().map,
+        zones: useCanvasObjectStore.getState().objects,
+        points: getMapPoints(useMapPointStore.getState()),
+        geoAnchor: getSavableMapGeoAnchor(useGeoAnchorStore.getState()),
         layerSettings: getLayerSettingParameters(useLayerSettingsStore.getState().layers),
     };
 }
@@ -45,26 +45,26 @@ export function currentMapContent(): MapContent {
 export function isMapDirty(): boolean {
     const geo = useGeoAnchorStore.getState();
     return (
-        useEnvStore.getState().isEnvDirty ||
+        useMapStore.getState().isMapDirty ||
         selectIsDirty(useCanvasObjectStore.getState()) ||
         useLayerSettingsStore.getState().isLayerSettingsDirty ||
-        useEnvPointStore.getState().isEnvPointsDirty ||
+        useMapPointStore.getState().isMapPointsDirty ||
         geo.isSystemGeoAnchorDirty ||
-        geo.isEnvironmentGeoAnchorDirty
+        geo.isMapGeoAnchorDirty
     );
 }
 
 /** Gives the stores the id the server assigned to a new map. */
 function adoptMapId(id: number): void {
-    useEnvStore.setState((s) => ({ env: { ...s.env, id } }));
-    useCanvasObjectStore.setState((s) => ({ objects: s.objects.map((o) => ({ ...o, environmentId: id })) }));
+    useMapStore.setState((s) => ({ map: { ...s.map, id } }));
+    useCanvasObjectStore.setState((s) => ({ objects: s.objects.map((o) => ({ ...o, mapId: id })) }));
 }
 
 function markSaved(): void {
     useCanvasObjectStore.getState().clearDirty();
-    useEnvStore.getState().clearDirty();
+    useMapStore.getState().clearDirty();
     useLayerSettingsStore.getState().clearDirty();
-    useEnvPointStore.getState().clearDirty();
+    useMapPointStore.getState().clearDirty();
 }
 
 function reportSaveError(err: unknown): void {
@@ -97,7 +97,7 @@ export async function saveCanvas(): Promise<boolean> {
     try {
         const content = currentMapContent();
         const id = await saveMap(content);
-        if (content.env.id !== id) adoptMapId(id);
+        if (content.map.id !== id) adoptMapId(id);
         await useGeoAnchorStore.getState().saveGeoAnchors();
         markSaved();
         return true;

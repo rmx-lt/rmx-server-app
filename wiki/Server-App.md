@@ -445,7 +445,7 @@ at most 16 KiB of JSON, at most 100 settings per user.
 
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
-`65d23b7` (rmx-server-app#51): draw an environment (zones, obstacles, start and
+`65d23b7` (rmx-server-app#51): draw a map (mowing zones, no-go zones, start and
 end points) on a canvas, inspect it, and save it. It opens on the login form
 when there is no session; after login the workbench loads, with the user menu
 (log out, log out everywhere) at the right of its header. While logged in the
@@ -457,15 +457,20 @@ whether the session still exists and shows the login form if not.
   `web/src/data/planning/` (the API client is `web/src/data/api/planning.ts`).
   The browser keeps no planning data; the IndexedDB database `blade-terminal`
   of earlier versions is deleted at login, without import. The UI and the code
-  outside `src/data/` still say environment, zone and obstacle;
-  `src/data/planning/maps.ts` translates to the server's map and zone
-  categories (`zone` ↔ `mowing`, `obstacle` ↔ `no_go`). The web app can't draw
-  navigation zones yet
+  use the server's names: map, mowing zone, no-go zone, and the zone
+  categories `mowing` and `no_go` as they are, with no translation
+  ([rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82)).
+  The web app can't draw navigation zones yet
   ([rmx-server-app#81](https://github.com/rmx-lt/rmx-server-app/issues/81)), so
-  it keeps a map's navigation zones out of the canvas and writes them back
-  unchanged on every save (renumbered if a drawn zone took their id). The
-  rename of the UI is
-  [rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82).
+  `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
+  and writes them back unchanged on every save (renumbered if a drawn zone took
+  their id).
+- **XML files.** File → Export writes the open map as XML, File → Import reads
+  one into a new map. The root `<map>` holds `<info>` (name, format, type,
+  coordinate system, headland), `<zones>` (one `<zone>` each, categories
+  `mowing` and `no_go`), `<points>` and `<geoAnchor>`. Files of earlier
+  versions (root `<workspace>`, categories `zone` and `obstacle`) are not
+  read: the import says which element or value it expected.
 - **Saving.** A save sends the whole map. The status bar shows the save state;
   File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
   starts a new blank map, which gets its id from the server on its first save;

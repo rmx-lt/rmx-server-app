@@ -1,6 +1,6 @@
-import type { Object as CanvasObject } from "@/data/planning/schemaTypes";
+import type { Zone as Zone } from "@/data/planning/schemaTypes";
 import type { CanvasPolygonItem } from "@/data/planning/serviceTypes";
-import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import { ensureWinding } from "@/utils/geometry";
 
 const MITER_LIMIT_MULTIPLIER = 4;
@@ -72,43 +72,43 @@ export function parseHeadlandWidth(rawWidth: string): number | null {
 }
 
 export function computeHeadlandDerivedGeometry(input: {
-    objects: CanvasObject[];
+    objects: Zone[];
     headlandEnabled: boolean;
     headlandWidth: number | null;
 }): {
     shrunkenZones: CanvasPolygonItem[];
-    expandedObstacles: CanvasPolygonItem[];
+    expandedNoGoZones: CanvasPolygonItem[];
 } {
     const { objects, headlandEnabled, headlandWidth } = input;
 
     if (!headlandEnabled || headlandWidth === null) {
         return {
             shrunkenZones: [],
-            expandedObstacles: [],
+            expandedNoGoZones: [],
         };
     }
 
-    const zoneObjects = objects.filter((o) => o.category === OBJECT_CATEGORY.ZONE);
-    const obstacleObjects = objects.filter((o) => o.category === OBJECT_CATEGORY.OBSTACLE);
+    const zoneObjects = objects.filter((o) => o.category === ZONE_CATEGORY.MOWING);
+    const noGoZoneObjects = objects.filter((o) => o.category === ZONE_CATEGORY.NO_GO);
 
     const shrunkenZones = zoneObjects.map((zone, index) => {
         const offset = offsetPolygonVertices(zone.vertices, headlandWidth);
         return {
             id: index + 1,
-            vertices: ensureWinding(offset, OBJECT_CATEGORY.ZONE),
+            vertices: ensureWinding(offset, ZONE_CATEGORY.MOWING),
         } satisfies CanvasPolygonItem;
     });
 
-    const expandedObstacles = obstacleObjects.map((obstacle, index) => {
-        const offset = offsetPolygonVertices(obstacle.vertices, headlandWidth);
+    const expandedNoGoZones = noGoZoneObjects.map((noGoZone, index) => {
+        const offset = offsetPolygonVertices(noGoZone.vertices, headlandWidth);
         return {
             id: index + 1,
-            vertices: ensureWinding(offset, OBJECT_CATEGORY.OBSTACLE),
+            vertices: ensureWinding(offset, ZONE_CATEGORY.NO_GO),
         } satisfies CanvasPolygonItem;
     });
 
     return {
         shrunkenZones,
-        expandedObstacles,
+        expandedNoGoZones,
     };
 }

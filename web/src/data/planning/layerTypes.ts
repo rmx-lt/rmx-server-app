@@ -5,7 +5,7 @@ export type LayerId = number;
 /**
  * Typed layer kinds.
  * - "Polygon" | "Point" | "Line" — mirror the API DebugLayerType for compute result layers.
- *   Obstacles and Zones are "Polygon"; future debug layers from the provider will use Point/Line.
+ *   No-go zones and Zones are "Polygon"; future debug layers from the provider will use Point/Line.
  * - "Grid" — internal canvas utility layer.
  * - "ObjectGroup" — a dedicated settings-owner layer for a group of polygon object types.
  *   It stores group-level settings (e.g. "Show Vertex IDs") but never renders standalone.
@@ -40,7 +40,7 @@ export interface LayerDefinition {
 /**
  * DB record for the `layerSettingsSetup` table.
  * Stores the full attribute metadata fetched from a provider (or seeded for system layers).
- * This is the source-of-truth template from which per-environment `layerSettings` rows are initialized.
+ * This is the source-of-truth template from which per-map `layerSettings` rows are initialized.
  * System layers use `algorithmId: 0, providerId: 0`.
  */
 export interface LayerSettingsSetup {
@@ -89,8 +89,8 @@ export interface LayerRecord {
 
 /**
  * DB record for the `layerSettings` table.
- * Per-environment working copy initialized from `layerSettingsSetup`.
- * Each environment holds its own independent copy for all layers (system + provider).
+ * Per-map working copy initialized from `layerSettingsSetup`.
+ * Each map holds its own independent copy for all layers (system + provider).
  * Only the mutable `value` field is stored — metadata fields (`key`, `styleType`,
  * `styleGroup`) live exclusively in `layerSettingsSetup` and are joined at load time.
  */
@@ -101,8 +101,8 @@ export interface LayerSettingParameter {
     layerId: number;
     algorithmId: number;
     providerId: number;
-    /** FK → environments.id */
-    environmentId: number;
+    /** FK → maps.id */
+    mapId: number;
     value: string;
 }
 

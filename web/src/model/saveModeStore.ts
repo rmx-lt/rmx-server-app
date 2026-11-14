@@ -17,7 +17,7 @@ interface SaveModeState {
     /** Whether the user has autosave turned on. Persisted in localStorage. */
     isAutoSaveEnabled: boolean;
     setMode: (mode: SaveMode) => void;
-    /** Toggles the autosave preference and persists it. Call applyAutoSaveToggle() from workspaceBridge to also update mode. */
+    /** Toggles the autosave preference and persists it. Call applyAutoSaveToggle() from mapBridge to also update mode. */
     setAutoSaveEnabled: (enabled: boolean) => void;
 }
 

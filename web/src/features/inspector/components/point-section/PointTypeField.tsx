@@ -1,9 +1,9 @@
 import InspectorPanelSectionSelectField from "@/components/inspector-panel/InspectorPanelSectionSelectField";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
-import { useEnvPointStore } from "@/model/envPointStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapPointStore } from "@/model/mapPointStore";
+import { useMapStore } from "@/model/mapStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
-import type { EnvPointType } from "@/data/planning/schemaTypes";
+import type { MapPointType } from "@/data/planning/schemaTypes";
 
 const POINT_TYPE_OPTIONS = [
     { value: "start", label: "Start" },
@@ -12,27 +12,27 @@ const POINT_TYPE_OPTIONS = [
 ];
 
 export default function PointTypeField() {
-    const selectedEnvPointType = useCanvasSelectionStore((s) => s.selectedEnvPointType);
-    const selectEnvPoint = useCanvasSelectionStore((s) => s.selectEnvPoint);
-    const startPoint = useEnvPointStore((s) => s.startPoint);
-    const endPoint = useEnvPointStore((s) => s.endPoint);
-    const changePointType = useEnvPointStore((s) => s.changePointType);
-    const envId = useEnvStore((s) => s.env.id);
+    const selectedMapPointType = useCanvasSelectionStore((s) => s.selectedMapPointType);
+    const selectMapPoint = useCanvasSelectionStore((s) => s.selectMapPoint);
+    const startPoint = useMapPointStore((s) => s.startPoint);
+    const endPoint = useMapPointStore((s) => s.endPoint);
+    const changePointType = useMapPointStore((s) => s.changePointType);
+    const mapId = useMapStore((s) => s.map.id);
     const requestConfirmation = useConfirmationModalStore((s) => s.requestConfirmation);
 
-    if (!selectedEnvPointType) return null;
+    if (!selectedMapPointType) return null;
 
     function handleChange(newType: string) {
-        const toType = newType as EnvPointType;
-        if (toType === selectedEnvPointType) return;
+        const toType = newType as MapPointType;
+        if (toType === selectedMapPointType) return;
 
         // Determine which existing point (if any) will be removed by this change
         let conflictPoint;
         let conflictTypeName: string;
         if (toType === "start_end") {
             // start_end clears both; warn about whichever exists besides fromType
-            conflictPoint = selectedEnvPointType === "start" ? endPoint : startPoint;
-            conflictTypeName = selectedEnvPointType === "start" ? "end" : "start";
+            conflictPoint = selectedMapPointType === "start" ? endPoint : startPoint;
+            conflictTypeName = selectedMapPointType === "start" ? "end" : "start";
         } else {
             conflictPoint = toType === "start" ? startPoint : endPoint;
             conflictTypeName = toType;
@@ -45,13 +45,13 @@ export default function PointTypeField() {
                 tone: "warning",
                 confirmLabel: "Continue",
                 confirmAction: async () => {
-                    await changePointType(envId, selectedEnvPointType!, toType);
-                    selectEnvPoint(toType);
+                    await changePointType(mapId, selectedMapPointType!, toType);
+                    selectMapPoint(toType);
                 },
             });
         } else {
-            changePointType(envId, selectedEnvPointType!, toType).then(() => {
-                selectEnvPoint(toType);
+            changePointType(mapId, selectedMapPointType!, toType).then(() => {
+                selectMapPoint(toType);
             });
         }
     }
@@ -59,7 +59,7 @@ export default function PointTypeField() {
     return (
         <InspectorPanelSectionSelectField
             label="Type"
-            value={selectedEnvPointType}
+            value={selectedMapPointType}
             options={POINT_TYPE_OPTIONS}
             onChange={handleChange}
         />

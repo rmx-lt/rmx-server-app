@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useEnvPointStore } from "@/model/envPointStore";
+import { useMapPointStore } from "@/model/mapPointStore";
 import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
@@ -11,15 +11,15 @@ import { useGeoAnchorStore } from "@/model/geoAnchorStore";
  * before the next save (or after a failed one).
  */
 export function useBeforeUnload(): void {
-    const isEnvDirty = useEnvStore((state) => state.isEnvDirty);
+    const isMapDirty = useMapStore((state) => state.isMapDirty);
     const isCanvasDirty = useCanvasObjectStore(selectIsDirty);
     const isSystemGeoAnchorDirty = useGeoAnchorStore((state) => state.isSystemGeoAnchorDirty);
-    const isEnvironmentGeoAnchorDirty = useGeoAnchorStore((state) => state.isEnvironmentGeoAnchorDirty);
+    const isMapGeoAnchorDirty = useGeoAnchorStore((state) => state.isMapGeoAnchorDirty);
     const isLayerSettingsDirty = useLayerSettingsStore((state) => state.isLayerSettingsDirty);
-    const isEnvPointsDirty = useEnvPointStore((state) => state.isEnvPointsDirty);
+    const isMapPointsDirty = useMapPointStore((state) => state.isMapPointsDirty);
 
     const shouldWarn =
-        isEnvDirty || isCanvasDirty || isSystemGeoAnchorDirty || isEnvironmentGeoAnchorDirty || isLayerSettingsDirty || isEnvPointsDirty;
+        isMapDirty || isCanvasDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty || isLayerSettingsDirty || isMapPointsDirty;
 
     useEffect(() => {
         if (!shouldWarn) return;

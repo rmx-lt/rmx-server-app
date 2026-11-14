@@ -1,4 +1,4 @@
-import type { CoordSystemType, EnvFormat, EnvType, ObjectCategory, ObjectType } from "@/config/db-ops/enums";
+import type { CoordSystemType, MapFormat, MapType, ZoneCategory, ZoneType } from "@/config/db-ops/enums";
 
 /**
  * Geographic anchor that binds the canvas world origin (0, 0) to a real-world
@@ -12,16 +12,16 @@ export interface GeoAnchor {
     lon: number;
 }
 
-export interface Environment {
+export interface MapInfo {
     id: number;
     name: string;
-    format: EnvFormat;
-    type: EnvType;
+    format: MapFormat;
+    type: MapType;
     coordSystem: CoordSystemType;
     headlandEnabled: boolean;
     headlandWidth: string;
-    zoneCount: number;
-    obstacleCount: number;
+    mowingZoneCount: number;
+    noGoZoneCount: number;
 }
 
 /** Singleton row containing system-level default geo anchor values. */
@@ -32,24 +32,24 @@ export interface GeoAnchorSystemRecord {
     geoAnchor?: GeoAnchor;
 }
 
-/** Per-environment geo anchor assignment. One row per environment. */
-export interface EnvironmentGeoAnchorRecord {
-    /** PK — FK → environments.id */
-    environmentId: number;
-    /** Optional environment-specific anchor. */
+/** Per-map geo anchor assignment. One row per map. */
+export interface MapGeoAnchorRecord {
+    /** PK — FK → maps.id */
+    mapId: number;
+    /** Optional map-specific anchor. */
     geoAnchor?: GeoAnchor;
 }
 
-export interface Object {
+export interface Zone {
     id: number;
-    environmentId: number;
-    category: ObjectCategory;
+    mapId: number;
+    category: ZoneCategory;
     /**
      * Vertex winding convention (in screen coordinates, Y increases downward):
      * - `zone`     → vertices inserted **clockwise** (positive signed area)
-     * - `obstacle` → vertices inserted **counter-clockwise** (negative signed area)
+     * - `no-go zone` → vertices inserted **counter-clockwise** (negative signed area)
      */
-    type: ObjectType;
+    type: ZoneType;
     /** Cached: precomputed number of vertices. */
     vertexCount: number;
     /** Cached: precomputed polygon area (shoelace formula). */
@@ -58,11 +58,11 @@ export interface Object {
     vertices: Array<{ x: number; y: number }>;
 }
 
-export type EnvPointType = "start" | "end" | "start_end";
+export type MapPointType = "start" | "end" | "start_end";
 
-export interface EnvPoint {
+export interface MapPoint {
     id?: number;
-    environmentId: number;
-    type: EnvPointType;
+    mapId: number;
+    type: MapPointType;
     point: { x: number; y: number };
 }

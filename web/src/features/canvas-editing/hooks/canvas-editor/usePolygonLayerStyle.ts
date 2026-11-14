@@ -1,6 +1,6 @@
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
 import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
-import { OBJECT_CATEGORY, type ObjectCategory } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
 
 interface PolygonLayerStyle {
     /** Whether the layer is currently set to visible. */
@@ -17,7 +17,7 @@ interface PolygonLayerStyle {
 
 const DEFAULTS = {
     zone: { stroke: "#22c55e", fill: "#22c55e2e" },
-    obstacle: { stroke: "#ef4444", fill: "#ef44443b" },
+    noGoZone: { stroke: "#ef4444", fill: "#ef44443b" },
 } as const;
 
 /**
@@ -25,9 +25,9 @@ const DEFAULTS = {
  * Centralises the repeated getLayerParam calls that previously appeared in every
  * canvas layer component.
  */
-export function usePolygonLayerStyle(category: ObjectCategory): PolygonLayerStyle {
+export function usePolygonLayerStyle(category: ZoneCategory): PolygonLayerStyle {
     const layers = useLayerSettingsStore((s) => s.layers);
-    const layerId = category === OBJECT_CATEGORY.ZONE ? LAYER_ID.ZONES : LAYER_ID.OBSTACLES;
+    const layerId = category === ZONE_CATEGORY.MOWING ? LAYER_ID.MOWING_ZONES : LAYER_ID.NO_GO_ZONES;
     const def = DEFAULTS[category as keyof typeof DEFAULTS] ?? DEFAULTS.zone;
     return {
         visible: getLayerParam(layers, layerId, LAYER_PARAM_KEY.VISIBLE) !== "false",

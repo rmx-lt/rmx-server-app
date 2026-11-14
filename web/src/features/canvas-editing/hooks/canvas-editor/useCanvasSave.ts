@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { requestAutosave } from "@/features/canvas-editing/data/canvasBridge";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useEnvPointStore } from "@/model/envPointStore";
+import { useMapPointStore } from "@/model/mapPointStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
 /**
@@ -19,17 +19,17 @@ export function useCanvasAutosave(): void {
             useCanvasObjectStore.subscribe((s, prev) => {
                 if (s.dirtyObjects !== prev.dirtyObjects || s.deletedObjects !== prev.deletedObjects) requestAutosave();
             }),
-            useEnvStore.subscribe((s, prev) => {
-                if (s.isEnvDirty && s.env !== prev.env) requestAutosave();
+            useMapStore.subscribe((s, prev) => {
+                if (s.isMapDirty && s.map !== prev.map) requestAutosave();
             }),
             useLayerSettingsStore.subscribe((s, prev) => {
                 if (s.isLayerSettingsDirty && s.layers !== prev.layers) requestAutosave();
             }),
-            useEnvPointStore.subscribe((s, prev) => {
-                if (s.isEnvPointsDirty && s !== prev) requestAutosave();
+            useMapPointStore.subscribe((s, prev) => {
+                if (s.isMapPointsDirty && s !== prev) requestAutosave();
             }),
             useGeoAnchorStore.subscribe((s, prev) => {
-                if (s.isEnvironmentGeoAnchorDirty && s.environmentDraft !== prev.environmentDraft) requestAutosave();
+                if (s.isMapGeoAnchorDirty && s.mapDraft !== prev.mapDraft) requestAutosave();
             }),
         ];
         return () => unsubscribes.forEach((u) => u());

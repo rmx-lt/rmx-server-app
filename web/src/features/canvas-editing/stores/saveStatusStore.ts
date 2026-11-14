@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { useEnvStore } from "@/model/envStore";
+import { useMapStore } from "@/model/mapStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useEnvPointStore } from "@/model/envPointStore";
+import { useMapPointStore } from "@/model/mapPointStore";
 import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
@@ -23,15 +23,15 @@ interface SaveStatusState {
 // ---------------------------------------------------------------------------
 
 function computeStatus(): SaveStatus {
-    const { isEnvDirty } = useEnvStore.getState();
+    const { isMapDirty } = useMapStore.getState();
     const isCanvasDirty = selectIsDirty(useCanvasObjectStore.getState());
     const { isLayerSettingsDirty } = useLayerSettingsStore.getState();
     const { mode } = useSaveModeStore.getState();
 
-    const { isEnvPointsDirty } = useEnvPointStore.getState();
-    const { isSystemGeoAnchorDirty, isEnvironmentGeoAnchorDirty } = useGeoAnchorStore.getState();
+    const { isMapPointsDirty } = useMapPointStore.getState();
+    const { isSystemGeoAnchorDirty, isMapGeoAnchorDirty } = useGeoAnchorStore.getState();
 
-    const isDirty = isEnvDirty || isCanvasDirty || isLayerSettingsDirty || isEnvPointsDirty || isSystemGeoAnchorDirty || isEnvironmentGeoAnchorDirty;
+    const isDirty = isMapDirty || isCanvasDirty || isLayerSettingsDirty || isMapPointsDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty;
 
     if (isDirty && mode !== "autosave") return "unsaved";
     if (mode === "autosave" || (mode === "manual" && !isDirty)) return "saved";
@@ -63,9 +63,9 @@ function syncStatus(): void {
     useSaveStatusStore.setState({ status: computeStatus() });
 }
 
-useEnvStore.subscribe(syncStatus);
+useMapStore.subscribe(syncStatus);
 useCanvasObjectStore.subscribe(syncStatus);
 useSaveModeStore.subscribe(syncStatus);
 useLayerSettingsStore.subscribe(syncStatus);
-useEnvPointStore.subscribe(syncStatus);
+useMapPointStore.subscribe(syncStatus);
 useGeoAnchorStore.subscribe(syncStatus);
