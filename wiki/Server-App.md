@@ -420,6 +420,8 @@ new domains and the ported blade-terminal client fit without a later move.
 go.mod, go.sum          Go module (go 1.26), staticcheck pinned as a tool
 cmd/rmx-server/         main: serve, healthcheck, user commands (imports app only)
 cmd/gen-ts/             TypeScript generator; reads internal/api only
+cmd/devsim/             simulated gateway for local development (config for .env, paho)
+dev/                    local broker config; run.ps1 starts the whole local environment
 internal/
   app/                  composition root: construct, wire, start/stop, health, static files, CLI
   buildinfo/            Version (the -ldflags target)
@@ -451,7 +453,7 @@ with its layer, from `go list`; a package that is not listed fails the test):
   cross-domain need is a small interface declared by the consumer (e.g.
   `commands.DeviceLookup`), satisfied by the other domain and injected by `app`.
 - Only `app` and `integration` import everything. `cmd/rmx-server` imports
-  only `app`, `cmd/gen-ts` only `api`.
+  only `app`, `cmd/gen-ts` only `api`, `cmd/devsim` only `config` (for `.env`).
 - Each table has one owning domain; foreign keys to `devices` / `users` are
   fine, cross-domain queries are not. A cross-domain write uses `db.InTx`
   and passes the transaction to both stores. Events are published after the
@@ -459,7 +461,8 @@ with its layer, from `go list`; a package that is not listed fails the test):
   in the database, not on the bus.
 - Third-party fences: paho only in `mqtt`, coder/websocket only in `ws`, pgx
   (and goose) only in `db` and in the domains' `store.go` files. The
-  integration tests are exempt: they play the browser and the devices.
+  integration tests are exempt: they play the browser and the devices. `cmd/devsim`
+  may use paho too: it plays a device.
 
 Not used, on purpose: several Go modules, `pkg/`, an interface around every
 store, an outbox or external bus, an ORM, OpenAPI, sqlc (for now),
@@ -518,6 +521,61 @@ Dockerfile                        multi-stage: bun build + go build → distrole
 ## Local development
 
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
+
+**One command** (PowerShell, from the repo):
+
+```powershell
+dev\run.ps1             # stack + Go server + web dev server + simulated device
+dev\run.ps1 -NoSim      # without the simulated device
+dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
+```
+
+Then open <http://localhost:3000/app/> and log in as `DEV_USER` / `DEV_PASSWORD`
+from `.env` (default `dev` / `dev-password-123`). The script:
+
+- creates `.env` from `.env.example` when it is missing;
+- refuses to start when port 8080 or 3000 is taken (a leftover server would
+  answer instead), and names the process;
+- starts TimescaleDB + Mosquitto (`compose.dev.yaml`; they keep running after
+  Ctrl+C, stop them with `docker compose -f compose.dev.yaml down`);
+- builds `rmx-server` and `devsim` into `.dev/` (gitignored), creates the dev
+  login or resets its password to `DEV_PASSWORD`;
+- runs the web dev server (hot reload), the server and the simulator in one
+  terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
+  `.env` it rebuilds and restarts the server and the simulator; a build error
+  waits for the next save. Ctrl+C stops all three;
+- sets `FIRMWARE_DIR=dev/firmware` (gitignored) when `.env` sets none, so the
+  simulator's `ota` works: drop any `<version>.bin` there.
+
+**Simulated device** (`cmd/devsim`). It behaves like rmx-mower-gateway on the
+local broker, written from the firmware's contract (`remote_cmd.h`, `ota.c`)
+and from [Firmware over MQTT](#firmware-over-mqtt), not from the server code:
+
+- logs in as `test-device` with the client id `<name>` (default `mower-sim`,
+  `DEVSIM_NAME` or `-name`); retained `online` on `mower/<name>/status`, last
+  will `offline`;
+- answers `ping`, `status`, `gps` (a fixed position), `ota` and `restart` on
+  `mower/<name>/cmd` with the firmware's replies and error codes on
+  `mower/<name>/cmd/ack` (`expires_at`, duplicate ids, `busy`, `same_version`,
+  `unknown_cmd`, ...);
+- `ota` downloads the file from the local server chunk by chunk, checks size,
+  SHA-256 and (for a real ESP-IDF image) the version, acks `done`, then
+  "restarts": `offline`, 3 s, `online` with the new version on the other
+  partition, and a retained report on `mower/<name>/firmware`. A test file of
+  any content works; there is no signature check;
+- `go run ./cmd/devsim send <cmd> [key=value ...]` publishes a command as the
+  `app` login and prints the ack(s), like the gateway's `tools/mqtt_cmd.ps1`:
+
+```powershell
+go run ./cmd/devsim send status
+go run ./cmd/devsim send ota version=0.4.0 size=9000   # dev/firmware/0.4.0.bin
+go run ./cmd/devsim -name mower-02                     # a second device
+```
+
+The real board connects only to the VPS broker (port 8884, client
+certificate), so testing with it means a production deploy.
+
+**By hand**, the same steps one by one:
 
 ```powershell
 # 1. Settings: dev-only passwords for the local stack.
