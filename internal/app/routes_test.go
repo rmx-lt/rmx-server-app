@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmx-lt/rmx-server-app/internal/auth"
 	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/planning"
 	"github.com/rmx-lt/rmx-server-app/internal/ws"
 )
 
@@ -24,9 +25,10 @@ var publicRoutes = []string{
 
 func testApp(staticDir string) *app {
 	a := &app{
-		cfg:  &config.Config{StaticDir: staticDir},
-		auth: auth.New(nil),
-		ws:   ws.New(context.Background(), nil),
+		cfg:      &config.Config{StaticDir: staticDir},
+		auth:     auth.New(nil),
+		planning: planning.New(nil),
+		ws:       ws.New(context.Background(), nil),
 	}
 	if staticDir != "" {
 		a.static = http.NotFoundHandler()
@@ -48,7 +50,19 @@ func TestPublicRoutes(t *testing.T) {
 
 func TestProtectedRoutes(t *testing.T) {
 	got := testApp("").router().ProtectedRoutes()
-	want := []string{"GET /app/api/auth/me", "GET /app/ws", "POST /app/api/auth/logout-all"}
+	want := []string{
+		"DELETE /app/api/environments/{id}",
+		"DELETE /app/api/settings/{key}",
+		"GET /app/api/auth/me",
+		"GET /app/api/environments",
+		"GET /app/api/environments/{id}",
+		"GET /app/api/settings",
+		"GET /app/ws",
+		"POST /app/api/auth/logout-all",
+		"POST /app/api/environments",
+		"PUT /app/api/environments/{id}",
+		"PUT /app/api/settings/{key}",
+	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("protected routes: got %q, want %q", got, want)
 	}

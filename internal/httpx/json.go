@@ -34,16 +34,21 @@ func WriteError(w http.ResponseWriter, err error) {
 	WriteJSON(w, e.Status(), e.API())
 }
 
-// maxBody is the largest request body read; the biggest legitimate one (a
-// login) is far smaller.
+// maxBody is the largest request body ReadJSON reads; most bodies (a login)
+// are far smaller. Routes with bigger bodies use ReadJSONLimit.
 const maxBody = 64 << 10
 
 // ReadJSON reads the request body into v (a struct pointer, see
-// api.Unmarshal for what counts as a missing member).
+// api.Unmarshal for what counts as a missing member), at most 64 KiB.
 func ReadJSON(w http.ResponseWriter, r *http.Request, v any) *apperr.Error {
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
+	return ReadJSONLimit(w, r, v, maxBody)
+}
+
+// ReadJSONLimit is ReadJSON with a limit of limit bytes.
+func ReadJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) *apperr.Error {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if err != nil {
-		return apperr.BadRequest("request body could not be read (at most %d KiB)", maxBody>>10)
+		return apperr.BadRequest("request body could not be read (at most %d KiB)", limit>>10)
 	}
 	if err := api.Unmarshal(body, v); err != nil {
 		return apperr.BadRequest("invalid request body: %v", err)

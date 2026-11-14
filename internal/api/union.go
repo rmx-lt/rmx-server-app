@@ -62,8 +62,10 @@ type Enum struct {
 // Enums lists every enum, for the TypeScript generator.
 var Enums = []Enum{
 	{"ErrorCode", reflect.TypeFor[ErrorCode](), []string{
-		"bad_request", "not_found", "internal", "unauthorized", "forbidden", "too_many_requests",
+		"bad_request", "not_found", "internal", "unauthorized", "forbidden", "too_many_requests", "conflict",
 	}},
+	{"ObjectCategory", reflect.TypeFor[ObjectCategory](), []string{"zone", "obstacle"}},
+	{"EnvPointType", reflect.TypeFor[EnvPointType](), []string{"start", "end", "start_end"}},
 }
 
 // Structs lists every plain struct, for the TypeScript generator.
@@ -74,6 +76,20 @@ var Structs = []reflect.Type{
 	reflect.TypeFor[Health](),
 	reflect.TypeFor[LoginRequest](),
 	reflect.TypeFor[Me](),
+	reflect.TypeFor[Point](),
+	reflect.TypeFor[GeoAnchor](),
+	reflect.TypeFor[PlanObject](),
+	reflect.TypeFor[EnvPoint](),
+	reflect.TypeFor[LayerSetting](),
+	reflect.TypeFor[EnvironmentDoc](),
+	reflect.TypeFor[EnvironmentSummary](),
+	reflect.TypeFor[EnvironmentList](),
+	reflect.TypeFor[Environment](),
+	reflect.TypeFor[EnvironmentCreate](),
+	reflect.TypeFor[EnvironmentUpdate](),
+	reflect.TypeFor[Setting](),
+	reflect.TypeFor[SettingList](),
+	reflect.TypeFor[SettingValue](),
 }
 
 func (u *Union) marshal(v any) ([]byte, error) {

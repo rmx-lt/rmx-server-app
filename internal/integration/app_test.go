@@ -148,6 +148,9 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 	ctx := context.Background()
 	for _, stmt := range []string{
 		`DROP TABLE goose_db_version`,
+		// Back to the schema sqlx left behind: undo what the migrations after
+		// its three created (20261113000000_records_drop only drops, with IF EXISTS).
+		`DROP TABLE environments, user_settings`,
 		`CREATE TABLE _sqlx_migrations (version bigint PRIMARY KEY, description text NOT NULL,
 		   installed_on timestamptz NOT NULL DEFAULT now(), success boolean NOT NULL,
 		   checksum bytea NOT NULL, execution_time bigint NOT NULL)`,
@@ -167,7 +170,7 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The three it adopted, plus the ones after them.
-	eq(t, applied, 4)
+	eq(t, applied, 5)
 	// Running again does nothing, and the old table is still there.
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)

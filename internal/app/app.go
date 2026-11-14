@@ -20,6 +20,7 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/db"
 	"github.com/rmx-lt/rmx-server-app/internal/firmware"
 	"github.com/rmx-lt/rmx-server-app/internal/mqtt"
+	"github.com/rmx-lt/rmx-server-app/internal/planning"
 	"github.com/rmx-lt/rmx-server-app/internal/ws"
 )
 
@@ -28,8 +29,10 @@ type app struct {
 	cfg  *config.Config
 	pool *db.Pool
 	auth *auth.Service
-	mqtt *mqtt.Client
-	ws   *ws.Server
+	// planning holds the users' environments and settings.
+	planning *planning.Service
+	mqtt     *mqtt.Client
+	ws       *ws.Server
 	// static serves the built web app; nil when STATIC_DIR is not set.
 	static http.Handler
 }
@@ -71,7 +74,7 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	defer closeStatic()
 
 	mq.Start()
-	a := &app{cfg: cfg, pool: pool, auth: authSvc, mqtt: mq, ws: ws.New(ctx, authSvc.SessionValid), static: static}
+	a := &app{cfg: cfg, pool: pool, auth: authSvc, planning: planning.New(pool), mqtt: mq, ws: ws.New(ctx, authSvc.SessionValid), static: static}
 
 	var background sync.WaitGroup
 	background.Add(1)

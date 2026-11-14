@@ -12,6 +12,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -142,7 +143,10 @@ type generator struct {
 	files map[string]string       // TypeScript name -> file content
 }
 
-var timeType = reflect.TypeFor[time.Time]()
+var (
+	timeType = reflect.TypeFor[time.Time]()
+	rawType  = reflect.TypeFor[json.RawMessage]()
+)
 
 func (g *generator) generate() error {
 	for _, e := range api.Enums {
@@ -255,6 +259,8 @@ func (g *generator) tsType(t reflect.Type, deps map[string]bool) (string, error)
 	switch {
 	case t == timeType:
 		return "string", nil // RFC 3339
+	case t == rawType:
+		return "unknown", nil // any JSON value
 	case t.Kind() == reflect.Pointer:
 		inner, err := g.tsType(t.Elem(), deps)
 		return inner + " | null", err

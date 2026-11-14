@@ -3,4 +3,4 @@
 /**
  * ErrorCode says what went wrong, in an ApiError.
  */
-export type ErrorCode = "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests";
+export type ErrorCode = "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests" | "conflict";

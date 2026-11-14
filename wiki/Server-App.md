@@ -17,6 +17,7 @@ and ported to Go in November 2026, when the backend language was decided
 - [How it works](#how-it-works)
 - [Firmware over MQTT](#firmware-over-mqtt)
 - [Login and sessions](#login-and-sessions)
+- [Planning API](#planning-api)
 - [Web app](#web-app)
 - [Repository layout](#repository-layout)
 - [Local development](#local-development)
@@ -39,8 +40,10 @@ This is the production layout: **browsers never speak MQTT**. Only devices
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **HTTPS**: login and logout under `/app/api/auth`, `/app/health`, and
-  the built client under `/app/`.
+- **HTTPS**: login and logout under `/app/api/auth`, the user's
+  environments and settings under `/app/api/environments` and
+  `/app/api/settings` (see [Planning API](#planning-api)), `/app/health`,
+  and the built client under `/app/`.
 - **WSS**: `/app/ws`, JSON request/response with a `request_id`. The only
   request today is `ping`; the connection (session check, keep-alive, close
   codes) is what later features build on.
@@ -62,6 +65,8 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
+| `environments` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the environment's content, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 
 The first migrations still create the old `records` and `record_events`
 tables; a later one drops them, so every database runs the same sequence.
@@ -95,7 +100,7 @@ Everything except login, logout and `/app/health` needs the session cookie
 (else 401). Every request that changes something, and the WebSocket handshake,
 needs an allowed `Origin` (else 403).
 
-Errors: `{"code": "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests", "message": "..."}`.
+Errors: `{"code": "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests" | "conflict", "message": "..."}`.
 
 The WebSocket carries one envelope:
 
@@ -384,6 +389,43 @@ docker compose exec -T app /app/rmx-server create-user admin < password-file
 Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
 12–256 characters. There is no default user and no default password.
 
+## Planning API
+
+Where the web app keeps what users plan: their environments and their
+settings, per user. Code: `internal/planning/`, wire types in
+`internal/api/planning.go` (generated to `web/src/data/api/generated/`).
+All routes need a session; another user's environment answers 404, as if it
+did not exist.
+
+| Route | Body → answer |
+|---|---|
+| `GET /app/api/environments` | → `EnvironmentList`: id, name, revision, zone and obstacle counts, `updated_at`; newest change first |
+| `POST /app/api/environments` | `EnvironmentCreate` {name, doc} → 201 `Environment` at revision 1 |
+| `GET /app/api/environments/{id}` | → `Environment` {id, name, revision, updated_at, doc} |
+| `PUT /app/api/environments/{id}` | `EnvironmentUpdate` {name, revision, doc} → `Environment` at revision + 1; 409 `conflict` when `revision` is not the stored one |
+| `DELETE /app/api/environments/{id}` | → 204 |
+| `GET /app/api/settings` | → `SettingList` {settings: [{key, value}]}, sorted by key |
+| `PUT /app/api/settings/{key}` | `SettingValue` {value: any JSON but null} → 204 |
+| `DELETE /app/api/settings/{key}` | → 204, also when the key was not set |
+
+**One document per environment.** The client loads and saves an environment
+as a whole, so its content is one JSON document (`EnvironmentDoc`): format,
+type, coordinate system, headland, `objects` (polygons: id, category `zone`
+or `obstacle`, type, vertices), `points` (at most one each of `start`, `end`,
+`start_end`), `layer_settings` (layer id, setting id, value) and
+`geo_anchor` (WGS-84 of the canvas origin, or null). Missing lists come back
+as empty arrays.
+
+**Revisions instead of last-write-wins.** Every save names the revision it
+started from. If another browser saved in between, the save is refused with
+409 and the client has to reload; nothing is overwritten silently.
+
+**Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
+spaces removed), a body of at most 4 MiB, 5000 objects, 100 000 vertices,
+1000 layer settings of at most 4096 characters each, a geo anchor inside
+±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
+at most 16 KiB of JSON, at most 100 settings per user.
+
 ## Web app
 
 The web app in `web/` is the blade-terminal workbench, ported from
@@ -397,8 +439,9 @@ whether the session still exists and shows the login form if not.
 
 - **Data stays in the browser.** Environments, objects, layers and settings are
   stored in IndexedDB through Dexie (database name `blade-terminal`, code in
-  `web/src/data/local/`), per browser profile, not on the server. Moving them
-  to the server is rmx-server-app#53.
+  `web/src/data/local/`), per browser profile, not on the server. The server
+  side exists ([Planning API](#planning-api)); switching the client to it is
+  [rmx-server-app#79](https://github.com/rmx-lt/rmx-server-app/issues/79).
 - **Saving.** The status bar shows the save state; File → Save (Ctrl+S) or a
   click on "Unsaved changes" saves. A page load starts a new blank environment;
   saved ones open with File → Open (Ctrl+O).
@@ -433,7 +476,7 @@ internal/
   httpx/                Router with Public() / Protected() only, JSON helpers
   mqtt/                 broker client, topic grammar <prefix>/<device>/<suffix>, suffix → handler
   ws/                   connections, op → handler routing, event push
-  auth/ firmware/       domains (later: devices, telemetry, commands, planning), files:
+  auth/ firmware/       domains (planning/ too; later: devices, telemetry, commands), files:
                           service.go, store.go (all SQL, takes db.DBTX), http.go, ws.go,
                           mqtt.go (device payloads + topic suffixes), as far as the domain needs them
   integration/          harness (fresh database, own topic prefix, logged-in client)
@@ -655,7 +698,7 @@ Then open <http://localhost:8080/app/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `firmware_test.go`) start the real
+`app_test.go`, `auth_test.go`, `firmware_test.go`, `planning_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
 ping, a firmware download (every chunk, including a resume from the middle,
@@ -665,7 +708,10 @@ login: wrong
 password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
-fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit.
+fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
+the planning API: an environment's create/read/update/delete, the revision
+conflict, invalid input, that users can't see each other's environments, and
+settings.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
