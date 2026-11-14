@@ -32,7 +32,7 @@ type Config struct {
 	MQTT             MQTT
 	// AllowedOrigins is ALLOWED_ORIGINS, required: comma-separated origins
 	// (scheme://host[:port]) whose pages may log in, change data and open the
-	// WebSocket. On the VPS https://api.rmx.lt. Everything else gets 403 (CSRF
+	// WebSocket. On the VPS https://rmx.lt. Everything else gets 403 (CSRF
 	// protection).
 	AllowedOrigins []string
 	// StaticDir is STATIC_DIR: built client files to serve under /app/. Empty
@@ -168,7 +168,7 @@ func ParseOrigins(value string) ([]string, error) {
 			return nil, fmt.Errorf("ALLOWED_ORIGINS: %s must start with https:// or http://", o)
 		}
 		if rest == "" || strings.ContainsAny(rest, "/?#@*") {
-			return nil, fmt.Errorf("ALLOWED_ORIGINS: %s must be only scheme://host[:port], like https://api.rmx.lt", o)
+			return nil, fmt.Errorf("ALLOWED_ORIGINS: %s must be only scheme://host[:port], like https://rmx.lt", o)
 		}
 		origins = append(origins, lower)
 	}
