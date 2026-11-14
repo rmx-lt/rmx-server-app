@@ -47,6 +47,7 @@ var layers = map[string]layer{
 
 	"internal/auth":     domain,
 	"internal/firmware": domain,
+	"internal/planning": domain,
 
 	"internal/app":         root,
 	"internal/integration": root,
