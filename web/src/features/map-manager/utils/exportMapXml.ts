@@ -1,8 +1,8 @@
 import type { GeoAnchor, MapInfo, MapPoint, Zone } from "@/data/planning/schemaTypes";
 
-// Writes a map as XML (read back by importMapXml.ts). The element names
-// (<workspace>, <environment>, <objects>, <envPoints>) are the file format's
-// and stay as they are; zone categories are the server's ("mowing", "no_go").
+// Writes a map as XML (read back by importMapXml.ts): <map> holds <info> (name,
+// format, type, coordinate system, headland), <zones> (one <zone> each, with
+// the server's categories "mowing" and "no_go"), <points> and <geoAnchor>.
 
 function escapeXmlText(value: string): string {
     return value
@@ -15,21 +15,21 @@ export function buildExportXml(map: MapInfo, zones: Zone[], mapPoints: MapPoint[
     const lines: string[] = [];
 
     lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-    lines.push("<workspace>");
+    lines.push("<map>");
 
-    lines.push("  <environment>");
+    lines.push("  <info>");
     lines.push(`    <name>${escapeXmlText(map.name)}</name>`);
     lines.push(`    <format>${escapeXmlText(map.format)}</format>`);
     lines.push(`    <type>${escapeXmlText(map.type)}</type>`);
     lines.push(`    <coordSystem>${escapeXmlText(map.coordSystem)}</coordSystem>`);
     lines.push(`    <headlandEnabled>${map.headlandEnabled}</headlandEnabled>`);
     lines.push(`    <headlandWidth>${escapeXmlText(map.headlandWidth)}</headlandWidth>`);
-    lines.push("  </environment>");
+    lines.push("  </info>");
 
-    lines.push("  <objects>");
+    lines.push("  <zones>");
 
     for (const zone of zones) {
-        lines.push(`    <object>`);
+        lines.push(`    <zone>`);
         lines.push(`      <id>${zone.id}</id>`);
         lines.push(`      <category>${escapeXmlText(zone.category)}</category>`);
         lines.push(`      <type>${escapeXmlText(zone.type)}</type>`);
@@ -41,12 +41,12 @@ export function buildExportXml(map: MapInfo, zones: Zone[], mapPoints: MapPoint[
             lines.push(`        </vertex>`);
         }
         lines.push(`      </vertices>`);
-        lines.push("    </object>");
+        lines.push("    </zone>");
     }
 
-    lines.push("  </objects>");
+    lines.push("  </zones>");
 
-    lines.push("  <envPoints>");
+    lines.push("  <points>");
 
     for (const mapPoint of mapPoints) {
         lines.push("    <point>");
@@ -56,7 +56,7 @@ export function buildExportXml(map: MapInfo, zones: Zone[], mapPoints: MapPoint[
         lines.push("    </point>");
     }
 
-    lines.push("  </envPoints>");
+    lines.push("  </points>");
 
     if (geoAnchor) {
         lines.push("  <geoAnchor>");
@@ -65,7 +65,7 @@ export function buildExportXml(map: MapInfo, zones: Zone[], mapPoints: MapPoint[
         lines.push("  </geoAnchor>");
     }
 
-    lines.push("</workspace>");
+    lines.push("</map>");
 
     return lines.join("\n");
 }

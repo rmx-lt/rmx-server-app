@@ -12,9 +12,9 @@ import {
 } from "@/config/db-ops/enums";
 import type { MapPointType, GeoAnchor } from "@/data/planning/schemaTypes";
 
-// Reads a map from the XML file the export writes (exportMapXml.ts). The
-// element names (<workspace>, <environment>, <objects>, <envPoints>) are the
-// file format's and stay as they are.
+// Reads a map from the XML file the export writes (exportMapXml.ts). Files of
+// earlier versions (root <workspace>, zone categories "zone" and "obstacle")
+// are not read.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,8 +65,7 @@ const VALID_MAP_POINT_TYPES: MapPointType[] = ["start", "end", "start_end"];
 
 /**
  * The zone category of a <category> value, or an error naming the values
- * allowed. Only the server's categories are read; files written before they
- * were renamed ("zone", "obstacle") are not.
+ * allowed. Only the server's categories are read.
  */
 export function parseZoneCategory(value: string, context: string): ZoneCategory | ImportParseError {
     if (VALID_CATEGORIES.includes(value)) return value as ZoneCategory;
@@ -119,43 +118,43 @@ export function parseImportXml(xml: string): ImportedMapData | ImportParseError 
     }
 
     const root = doc.documentElement;
-    if (root.tagName !== "workspace") {
-        return { error: `Expected root element <workspace>, got <${root.tagName}>.` };
+    if (root.tagName !== "map") {
+        return { error: `Expected root element <map>, got <${root.tagName}>.` };
     }
 
-    const rootAttrErr = checkNoAttributes(root, "<workspace>");
+    const rootAttrErr = checkNoAttributes(root, "<map>");
     if (rootAttrErr) return rootAttrErr;
-    const rootChildErr = checkChildren(root, ["environment", "objects", "envPoints", "geoAnchor"], "<workspace>");
+    const rootChildErr = checkChildren(root, ["info", "zones", "points", "geoAnchor"], "<map>");
     if (rootChildErr) return rootChildErr;
 
-    // --- <environment> ---
-    const mapEl = root.querySelector(":scope > environment");
-    if (!mapEl) return { error: "Missing <environment> element." };
+    // --- <info> ---
+    const mapEl = root.querySelector(":scope > info");
+    if (!mapEl) return { error: "Missing <info> element." };
 
-    const mapAttrErr = checkNoAttributes(mapEl, "<workspace>");
+    const mapAttrErr = checkNoAttributes(mapEl, "<info>");
     if (mapAttrErr) return mapAttrErr;
-    const mapChildErr = checkChildren(mapEl, ["name", "format", "type", "coordSystem", "headlandEnabled", "headlandWidth"], "<environment>");
+    const mapChildErr = checkChildren(mapEl, ["name", "format", "type", "coordSystem", "headlandEnabled", "headlandWidth"], "<info>");
     if (mapChildErr) return mapChildErr;
 
-    const nameResult = requireText(mapEl, "name", "<environment>");
+    const nameResult = requireText(mapEl, "name", "<info>");
     if (typeof nameResult !== "string") return nameResult;
     const name = nameResult;
 
-    const formatResult = requireText(mapEl, "format", "<environment>");
+    const formatResult = requireText(mapEl, "format", "<info>");
     if (typeof formatResult !== "string") return formatResult;
     if (!VALID_FORMATS.includes(formatResult)) {
         return { error: `Invalid <format> value "${formatResult}". Expected one of: ${VALID_FORMATS.join(", ")}.` };
     }
     const format = formatResult as MapFormat;
 
-    const typeResult = requireText(mapEl, "type", "<environment>");
+    const typeResult = requireText(mapEl, "type", "<info>");
     if (typeof typeResult !== "string") return typeResult;
     if (!VALID_TYPES.includes(typeResult)) {
         return { error: `Invalid <type> value "${typeResult}". Expected one of: ${VALID_TYPES.join(", ")}.` };
     }
     const type = typeResult as MapType;
 
-    const coordResult = requireText(mapEl, "coordSystem", "<environment>");
+    const coordResult = requireText(mapEl, "coordSystem", "<info>");
     if (typeof coordResult !== "string") return coordResult;
     if (!VALID_COORD_SYSTEMS.includes(coordResult)) {
         return { error: `Invalid <coordSystem> value "${coordResult}". Expected one of: ${VALID_COORD_SYSTEMS.join(", ")}.` };
@@ -173,42 +172,42 @@ export function parseImportXml(xml: string): ImportedMapData | ImportParseError 
 
     const headlandWidth = textContent(mapEl, "headlandWidth") ?? "10";
 
-    // --- <objects> ---
-    const objectsEl = root.querySelector(":scope > objects");
-    if (!objectsEl) return { error: "Missing <objects> element." };
+    // --- <zones> ---
+    const zonesEl = root.querySelector(":scope > zones");
+    if (!zonesEl) return { error: "Missing <zones> element." };
 
-    const objectsAttrErr = checkNoAttributes(objectsEl, "<workspace>");
-    if (objectsAttrErr) return objectsAttrErr;
-    const objectsChildErr = checkChildren(objectsEl, ["object"], "<objects>");
-    if (objectsChildErr) return objectsChildErr;
+    const zonesAttrErr = checkNoAttributes(zonesEl, "<zones>");
+    if (zonesAttrErr) return zonesAttrErr;
+    const zonesChildErr = checkChildren(zonesEl, ["zone"], "<zones>");
+    if (zonesChildErr) return zonesChildErr;
 
     const zones: ParsedZone[] = [];
-    const objectEls = objectsEl.querySelectorAll(":scope > object");
+    const zoneEls = zonesEl.querySelectorAll(":scope > zone");
 
-    for (let i = 0; i < objectEls.length; i++) {
-        const objEl = objectEls[i]!;
-        const label = `<object> #${i + 1}`;
+    for (let i = 0; i < zoneEls.length; i++) {
+        const zoneEl = zoneEls[i]!;
+        const label = `<zone> #${i + 1}`;
 
-        const objAttrErr = checkNoAttributes(objEl, label);
-        if (objAttrErr) return objAttrErr;
-        const objChildErr = checkChildren(objEl, ["id", "category", "type", "vertices"], label);
-        if (objChildErr) return objChildErr;
+        const zoneAttrErr = checkNoAttributes(zoneEl, label);
+        if (zoneAttrErr) return zoneAttrErr;
+        const zoneChildErr = checkChildren(zoneEl, ["id", "category", "type", "vertices"], label);
+        if (zoneChildErr) return zoneChildErr;
 
-        const idText = textContent(objEl, "id");
+        const idText = textContent(zoneEl, "id");
         const id = idText !== null ? parseInt(idText, 10) : i + 1;
 
-        const categoryResult = requireText(objEl, "category", label);
+        const categoryResult = requireText(zoneEl, "category", label);
         if (typeof categoryResult !== "string") return categoryResult;
         const category = parseZoneCategory(categoryResult, label);
         if (typeof category !== "string") return category;
 
-        const objTypeText = textContent(objEl, "type") ?? "";
-        if (!VALID_ZONE_TYPES.includes(objTypeText)) {
-            return { error: `Invalid <type> "${objTypeText}" in ${label}.` };
+        const zoneTypeText = textContent(zoneEl, "type") ?? "";
+        if (!VALID_ZONE_TYPES.includes(zoneTypeText)) {
+            return { error: `Invalid <type> "${zoneTypeText}" in ${label}.` };
         }
-        const objType = objTypeText as ZoneType;
+        const zoneType = zoneTypeText as ZoneType;
 
-        const verticesEl = objEl.querySelector(":scope > vertices");
+        const verticesEl = zoneEl.querySelector(":scope > vertices");
         if (!verticesEl) return { error: `Missing <vertices> in ${label}.` };
 
         const verticesAttrErr = checkNoAttributes(verticesEl, label);
@@ -243,16 +242,16 @@ export function parseImportXml(xml: string): ImportedMapData | ImportParseError 
             vertices.push({ x, y });
         }
 
-        zones.push({ id, category, type: objType, vertices });
+        zones.push({ id, category, type: zoneType, vertices });
     }
 
-    // --- <envPoints> (optional) ---
-    const mapPointsEl = root.querySelector(":scope > envPoints");
+    // --- <points> (optional) ---
+    const mapPointsEl = root.querySelector(":scope > points");
     const mapPoints: ParsedMapPoint[] = [];
     if (mapPointsEl) {
-        const mapPointsAttrErr = checkNoAttributes(mapPointsEl, "<envPoints>");
+        const mapPointsAttrErr = checkNoAttributes(mapPointsEl, "<points>");
         if (mapPointsAttrErr) return mapPointsAttrErr;
-        const mapPointsChildErr = checkChildren(mapPointsEl, ["point"], "<envPoints>");
+        const mapPointsChildErr = checkChildren(mapPointsEl, ["point"], "<points>");
         if (mapPointsChildErr) return mapPointsChildErr;
 
         const pointEls = mapPointsEl.querySelectorAll(":scope > point");
@@ -275,7 +274,7 @@ export function parseImportXml(xml: string): ImportedMapData | ImportParseError 
             const type = pointTypeResult as MapPointType;
 
             if (seenTypes.has(type)) {
-                return { error: `Duplicate point type "${type}" in <envPoints>.` };
+                return { error: `Duplicate point type "${type}" in <points>.` };
             }
 
             const xText = textContent(pointEl, "x");
@@ -296,7 +295,7 @@ export function parseImportXml(xml: string): ImportedMapData | ImportParseError 
 
         const hasStartEnd = seenTypes.has("start_end");
         if (hasStartEnd && (seenTypes.has("start") || seenTypes.has("end"))) {
-            return { error: `Invalid <envPoints>: <type>start_end</type> cannot be combined with <type>start</type> or <type>end</type>.` };
+            return { error: `Invalid <points>: <type>start_end</type> cannot be combined with <type>start</type> or <type>end</type>.` };
         }
     }
 

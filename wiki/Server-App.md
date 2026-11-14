@@ -466,10 +466,11 @@ whether the session still exists and shows the login form if not.
   and writes them back unchanged on every save (renumbered if a drawn zone took
   their id).
 - **XML files.** File → Export writes the open map as XML, File → Import reads
-  one into a new map. The element names (`<workspace>`, `<environment>`,
-  `<objects>`, `<envPoints>`) are the file format's and stay; zone categories
-  are `mowing` and `no_go`. Files written before the rename (categories `zone`
-  and `obstacle`) are not read: the import names the allowed values.
+  one into a new map. The root `<map>` holds `<info>` (name, format, type,
+  coordinate system, headland), `<zones>` (one `<zone>` each, categories
+  `mowing` and `no_go`), `<points>` and `<geoAnchor>`. Files of earlier
+  versions (root `<workspace>`, categories `zone` and `obstacle`) are not
+  read: the import says which element or value it expected.
 - **Saving.** A save sends the whole map. The status bar shows the save state;
   File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
   starts a new blank map, which gets its id from the server on its first save;
