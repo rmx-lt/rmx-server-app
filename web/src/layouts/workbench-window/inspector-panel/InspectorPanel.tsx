@@ -11,11 +11,6 @@ import TypeField from "@/features/inspector/components/object-section/TypeField"
 import VertexSumField from "@/features/inspector/components/object-section/VertexSumField";
 import GrossAreaField from "@/features/inspector/components/object-section/GrossAreaField";
 import NetAreaField from "@/features/inspector/components/object-section/NetAreaField";
-import CoverageField from "@/features/inspector/components/coverage-section/CoverageField";
-import OverlapField from "@/features/inspector/components/coverage-section/OverlapField";
-import TurnSumField from "@/features/inspector/components/coverage-section/TurnSumField";
-import PathLengthField from "@/features/inspector/components/coverage-section/PathLengthField";
-import EfficiencyField from "@/features/inspector/components/coverage-section/EfficiencyField";
 import LayersTab from "@/features/inspector/components/calc-layers-section/LayersTab";
 import PointTypeField from "@/features/inspector/components/point-section/PointTypeField";
 import PointPositionField from "@/features/inspector/components/point-section/PointPositionField";
@@ -87,16 +82,6 @@ export default function InspectorPanel() {
           {hasMultiVertexSelection && (
             <InspectorPanelSection title="Vertices">
               <SelectedVertexCountField />
-            </InspectorPanelSection>
-          )}
-
-          {!hasSelection && !hasEnvPointSelection && !hasAnyVertexSelection && (
-            <InspectorPanelSection title="Coverage">
-              <CoverageField />
-              <OverlapField />
-              <EfficiencyField />
-              <TurnSumField />
-              <PathLengthField />
             </InspectorPanelSection>
           )}
         </div>

@@ -4,7 +4,6 @@ import MenuBarButton from "@/components/menu-bar/MenuBarButton";
 import MenuBarFileSubmenu from "./file-submenu/MenuBarFileSubmenu";
 import MenuBarEditSubmenu from "./edit-submenu/MenuBarEditSubmenu";
 import MenuBarViewSubmenu from "./view-submenu/MenuBarViewSubmenu";
-import MenuBarRunSubmenu from "./run-submenu/MenuBarRunSubmenu";
 import MenuBarMoreButton from "./more-submenu/MenuBarMoreButton";
 import type { MenuId } from "@/components/menu-bar/menuTypes";
 import type { ReactNode } from "react";
@@ -19,7 +18,6 @@ const MENU_ITEMS: MenuItem[] = [
   { menuId: "file", label: "File", submenu: <MenuBarFileSubmenu /> },
   { menuId: "edit", label: "Edit", submenu: <MenuBarEditSubmenu /> },
   { menuId: "view", label: "View", submenu: <MenuBarViewSubmenu /> },
-  { menuId: "run", label: "Run", submenu: <MenuBarRunSubmenu /> },
 ];
 
 export default function MenuBar() {

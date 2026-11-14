@@ -13,8 +13,6 @@ export default function LayersTab() {
     const setVisible = useLayerSettingsStore((s) => s.setVisible);
     const setParam = useLayerSettingsStore((s) => s.setParam);
     const reorderLayers = useLayerSettingsStore((s) => s.reorderLayers);
-    const selectedProviderId = useEnvStore((s) => s.computation.selectedProviderId);
-    const selectedAlgorithmId = useEnvStore((s) => s.computation.selectedAlgorithmId);
     const headlandEnabled = useEnvStore((s) => s.env.headlandEnabled);
 
     if (layers.length === 0) {
@@ -25,24 +23,12 @@ export default function LayersTab() {
         );
     }
 
-    // ── Filter: system layers always shown; algorithm layers only when both
-    //    provider and algorithm are selected and match.
-    const visible = layers.filter((item) => {
-        const { algorithmId, providerId } = item.layer;
-        if (
-            !headlandEnabled &&
-            (item.layer.id === LAYER_ID.SHRUNKEN_ZONES || item.layer.id === LAYER_ID.EXPANDED_OBSTACLES)
-        ) {
-            return false;
-        }
-        if (algorithmId === 0 && providerId === 0) return true;
-        return (
-            selectedProviderId !== null &&
-            selectedAlgorithmId !== null &&
-            providerId === selectedProviderId &&
-            algorithmId === selectedAlgorithmId
-        );
-    });
+    // The headland layers are hidden while the headland is switched off.
+    const visible = layers.filter(
+        (item) =>
+            headlandEnabled ||
+            (item.layer.id !== LAYER_ID.SHRUNKEN_ZONES && item.layer.id !== LAYER_ID.EXPANDED_OBSTACLES),
+    );
 
     // ── Sort all layers by Z-Index descending ────────────────────────────────
     const sorted = [...visible].sort((a, b) => {

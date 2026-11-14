@@ -19,11 +19,6 @@ export type LayerType = "Polygon" | "Point" | "Line" | "Grid" | "ObjectGroup" | 
 export type InternalStyleAttributeKey =
     | "Show Vertex IDs"
     | "Grid Line Color"
-    | "Coverage Grid Cell Size"
-    | "Coverage Grid Show Grid"
-    | "Coverage Grid Line Color"
-    | "Coverage Grid Line Width"
-    | "Coverage Grid Fill Opacity"
     | "Point Label Enum Values"
     | "Start Point Color"
     | "Start Point Radius"

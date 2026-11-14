@@ -27,8 +27,6 @@ import {
 } from "@/config/db-ops/enums";
 import { unitLabel } from "@/utils/unitOfMeasure";
 import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
-import { executeComputeRequest } from "@/features/coverage-planning/data/computeService";
 import type { CanvasGeneratorFloatingControlPrefs } from "@/features/canvas-editing/types/canvasGeneratorPrefs";
 
 const UI_PREF_KEY = "floatingControl.canvas-generator";
@@ -73,8 +71,6 @@ function CanvasGeneratorFloatingControl() {
     const envId = useEnvStore((s) => s.env.id);
     const env = useEnvStore((s) => s.env);
     const uom = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
-    const computeStatus = useComputeResultStore((s) => s.status);
-    const isComputeBusy = computeStatus === "submitting" || computeStatus === "polling";
 
     const isHydratedRef = useRef(false);
 
@@ -300,16 +296,6 @@ function CanvasGeneratorFloatingControl() {
         return true;
     }
 
-    async function handleGenerateAndRun() {
-        const generated = await handleGenerate();
-        if (!generated) return;
-        executeComputeRequest().then((result) => {
-            if (!result.ok) {
-                console.error("[GenerateAndRun] compute error:", result.error);
-            }
-        });
-    }
-
     return (
         <FloatingControl
             id="canvas-generator"
@@ -406,15 +392,10 @@ function CanvasGeneratorFloatingControl() {
                 label="Clear Environment"
                 onClick={handleClearEnvironment}
             />
-            <FloatingControlButton
+            <FloatingControlMainButton
                 label="Generate"
                 onClick={handleGenerate}
                 disabled={!canGenerate || !isSystemParamsCompatible}
-            />
-            <FloatingControlMainButton
-                label="Generate and Run"
-                onClick={handleGenerateAndRun}
-                disabled={isComputeBusy || !canGenerate || !isSystemParamsCompatible}
             />
         </FloatingControl>
     );

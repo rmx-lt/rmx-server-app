@@ -1,24 +1,26 @@
 import { create } from "zustand";
 import { COORD_SYSTEM, ENV_FORMAT, ENV_TYPE, type CoordSystemType, type EnvFormat, type EnvType } from "@/config/db-ops/enums";
-import type { Environment, ComputationSelection } from "@/data/local/schemaTypes";
+import type { Environment } from "@/data/local/schemaTypes";
 import { getSaveMode } from "@/model/saveModeStore";
 import { saveEnvironment } from "@/data/local/environments";
-import { saveComputationSelection } from "@/data/local/computationSelection";
-import {
-    createEmptyComputationSelection,
-    normalizeEnvironment,
-    normalizeComputationSelection,
-} from "@/utils/computationSelection";
+
+/** Fills in fields that environments saved by earlier versions may lack. */
+function normalizeEnvironment(env: Environment): Environment {
+    const maybeHeadland = env as Environment & { headlandEnabled?: boolean; headlandWidth?: string };
+    return {
+        ...env,
+        coordSystem: (env as Environment & { coordSystem?: string }).coordSystem ?? COORD_SYSTEM.CARTESIAN,
+        headlandEnabled: maybeHeadland.headlandEnabled ?? true,
+        headlandWidth: maybeHeadland.headlandWidth ?? "10",
+    };
+}
 
 interface EnvState {
     env: Environment;
-    computation: ComputationSelection;
-    /** True when env metadata or computation selection has been changed since the last save or load. */
+    /** True when env metadata has been changed since the last save or load. */
     isEnvDirty: boolean;
     /** Replaces the full environment record. Used by workspace bridge after load or init. Does not mark dirty. */
     setEnv: (env: Environment) => void;
-    /** Replaces the computation selection. Used by workspace bridge after load or init. Does not mark dirty. */
-    setComputation: (computation: ComputationSelection) => void;
     /** Updates the environment name and marks the record as dirty. Triggers autosave when mode is "autosave". */
     setName: (name: string) => void;
     /** Updates the environment format and marks the record as dirty. Triggers autosave when mode is "autosave". */
@@ -31,10 +33,6 @@ interface EnvState {
     setHeadlandEnabled: (enabled: boolean) => void;
     /** Updates system headland width on the environment and marks dirty. */
     setHeadlandWidth: (width: string) => void;
-    /** Updates the active computation provider and clears the active algorithm selection. */
-    setComputationProviderId: (providerId: number | null) => void;
-    /** Updates the active computation algorithm within the selected provider. */
-    setComputationAlgorithmId: (algorithmId: number | null) => void;
     /** Clears the dirty flag. Called by canvas bridge after a successful save. */
     clearDirty: () => void;
 }
@@ -51,31 +49,25 @@ const INITIAL_ENV: Environment = {
     obstacleCount: 0,
 };
 
-const INITIAL_COMPUTATION: ComputationSelection = createEmptyComputationSelection(0);
-
-function autosave(env: Environment, computation: ComputationSelection): void {
+function autosave(env: Environment): void {
     if (getSaveMode() === "autosave") {
         saveEnvironment(env).catch(console.error);
-        saveComputationSelection(computation).catch(console.error);
     }
 }
 
 function markEnvDirty(set: (fn: (state: EnvState) => Partial<EnvState>) => void, updater: (env: Environment) => Environment): void {
     set((state) => {
         const env = updater(normalizeEnvironment(state.env));
-        autosave(env, state.computation);
+        autosave(env);
         return { env, isEnvDirty: true };
     });
 }
 
 export const useEnvStore = create<EnvState>()((set) => ({
     env: INITIAL_ENV,
-    computation: INITIAL_COMPUTATION,
     isEnvDirty: false,
 
     setEnv: (env) => set({ env: normalizeEnvironment(env) }),
-
-    setComputation: (computation) => set({ computation: normalizeComputationSelection(computation) }),
 
     setName: (name) => markEnvDirty(set, (env) => ({ ...env, name })),
 
@@ -88,43 +80,6 @@ export const useEnvStore = create<EnvState>()((set) => ({
     setHeadlandEnabled: (enabled) => markEnvDirty(set, (env) => ({ ...env, headlandEnabled: enabled })),
 
     setHeadlandWidth: (width) => markEnvDirty(set, (env) => ({ ...env, headlandWidth: width })),
-
-    setComputationProviderId: (providerId) => {
-        set((state) => {
-            const computation = normalizeComputationSelection(state.computation);
-
-            if (computation.selectedProviderId === providerId) {
-                return {};
-            }
-
-            const nextComputation: ComputationSelection = {
-                ...computation,
-                selectedProviderId: providerId,
-                selectedAlgorithmId: null,
-            };
-
-            autosave(state.env, nextComputation);
-            return { computation: nextComputation, isEnvDirty: true };
-        });
-    },
-
-    setComputationAlgorithmId: (algorithmId) => {
-        set((state) => {
-            const computation = normalizeComputationSelection(state.computation);
-
-            if (computation.selectedAlgorithmId === algorithmId) {
-                return {};
-            }
-
-            const nextComputation: ComputationSelection = {
-                ...computation,
-                selectedAlgorithmId: algorithmId,
-            };
-
-            autosave(state.env, nextComputation);
-            return { computation: nextComputation, isEnvDirty: true };
-        });
-    },
 
     clearDirty: () => set({ isEnvDirty: false }),
 }));

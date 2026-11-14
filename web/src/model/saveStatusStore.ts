@@ -2,9 +2,7 @@ import { create } from "zustand";
 import { useEnvStore } from "@/model/envStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
-import { useParameterValuesStore } from "@/model/parameterValuesStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
 import { useEnvPointStore } from "@/model/envPointStore";
 import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
@@ -27,15 +25,13 @@ interface SaveStatusState {
 function computeStatus(): SaveStatus {
     const { isEnvDirty } = useEnvStore.getState();
     const isCanvasDirty = selectIsDirty(useCanvasObjectStore.getState());
-    const { isParameterValuesDirty } = useParameterValuesStore.getState();
     const { isLayerSettingsDirty } = useLayerSettingsStore.getState();
     const { mode } = useSaveModeStore.getState();
 
-    const { isComputeResultDirty } = useComputeResultStore.getState();
     const { isEnvPointsDirty } = useEnvPointStore.getState();
     const { isSystemGeoAnchorDirty, isEnvironmentGeoAnchorDirty } = useGeoAnchorStore.getState();
 
-    const isDirty = isEnvDirty || isCanvasDirty || isParameterValuesDirty || isLayerSettingsDirty || isComputeResultDirty || isEnvPointsDirty || isSystemGeoAnchorDirty || isEnvironmentGeoAnchorDirty;
+    const isDirty = isEnvDirty || isCanvasDirty || isLayerSettingsDirty || isEnvPointsDirty || isSystemGeoAnchorDirty || isEnvironmentGeoAnchorDirty;
 
     if (isDirty && mode !== "autosave") return "unsaved";
     if (mode === "autosave" || (mode === "manual" && !isDirty)) return "saved";
@@ -70,8 +66,6 @@ function syncStatus(): void {
 useEnvStore.subscribe(syncStatus);
 useCanvasObjectStore.subscribe(syncStatus);
 useSaveModeStore.subscribe(syncStatus);
-useParameterValuesStore.subscribe(syncStatus);
 useLayerSettingsStore.subscribe(syncStatus);
-useComputeResultStore.subscribe(syncStatus);
 useEnvPointStore.subscribe(syncStatus);
 useGeoAnchorStore.subscribe(syncStatus);

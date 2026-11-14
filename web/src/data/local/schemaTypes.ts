@@ -1,5 +1,4 @@
 import type { CoordSystemType, EnvFormat, EnvType, ObjectCategory, ObjectType } from "@/config/db-ops/enums";
-import type { ComputeResult } from "@/data/local/serviceTypes";
 
 /**
  * Geographic anchor that binds the canvas world origin (0, 0) to a real-world
@@ -11,20 +10,6 @@ export interface GeoAnchor {
     lat: number;
     /** WGS-84 longitude of the canvas world origin (0, 0). */
     lon: number;
-}
-
-export interface ComputationSelection {
-    environmentId: number;
-    selectedProviderId: number | null;
-    selectedAlgorithmId: number | null;
-}
-
-export interface ComputationAlgorithmParameter {
-    id: number;
-    environmentId: number;
-    providerId: number;
-    algorithmId: number;
-    value: string;
 }
 
 export interface Environment {
@@ -80,38 +65,4 @@ export interface EnvPoint {
     environmentId: number;
     type: EnvPointType;
     point: { x: number; y: number };
-}
-
-/** Per-environment working compute result. One row per environment; replaced on every successful compute. */
-export interface ComputeResultRecord {
-    /** PK — FK → environments.id */
-    environmentId: number;
-    jobId: string;
-    algorithmId: number;
-    providerId: number;
-    algorithmName: string;
-    completedAt: string;
-    result: ComputeResult;
-}
-
-/** Sparse serialized coverage-grid visit map entry: key = "col,row", count = visit count. */
-export interface CoverageGridVisitEntry {
-    key: string;
-    count: number;
-}
-
-/** Per-environment latest cached coverage-grid visits and derived metrics (single row per environment). */
-export interface CoverageGridVisitCacheRecord {
-    environmentId: number;
-    resultSignature: string;
-    cellSize: number;
-    pathWidth: number;
-    visitEntries: CoverageGridVisitEntry[];
-    maxCount: number;
-    coverageRatioPct: number | null;
-    overlapRatioPct: number | null;
-    turnCount: number | null;
-    pathLength: number | null;
-    efficiency: number | null;
-    createdAt: string;
 }

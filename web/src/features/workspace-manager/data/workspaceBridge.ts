@@ -1,6 +1,4 @@
 import { getEnvironment, saveEnvironment } from "@/data/local/environments";
-import { getComputationSelection, saveComputationSelection } from "@/data/local/computationSelection";
-import { getAlgorithmParametersByEnvironment, saveAlgorithmParameters } from "@/data/local/computationAlgorithmParameters";
 import { deleteObjectsByEnvironment, saveObjects } from "@/data/local/objects";
 import { COORD_SYSTEM, ENV_FORMAT, ENV_TYPE, OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import type { Environment } from "@/data/local/schemaTypes";
@@ -9,19 +7,14 @@ import { useEnvStore } from "@/model/envStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
-import { useParameterValuesStore } from "@/model/parameterValuesStore";
-import { loadComputationCatalog } from "@/model/computationCatalogStore";
 import { loadLayerSettings } from "@/model/layerSettingsStore";
 import { addMissingLayerSettingsForEnvironment, initLayerSettingsForEnvironment } from "@/data/local/layerSettings";
 import { getAllLayerSettingsSetup } from "@/data/local/layerSettingsSetup";
-import { getComputeResult } from "@/data/local/computeResults";
 import { deleteEnvPointsByEnvironment, upsertEnvPoint } from "@/data/local/envPoints";
 import { initEnvironmentGeoAnchorFromSystem, setEnvironmentGeoAnchor as persistEnvironmentGeoAnchor } from "@/data/local/environmentGeoAnchor";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
 import { useEnvPointStore } from "@/model/envPointStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { resolveNextEnvironmentId, loadCanvasForEnvironment, saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
-import { createEmptyComputationSelection } from "@/utils/computationSelection";
 
 const BLANK_ENV: Omit<Environment, "id"> = {
     name: "Untitled Environment",
@@ -51,9 +44,6 @@ export async function initializeWorkspace(): Promise<void> {
     const nextId = await resolveNextEnvironmentId();
     const env = { ...BLANK_ENV, id: nextId };
     useEnvStore.getState().setEnv(env);
-    useEnvStore.getState().setComputation(createEmptyComputationSelection(nextId));
-    useParameterValuesStore.getState().setParameterValues([]);
-    await loadComputationCatalog();
     await initLayerSettingsForEnvironment(nextId);
     await loadLayerSettings(nextId);
     await initEnvironmentGeoAnchorFromSystem(nextId);
@@ -62,7 +52,6 @@ export async function initializeWorkspace(): Promise<void> {
     useEnvPointStore.getState().clearPoints();
     await deleteEnvPointsByEnvironment(nextId);
     await useEnvPointStore.getState().loadEnvPoints(nextId);
-    useComputeResultStore.getState().resetResult();
 }
 
 /** Discards the current environment and starts a blank one without saving. */
@@ -70,9 +59,7 @@ export async function resetWorkspace(): Promise<void> {
     const nextId = await resolveNextEnvironmentId();
     const env = { ...BLANK_ENV, id: nextId };
     useEnvStore.getState().setEnv(env);
-    useEnvStore.getState().setComputation(createEmptyComputationSelection(nextId));
     useEnvStore.getState().clearDirty();
-    useParameterValuesStore.getState().setParameterValues([]);
     useSaveModeStore.getState().setMode("session");
     useCanvasObjectStore.getState().setObjects([]);
     useCanvasHistoryStore.getState().resetHistory();
@@ -84,7 +71,6 @@ export async function resetWorkspace(): Promise<void> {
     useEnvPointStore.getState().clearPoints();
     await deleteEnvPointsByEnvironment(nextId);
     await useEnvPointStore.getState().loadEnvPoints(nextId);
-    useComputeResultStore.getState().resetResult();
 }
 
 /** Loads an existing environment and its canvas objects from IndexedDB. */
@@ -98,14 +84,6 @@ export async function loadWorkspace(environmentId: number): Promise<void> {
     const obstacleObjectCount = countByCategory(objects, OBJECT_CATEGORY.OBSTACLE);
     useEnvStore.getState().setEnv({ ...env, zoneCount: zoneObjectCount, obstacleCount: obstacleObjectCount });
     useEnvStore.getState().clearDirty();
-    const [computation, parameterValues] = await Promise.all([
-        getComputationSelection(environmentId),
-        getAlgorithmParametersByEnvironment(environmentId),
-    ]);
-    // Set parameter values before computation so the panel's init effect sees loaded values
-    // when it fires in response to the algorithm/provider selection being restored.
-    useParameterValuesStore.getState().setParameterValues(parameterValues);
-    useEnvStore.getState().setComputation(computation);
     useCanvasHistoryStore.getState().resetHistory();
     const setups = await getAllLayerSettingsSetup();
     await addMissingLayerSettingsForEnvironment(environmentId, setups);
@@ -115,17 +93,11 @@ export async function loadWorkspace(environmentId: number): Promise<void> {
     await useGeoAnchorStore.getState().loadEnvironmentGeoAnchor(environmentId);
     useEnvPointStore.getState().clearPoints();
     await useEnvPointStore.getState().loadEnvPoints(environmentId);
-    const existingResult = await getComputeResult(environmentId);
-    if (existingResult) {
-        useComputeResultStore.getState().loadResult(existingResult);
-    } else {
-        useComputeResultStore.getState().resetResult();
-    }
 }
 
 /** Saves the current canvas as a new environment or overwrites an existing one, then loads it. */
 export async function saveAsWorkspace(name: string, selectedEnvId: number | null): Promise<void> {
-    const { env, computation } = useEnvStore.getState();
+    const { env } = useEnvStore.getState();
     const { objects } = useCanvasObjectStore.getState();
     const { startPoint, endPoint, startEndPoint } = useEnvPointStore.getState();
     const targetId = selectedEnvId ?? (await resolveNextEnvironmentId());
@@ -139,12 +111,8 @@ export async function saveAsWorkspace(name: string, selectedEnvId: number | null
         ]);
     }
     const targetObjects = objects.map((o) => ({ ...o, environmentId: targetId }));
-    const { parameterValues } = useParameterValuesStore.getState();
-    const targetParamValues = parameterValues.map((pv) => ({ ...pv, environmentId: targetId }));
     await Promise.all([
         saveEnvironment(targetEnv),
-        saveComputationSelection({ ...computation, environmentId: targetId }),
-        targetParamValues.length > 0 ? saveAlgorithmParameters(targetParamValues) : Promise.resolve(),
         targetObjects.length > 0 ? saveObjects(targetObjects) : Promise.resolve(),
         selectedEnvId === null ? initLayerSettingsForEnvironment(targetId) : Promise.resolve(),
         sourcePoints.length > 0
@@ -160,20 +128,16 @@ export async function saveAsWorkspace(name: string, selectedEnvId: number | null
  * active workspace. Returns the newly created environment ID so the caller can offer to load it.
  */
 export async function copyWorkspace(name: string): Promise<number> {
-    const { env, computation } = useEnvStore.getState();
+    const { env } = useEnvStore.getState();
     const { objects } = useCanvasObjectStore.getState();
     const { startPoint, endPoint, startEndPoint } = useEnvPointStore.getState();
-    const { parameterValues } = useParameterValuesStore.getState();
     const sourcePoints = [startPoint, endPoint, startEndPoint].filter(isDefined);
     const activeGeoAnchor = useGeoAnchorStore.getState().environmentGeoAnchor;
     const targetId = await resolveNextEnvironmentId();
     const targetEnv: Environment = { ...env, id: targetId, name };
     const targetObjects = objects.map((o) => ({ ...o, environmentId: targetId }));
-    const targetParamValues = parameterValues.map((pv) => ({ ...pv, environmentId: targetId }));
     await Promise.all([
         saveEnvironment(targetEnv),
-        saveComputationSelection({ ...computation, environmentId: targetId }),
-        targetParamValues.length > 0 ? saveAlgorithmParameters(targetParamValues) : Promise.resolve(),
         targetObjects.length > 0 ? saveObjects(targetObjects) : Promise.resolve(),
         initLayerSettingsForEnvironment(targetId),
         sourcePoints.length > 0
@@ -186,7 +150,6 @@ export async function copyWorkspace(name: string): Promise<number> {
 
 /**
  * Imports a parsed workspace from an XML file into a new environment in IndexedDB, then loads it.
- * Parameter values and computation selection are reset to empty (they are not part of the export format).
  */
 export async function importWorkspace(data: ImportedWorkspaceData): Promise<void> {
     const targetId = await resolveNextEnvironmentId();
@@ -218,7 +181,6 @@ export async function importWorkspace(data: ImportedWorkspaceData): Promise<void
 
     await Promise.all([
         saveEnvironment(targetEnv),
-        saveComputationSelection(createEmptyComputationSelection(targetId)),
         targetObjects.length > 0 ? saveObjects(targetObjects) : Promise.resolve(),
         initLayerSettingsForEnvironment(targetId),
         data.envPoints.length > 0
