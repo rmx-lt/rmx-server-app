@@ -10,70 +10,71 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/apperr"
 )
 
-func validDoc() api.EnvironmentDoc {
-	return api.EnvironmentDoc{
+func validDoc() api.MapDoc {
+	return api.MapDoc{
 		Format: "polygon", Type: "any_offline", CoordSystem: "Cartesian",
 		HeadlandEnabled: true, HeadlandWidth: "10",
-		Objects: []api.PlanObject{
-			{ID: 1, Category: "zone", Vertices: []api.Point{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}},
-			{ID: 2, Category: "obstacle", Type: "offline", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
+		Zones: []api.Zone{
+			{ID: 1, Category: "mowing", Vertices: []api.Point{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}},
+			{ID: 2, Category: "no_go", Type: "offline", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
+			{ID: 3, Category: "navigation", Vertices: []api.Point{{X: 10, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 2}}},
 		},
-		Points:        []api.EnvPoint{{Type: "start", Point: api.Point{X: 1, Y: 1}}},
+		Points:        []api.RoutePoint{{Type: "start", Point: api.Point{X: 1, Y: 1}}},
 		LayerSettings: []api.LayerSetting{{ID: 1, LayerID: 2, Value: "#00ff00"}},
 		GeoAnchor:     &api.GeoAnchor{Lat: 54.68, Lon: 25.28},
 	}
 }
 
-func TestCheckEnvironmentAccepts(t *testing.T) {
-	name, stored, err := checkEnvironment("  Garden  ", validDoc())
+func TestCheckMapAccepts(t *testing.T) {
+	name, stored, err := checkMap("  Garden  ", validDoc())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if name != "Garden" {
 		t.Errorf("name %q", name)
 	}
-	var back api.EnvironmentDoc
+	var back api.MapDoc
 	if err := json.Unmarshal(stored, &back); err != nil {
 		t.Fatal(err)
 	}
-	if len(back.Objects) != 2 || back.GeoAnchor == nil || back.LayerSettings[0].Value != "#00ff00" {
+	if len(back.Zones) != 3 || back.GeoAnchor == nil || back.LayerSettings[0].Value != "#00ff00" {
 		t.Errorf("round trip: %+v", back)
 	}
 }
 
-func TestCheckEnvironmentNormalizesLists(t *testing.T) {
-	_, stored, err := checkEnvironment("Empty", api.EnvironmentDoc{})
+func TestCheckMapNormalizesLists(t *testing.T) {
+	_, stored, err := checkMap("Empty", api.MapDoc{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, member := range []string{`"objects":[]`, `"points":[]`, `"layer_settings":[]`, `"geo_anchor":null`} {
+	for _, member := range []string{`"zones":[]`, `"points":[]`, `"layer_settings":[]`, `"geo_anchor":null`} {
 		if !strings.Contains(string(stored), member) {
 			t.Errorf("%s lacks %s", stored, member)
 		}
 	}
 }
 
-func TestCheckEnvironmentRefuses(t *testing.T) {
-	cases := map[string]func(*string, *api.EnvironmentDoc){
-		"empty name":      func(n *string, _ *api.EnvironmentDoc) { *n = "   " },
-		"long name":       func(n *string, _ *api.EnvironmentDoc) { *n = strings.Repeat("ž", MaxNameLength+1) },
-		"bad category":    func(_ *string, d *api.EnvironmentDoc) { d.Objects[0].Category = "pond" },
-		"duplicate id":    func(_ *string, d *api.EnvironmentDoc) { d.Objects[1].ID = 1 },
-		"bad point type":  func(_ *string, d *api.EnvironmentDoc) { d.Points[0].Type = "middle" },
-		"duplicate point": func(_ *string, d *api.EnvironmentDoc) { d.Points = append(d.Points, d.Points[0]) },
-		"anchor range":    func(_ *string, d *api.EnvironmentDoc) { d.GeoAnchor.Lat = 91 },
-		"long value": func(_ *string, d *api.EnvironmentDoc) {
+func TestCheckMapRefuses(t *testing.T) {
+	cases := map[string]func(*string, *api.MapDoc){
+		"empty name":      func(n *string, _ *api.MapDoc) { *n = "   " },
+		"long name":       func(n *string, _ *api.MapDoc) { *n = strings.Repeat("ž", MaxNameLength+1) },
+		"bad category":    func(_ *string, d *api.MapDoc) { d.Zones[0].Category = "obstacle" },
+		"duplicate id":    func(_ *string, d *api.MapDoc) { d.Zones[1].ID = 1 },
+		"bad point type":  func(_ *string, d *api.MapDoc) { d.Points[0].Type = "middle" },
+		"duplicate point": func(_ *string, d *api.MapDoc) { d.Points = append(d.Points, d.Points[0]) },
+		"anchor range":    func(_ *string, d *api.MapDoc) { d.GeoAnchor.Lat = 91 },
+		"long value": func(_ *string, d *api.MapDoc) {
 			d.LayerSettings[0].Value = strings.Repeat("x", maxValueLength+1)
 		},
-		"too many vertices": func(_ *string, d *api.EnvironmentDoc) {
-			d.Objects[0].Vertices = make([]api.Point, maxVertices+1)
+		"too many vertices": func(_ *string, d *api.MapDoc) {
+			d.Zones[0].Vertices = make([]api.Point, maxVertices+1)
 		},
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
-			envName, doc := "Garden", validDoc()
-			mutate(&envName, &doc)
-			_, _, err := checkEnvironment(envName, doc)
+			mapName, doc := "Garden", validDoc()
+			mutate(&mapName, &doc)
+			_, _, err := checkMap(mapName, doc)
 			var e *apperr.Error
 			if !errors.As(err, &e) || e.Code != api.CodeBadRequest {
 				t.Fatalf("got %v", err)
@@ -81,7 +82,7 @@ func TestCheckEnvironmentRefuses(t *testing.T) {
 		})
 	}
 	// The exact limit is fine.
-	if _, _, err := checkEnvironment(strings.Repeat("ž", MaxNameLength), validDoc()); err != nil {
+	if _, _, err := checkMap(strings.Repeat("ž", MaxNameLength), validDoc()); err != nil {
 		t.Error(err)
 	}
 }
@@ -101,7 +102,7 @@ func TestSettingKeys(t *testing.T) {
 
 func TestStoreErrors(t *testing.T) {
 	for err, code := range map[error]api.ErrorCode{
-		errNoEnvironment:   api.CodeNotFound,
+		errNoMap:           api.CodeNotFound,
 		errStaleRevision:   api.CodeConflict,
 		errors.New("boom"): api.CodeInternal,
 	} {

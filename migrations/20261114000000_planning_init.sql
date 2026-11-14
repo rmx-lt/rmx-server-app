@@ -1,18 +1,17 @@
 -- +goose Up
 -- Planning data, owned by the planning domain (wiki Server-App, "Planning API").
 --
--- environments: one row per environment a user drew in the web app. The
--- drawing itself (objects, start/end points, geo anchor, layer settings) is
--- one JSON document in doc, because the client always loads and saves an
--- environment as a whole. revision counts the saves; a save names the
--- revision it started from, so two browsers can't silently overwrite each
--- other.
+-- maps: one row per map a user drew in the web app. The drawing itself
+-- (zones, start/end points, geo anchor, layer settings) is one JSON document
+-- in doc, because the client always loads and saves a map as a whole.
+-- revision counts the saves; a save names the revision it started from, so
+-- two browsers can't silently overwrite each other.
 -- user_settings: per-user key/value settings of the web app (UI preferences,
--- the default geo anchor for new environments).
+-- the default geo anchor for new maps).
 
-CREATE TABLE environments (
+CREATE TABLE maps (
     id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    -- Deleting a user deletes their environments.
+    -- Deleting a user deletes their maps.
     user_id    bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     name       text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
     revision   bigint NOT NULL DEFAULT 1 CHECK (revision >= 1),
@@ -21,7 +20,7 @@ CREATE TABLE environments (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX environments_user_id_idx ON environments (user_id);
+CREATE INDEX maps_user_id_idx ON maps (user_id);
 
 CREATE TABLE user_settings (
     user_id    bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,

@@ -13,92 +13,94 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/db"
 )
 
-// All SQL of the planning domain, which owns the environments and
-// user_settings tables. Each function runs on q: the pool, or a transaction
+// All SQL of the planning domain, which owns the maps and user_settings
+// tables. Each function runs on q: the pool, or a transaction
 // from db.InTx. Every query is scoped to one user: another user's row is
 // treated as not existing.
 
 var (
-	errNoEnvironment = errors.New("no such environment")
+	errNoMap         = errors.New("no such map")
 	errStaleRevision = errors.New("stale revision")
 )
 
-func listEnvironments(ctx context.Context, q db.DBTX, userID core.UserID) ([]api.EnvironmentSummary, error) {
+func listMaps(ctx context.Context, q db.DBTX, userID core.UserID) ([]api.MapSummary, error) {
 	rows, err := q.Query(ctx,
-		`SELECT id, name, revision, updated_at,
-		        (SELECT count(*) FROM jsonb_array_elements(doc->'objects') o WHERE o->>'category' = 'zone'),
-		        (SELECT count(*) FROM jsonb_array_elements(doc->'objects') o WHERE o->>'category' = 'obstacle')
-		 FROM environments WHERE user_id = $1
-		 ORDER BY updated_at DESC, id DESC`, userID)
+		`SELECT m.id, m.name, m.revision, m.updated_at,
+		        count(*) FILTER (WHERE z->>'category' = 'mowing'),
+		        count(*) FILTER (WHERE z->>'category' = 'no_go'),
+		        count(*) FILTER (WHERE z->>'category' = 'navigation')
+		 FROM maps m LEFT JOIN LATERAL jsonb_array_elements(m.doc->'zones') z ON true
+		 WHERE m.user_id = $1
+		 GROUP BY m.id
+		 ORDER BY m.updated_at DESC, m.id DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (api.EnvironmentSummary, error) {
-		var s api.EnvironmentSummary
-		err := row.Scan(&s.ID, &s.Name, &s.Revision, &s.UpdatedAt, &s.ZoneCount, &s.ObstacleCount)
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (api.MapSummary, error) {
+		var s api.MapSummary
+		err := row.Scan(&s.ID, &s.Name, &s.Revision, &s.UpdatedAt, &s.MowingZoneCount, &s.NoGoZoneCount, &s.NavigationZoneCount)
 		return s, err
 	})
 }
 
-func getEnvironment(ctx context.Context, q db.DBTX, userID core.UserID, id int64) (api.Environment, error) {
-	var env api.Environment
+func getMap(ctx context.Context, q db.DBTX, userID core.UserID, id int64) (api.MapDetail, error) {
+	var m api.MapDetail
 	var doc []byte
 	err := q.QueryRow(ctx,
-		`SELECT id, name, revision, updated_at, doc FROM environments WHERE id = $1 AND user_id = $2`,
-		id, userID).Scan(&env.ID, &env.Name, &env.Revision, &env.UpdatedAt, &doc)
+		`SELECT id, name, revision, updated_at, doc FROM maps WHERE id = $1 AND user_id = $2`,
+		id, userID).Scan(&m.ID, &m.Name, &m.Revision, &m.UpdatedAt, &doc)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return env, errNoEnvironment
+		return m, errNoMap
 	}
 	if err != nil {
-		return env, err
+		return m, err
 	}
-	if err := json.Unmarshal(doc, &env.Doc); err != nil {
-		return env, err
+	if err := json.Unmarshal(doc, &m.Doc); err != nil {
+		return m, err
 	}
-	return env, nil
+	return m, nil
 }
 
-func insertEnvironment(ctx context.Context, q db.DBTX, userID core.UserID, name string, doc []byte) (int64, int64, time.Time, error) {
+func insertMap(ctx context.Context, q db.DBTX, userID core.UserID, name string, doc []byte) (int64, int64, time.Time, error) {
 	var id, revision int64
 	var updated time.Time
 	err := q.QueryRow(ctx,
-		`INSERT INTO environments (user_id, name, doc) VALUES ($1, $2, $3)
+		`INSERT INTO maps (user_id, name, doc) VALUES ($1, $2, $3)
 		 RETURNING id, revision, updated_at`, userID, name, doc).Scan(&id, &revision, &updated)
 	return id, revision, updated, err
 }
 
-// updateEnvironment saves over revision and returns the new revision, or
-// errNoEnvironment, or errStaleRevision when the stored revision differs.
-func updateEnvironment(ctx context.Context, q db.DBTX, userID core.UserID, id, revision int64, name string, doc []byte) (int64, time.Time, error) {
+// updateMap saves over revision and returns the new revision, or errNoMap, or errStaleRevision when the stored revision differs.
+func updateMap(ctx context.Context, q db.DBTX, userID core.UserID, id, revision int64, name string, doc []byte) (int64, time.Time, error) {
 	var next int64
 	var updated time.Time
 	err := q.QueryRow(ctx,
-		`UPDATE environments
+		`UPDATE maps
 		 SET name = $4, doc = $5, revision = revision + 1, updated_at = now()
 		 WHERE id = $1 AND user_id = $2 AND revision = $3
 		 RETURNING revision, updated_at`, id, userID, revision, name, doc).Scan(&next, &updated)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var exists bool
 		if err := q.QueryRow(ctx,
-			`SELECT EXISTS (SELECT 1 FROM environments WHERE id = $1 AND user_id = $2)`,
+			`SELECT EXISTS (SELECT 1 FROM maps WHERE id = $1 AND user_id = $2)`,
 			id, userID).Scan(&exists); err != nil {
 			return 0, updated, err
 		}
 		if exists {
 			return 0, updated, errStaleRevision
 		}
-		return 0, updated, errNoEnvironment
+		return 0, updated, errNoMap
 	}
 	return next, updated, err
 }
 
-func deleteEnvironment(ctx context.Context, q db.DBTX, userID core.UserID, id int64) error {
-	tag, err := q.Exec(ctx, `DELETE FROM environments WHERE id = $1 AND user_id = $2`, id, userID)
+func deleteMap(ctx context.Context, q db.DBTX, userID core.UserID, id int64) error {
+	tag, err := q.Exec(ctx, `DELETE FROM maps WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return errNoEnvironment
+		return errNoMap
 	}
 	return nil
 }

@@ -40,9 +40,8 @@ This is the production layout: **browsers never speak MQTT**. Only devices
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **HTTPS**: login and logout under `/app/api/auth`, the user's
-  environments and settings under `/app/api/environments` and
-  `/app/api/settings` (see [Planning API](#planning-api)), `/app/health`,
+- **HTTPS**: login and logout under `/app/api/auth`, the user's maps
+  and settings under `/app/api/maps` and `/app/api/settings` (see [Planning API](#planning-api)), `/app/health`,
   and the built client under `/app/`.
 - **WSS**: `/app/ws`, JSON request/response with a `request_id`. The only
   request today is `ping`; the connection (session check, keep-alive, close
@@ -65,7 +64,7 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
-| `environments` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the environment's content, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, points, layer settings and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
 | `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 
 The first migrations still create the old `records` and `record_events`
@@ -391,37 +390,53 @@ Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
 
 ## Planning API
 
-Where the web app keeps what users plan: their environments and their
-settings, per user. Code: `internal/planning/`, wire types in
-`internal/api/planning.go` (generated to `web/src/data/api/generated/`).
-All routes need a session; another user's environment answers 404, as if it
-did not exist.
+Where the web app keeps what users plan: their maps and their settings, per
+user. Code: `internal/planning/`, wire types in `internal/api/planning.go`
+(generated to `web/src/data/api/generated/`). All routes need a session;
+another user's map answers 404, as if it did not exist.
+
+**Names.** A **map** is one garden or site, drawn on the canvas. Its
+polygons are **zones**, each with a category:
+
+| Category | Meaning |
+|---|---|
+| `mowing` | mow it |
+| `no_go` | never enter: trees, beds, ponds, anything fixed the mower must avoid |
+| `navigation` | drive through without mowing: paths between lawns, the way to the dock |
+
+These follow other robot mower apps (Husqvarna: work area, stay-out zone,
+transport path; Mammotion: task area, no-go zone, channel; OpenMowerNext:
+operation, exclusion and navigation areas). In those apps a drawn no-go zone
+is how a fixed obstacle is mapped; "obstacle" means what the mower's sensors
+find while driving.
 
 | Route | Body → answer |
 |---|---|
-| `GET /app/api/environments` | → `EnvironmentList`: id, name, revision, zone and obstacle counts, `updated_at`; newest change first |
-| `POST /app/api/environments` | `EnvironmentCreate` {name, doc} → 201 `Environment` at revision 1 |
-| `GET /app/api/environments/{id}` | → `Environment` {id, name, revision, updated_at, doc} |
-| `PUT /app/api/environments/{id}` | `EnvironmentUpdate` {name, revision, doc} → `Environment` at revision + 1; 409 `conflict` when `revision` is not the stored one |
-| `DELETE /app/api/environments/{id}` | → 204 |
+| `GET /app/api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
+| `POST /app/api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
+| `GET /app/api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
+| `PUT /app/api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
+| `DELETE /app/api/maps/{id}` | → 204 |
 | `GET /app/api/settings` | → `SettingList` {settings: [{key, value}]}, sorted by key |
 | `PUT /app/api/settings/{key}` | `SettingValue` {value: any JSON but null} → 204 |
 | `DELETE /app/api/settings/{key}` | → 204, also when the key was not set |
 
-**One document per environment.** The client loads and saves an environment
-as a whole, so its content is one JSON document (`EnvironmentDoc`): format,
-type, coordinate system, headland, `objects` (polygons: id, category `zone`
-or `obstacle`, type, vertices), `points` (at most one each of `start`, `end`,
-`start_end`), `layer_settings` (layer id, setting id, value) and
-`geo_anchor` (WGS-84 of the canvas origin, or null). Missing lists come back
-as empty arrays.
+The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
+shadow JavaScript's `Map`.
+
+**One document per map.** The client loads and saves a map as a whole, so
+its content is one JSON document (`MapDoc`): format, type, coordinate
+system, headland, `zones` (id, category, type, vertices), `points` (at most
+one each of `start`, `end`, `start_end`), `layer_settings` (layer id,
+setting id, value) and `geo_anchor` (WGS-84 of the canvas origin, or null).
+Missing lists come back as empty arrays.
 
 **Revisions instead of last-write-wins.** Every save names the revision it
 started from. If another browser saved in between, the save is refused with
 409 and the client has to reload; nothing is overwritten silently.
 
 **Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
-spaces removed), a body of at most 4 MiB, 5000 objects, 100 000 vertices,
+spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
 1000 layer settings of at most 4096 characters each, a geo anchor inside
 ±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
 at most 16 KiB of JSON, at most 100 settings per user.
@@ -709,9 +724,9 @@ password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
 fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
-the planning API: an environment's create/read/update/delete, the revision
-conflict, invalid input, that users can't see each other's environments, and
-settings.
+the planning API: a map's create/read/update/delete, zone counts per
+category, the revision conflict, invalid input, that users can't see each
+other's maps, and settings.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.

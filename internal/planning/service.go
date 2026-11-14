@@ -1,7 +1,7 @@
-// Package planning stores what users plan in the web app: their environments
-// (each one JSON document: polygons, route points, geo anchor, layer
-// settings) and their per-user settings. Every call is scoped to one user;
-// another user's environment answers as if it did not exist.
+// Package planning stores what users plan in the web app: their maps (each
+// one JSON document: mowing, no-go and navigation zones, route points, geo
+// anchor, layer settings) and their per-user settings. Every call is scoped
+// to one user; another user's map answers as if it did not exist.
 package planning
 
 import (
@@ -20,16 +20,16 @@ import (
 
 // Limits on what a user can store.
 const (
-	// MaxNameLength is the longest environment name, in characters.
+	// MaxNameLength is the longest map name, in characters.
 	MaxNameLength = 100
-	// MaxEnvironmentBytes is the largest environment request body.
-	MaxEnvironmentBytes = 4 << 20
+	// MaxMapBytes is the largest map request body.
+	MaxMapBytes = 4 << 20
 	// MaxSettingBytes is the largest setting value, as JSON.
 	MaxSettingBytes = 16 << 10
 	// MaxSettings is the most settings one user can have.
 	MaxSettings = 100
-	// maxObjects, maxVertices, maxLayerSettings and maxValueLength bound one document.
-	maxObjects       = 5000
+	// maxZones, maxVertices, maxLayerSettings and maxValueLength bound one document.
+	maxZones         = 5000
 	maxVertices      = 100_000
 	maxLayerSettings = 1000
 	maxValueLength   = 4096
@@ -45,60 +45,60 @@ type Service struct {
 // New returns the service on pool.
 func New(pool *db.Pool) *Service { return &Service{pool: pool} }
 
-// ListEnvironments returns the user's environments, newest change first.
-func (s *Service) ListEnvironments(ctx context.Context, userID core.UserID) ([]api.EnvironmentSummary, error) {
-	list, err := listEnvironments(ctx, s.pool, userID)
+// ListMaps returns the user's maps, newest change first.
+func (s *Service) ListMaps(ctx context.Context, userID core.UserID) ([]api.MapSummary, error) {
+	list, err := listMaps(ctx, s.pool, userID)
 	if err != nil {
 		return nil, apperr.DB(err)
 	}
 	if list == nil {
-		list = []api.EnvironmentSummary{}
+		list = []api.MapSummary{}
 	}
 	return list, nil
 }
 
-// GetEnvironment returns one of the user's environments.
-func (s *Service) GetEnvironment(ctx context.Context, userID core.UserID, id int64) (api.Environment, error) {
-	env, err := getEnvironment(ctx, s.pool, userID, id)
+// GetMap returns one of the user's maps.
+func (s *Service) GetMap(ctx context.Context, userID core.UserID, id int64) (api.MapDetail, error) {
+	m, err := getMap(ctx, s.pool, userID, id)
 	if err != nil {
-		return env, storeError(err)
+		return m, storeError(err)
 	}
-	normalize(&env.Doc)
-	return env, nil
+	normalize(&m.Doc)
+	return m, nil
 }
 
-// CreateEnvironment stores a new environment for the user, at revision 1.
-func (s *Service) CreateEnvironment(ctx context.Context, userID core.UserID, req api.EnvironmentCreate) (api.Environment, error) {
-	name, doc, err := checkEnvironment(req.Name, req.Doc)
+// CreateMap stores a new map for the user, at revision 1.
+func (s *Service) CreateMap(ctx context.Context, userID core.UserID, req api.MapCreate) (api.MapDetail, error) {
+	name, doc, err := checkMap(req.Name, req.Doc)
 	if err != nil {
-		return api.Environment{}, err
+		return api.MapDetail{}, err
 	}
-	id, revision, updated, dbErr := insertEnvironment(ctx, s.pool, userID, name, doc)
+	id, revision, updated, dbErr := insertMap(ctx, s.pool, userID, name, doc)
 	if dbErr != nil {
-		return api.Environment{}, apperr.DB(dbErr)
+		return api.MapDetail{}, apperr.DB(dbErr)
 	}
 	normalize(&req.Doc)
-	return api.Environment{ID: id, Name: name, Revision: revision, UpdatedAt: updated, Doc: req.Doc}, nil
+	return api.MapDetail{ID: id, Name: name, Revision: revision, UpdatedAt: updated, Doc: req.Doc}, nil
 }
 
-// UpdateEnvironment saves over one of the user's environments, if req.Revision
-// is still the stored revision (else a conflict).
-func (s *Service) UpdateEnvironment(ctx context.Context, userID core.UserID, id int64, req api.EnvironmentUpdate) (api.Environment, error) {
-	name, doc, err := checkEnvironment(req.Name, req.Doc)
+// UpdateMap saves over one of the user's maps, if req.Revision is still the
+// stored revision (else a conflict).
+func (s *Service) UpdateMap(ctx context.Context, userID core.UserID, id int64, req api.MapUpdate) (api.MapDetail, error) {
+	name, doc, err := checkMap(req.Name, req.Doc)
 	if err != nil {
-		return api.Environment{}, err
+		return api.MapDetail{}, err
 	}
-	revision, updated, dbErr := updateEnvironment(ctx, s.pool, userID, id, req.Revision, name, doc)
+	revision, updated, dbErr := updateMap(ctx, s.pool, userID, id, req.Revision, name, doc)
 	if dbErr != nil {
-		return api.Environment{}, storeError(dbErr)
+		return api.MapDetail{}, storeError(dbErr)
 	}
 	normalize(&req.Doc)
-	return api.Environment{ID: id, Name: name, Revision: revision, UpdatedAt: updated, Doc: req.Doc}, nil
+	return api.MapDetail{ID: id, Name: name, Revision: revision, UpdatedAt: updated, Doc: req.Doc}, nil
 }
 
-// DeleteEnvironment deletes one of the user's environments.
-func (s *Service) DeleteEnvironment(ctx context.Context, userID core.UserID, id int64) error {
-	if err := deleteEnvironment(ctx, s.pool, userID, id); err != nil {
+// DeleteMap deletes one of the user's maps.
+func (s *Service) DeleteMap(ctx context.Context, userID core.UserID, id int64) error {
+	if err := deleteMap(ctx, s.pool, userID, id); err != nil {
 		return storeError(err)
 	}
 	return nil
@@ -124,7 +124,7 @@ func (s *Service) SetSetting(ctx context.Context, userID core.UserID, key string
 	if len(value) > MaxSettingBytes {
 		return apperr.BadRequest("setting value too large (at most %d KiB)", MaxSettingBytes>>10)
 	}
-	err := db.InTx(ctx, s.pool, func(tx db.DBTX) error {
+	return db.InTx(ctx, s.pool, func(tx db.DBTX) error {
 		n, err := countSettings(ctx, tx, userID, key)
 		if err != nil {
 			return apperr.DB(err)
@@ -137,7 +137,6 @@ func (s *Service) SetSetting(ctx context.Context, userID core.UserID, key string
 		}
 		return nil
 	})
-	return err
 }
 
 // DeleteSetting removes key; removing a key that is not set is fine.
@@ -153,17 +152,17 @@ func (s *Service) DeleteSetting(ctx context.Context, userID core.UserID, key str
 
 func storeError(err error) error {
 	switch {
-	case errors.Is(err, errNoEnvironment):
-		return apperr.NotFound("environment not found")
+	case errors.Is(err, errNoMap):
+		return apperr.NotFound("map not found")
 	case errors.Is(err, errStaleRevision):
-		return apperr.Conflict("the environment was changed elsewhere; reload it")
+		return apperr.Conflict("the map was changed elsewhere; reload it")
 	}
 	return apperr.DB(err)
 }
 
-// checkEnvironment validates a name and document and returns the trimmed
-// name and the document as stored JSON.
-func checkEnvironment(name string, doc api.EnvironmentDoc) (string, []byte, error) {
+// checkMap validates a name and document and returns the trimmed name and
+// the document as stored JSON.
+func checkMap(name string, doc api.MapDoc) (string, []byte, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > MaxNameLength {
 		return "", nil, apperr.BadRequest("name must be 1 to %d characters", MaxNameLength)
@@ -179,26 +178,28 @@ func checkEnvironment(name string, doc api.EnvironmentDoc) (string, []byte, erro
 	return name, stored, nil
 }
 
-func checkDoc(doc *api.EnvironmentDoc) error {
-	if len(doc.Objects) > maxObjects {
-		return apperr.BadRequest("too many objects (at most %d)", maxObjects)
+func checkDoc(doc *api.MapDoc) error {
+	if len(doc.Zones) > maxZones {
+		return apperr.BadRequest("too many zones (at most %d)", maxZones)
 	}
-	ids := make(map[int64]bool, len(doc.Objects))
+	ids := make(map[int64]bool, len(doc.Zones))
 	vertices := 0
-	for _, o := range doc.Objects {
-		if o.Category != "zone" && o.Category != "obstacle" {
-			return apperr.BadRequest("object %d: category must be zone or obstacle", o.ID)
+	for _, z := range doc.Zones {
+		switch z.Category {
+		case "mowing", "no_go", "navigation":
+		default:
+			return apperr.BadRequest("zone %d: category must be mowing, no_go or navigation", z.ID)
 		}
-		if ids[o.ID] {
-			return apperr.BadRequest("object id %d appears twice", o.ID)
+		if ids[z.ID] {
+			return apperr.BadRequest("zone id %d appears twice", z.ID)
 		}
-		ids[o.ID] = true
-		vertices += len(o.Vertices)
+		ids[z.ID] = true
+		vertices += len(z.Vertices)
 	}
 	if vertices > maxVertices {
 		return apperr.BadRequest("too many vertices (at most %d)", maxVertices)
 	}
-	seen := map[api.EnvPointType]bool{}
+	seen := map[api.RoutePointType]bool{}
 	for _, p := range doc.Points {
 		switch p.Type {
 		case "start", "end", "start_end":
@@ -225,17 +226,17 @@ func checkDoc(doc *api.EnvironmentDoc) error {
 }
 
 // normalize turns missing lists into empty ones, so the client always gets arrays.
-func normalize(doc *api.EnvironmentDoc) {
-	if doc.Objects == nil {
-		doc.Objects = []api.PlanObject{}
+func normalize(doc *api.MapDoc) {
+	if doc.Zones == nil {
+		doc.Zones = []api.Zone{}
 	}
-	for i := range doc.Objects {
-		if doc.Objects[i].Vertices == nil {
-			doc.Objects[i].Vertices = []api.Point{}
+	for i := range doc.Zones {
+		if doc.Zones[i].Vertices == nil {
+			doc.Zones[i].Vertices = []api.Point{}
 		}
 	}
 	if doc.Points == nil {
-		doc.Points = []api.EnvPoint{}
+		doc.Points = []api.RoutePoint{}
 	}
 	if doc.LayerSettings == nil {
 		doc.LayerSettings = []api.LayerSetting{}

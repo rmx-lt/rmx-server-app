@@ -29,7 +29,7 @@ type app struct {
 	cfg  *config.Config
 	pool *db.Pool
 	auth *auth.Service
-	// planning holds the users' environments and settings.
+	// planning holds the users' maps and settings.
 	planning *planning.Service
 	mqtt     *mqtt.Client
 	ws       *ws.Server
