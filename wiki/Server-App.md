@@ -338,8 +338,8 @@ browser                                   rmx-server                       Times
 | `HttpOnly` | yes | Scripts can't read the cookie. |
 | `Secure` | yes | HTTPS only. (Browsers treat `http://localhost` as secure, so local development works.) |
 | `SameSite` | **Strict** | The cookie is never sent on requests that another site starts, so a foreign page can't use it (CSRF). Lax would also send it when someone follows a link here from another site; we don't need that, because the page (static files) is public and only its own same-site API calls need the cookie. |
-| `Path` | `/app` | The app shares `api.rmx.lt` with other services; its cookie stays under `/app`. |
-| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. If the app ever gets an origin of its own, it should use `__Host-session; Path=/`. |
+| `Path` | `/app` | The app shares `rmx.lt` with the static site; its cookie stays under `/app`. |
+| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `api.rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. If the app ever gets an origin of its own, it should use `__Host-session; Path=/`. |
 | CSRF | SameSite **plus** an `Origin` check | SameSite works per *site* (all of `rmx.lt`), and not every browser enforces it. Every request that isn't GET/HEAD/OPTIONS, and every WebSocket handshake, must have an `Origin` from `ALLOWED_ORIGINS`, or it gets 403. The login too (no "log the victim into the attacker's account"). WebSockets matter most: CORS doesn't cover them, so without this any website could open one with the user's cookie ("cross-site WebSocket hijacking"). |
 | Password guessing | in-memory backoff per username and per IP | 5 free failures per username (20 per IP), then 1 s, 2 s, 4 s … up to 15 min; while waiting, even the right password gets 429. Unknown usernames are checked against a dummy hash, so they take as long and get the same answer. A restart forgets the counters; several instances would need a shared store. |
 | Client IP | last `X-Forwarded-For` entry, else the TCP peer | Caddy sets that header; the app's port is not published, so only Caddy reaches it. |
@@ -667,7 +667,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `MQTT_PORT` | no | `1883` | default 1883 |
 | `MQTT_USERNAME` | yes | `app` | ACL: readwrite `mower/#` |
 | `MQTT_PASSWORD` | yes | (secret, server-side `.env`) | never logged |
-| `ALLOWED_ORIGINS` | **yes** | `https://api.rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
+| `ALLOWED_ORIGINS` | **yes** | `https://rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`. The Rust version's `RUST_LOG` is ignored |
 | `BIND_ADDR` | no | `0.0.0.0:8080` | already set in the image |
 | `MQTT_CLIENT_ID` | no | `rmx-server` | must be unique on the broker |
@@ -682,7 +682,7 @@ or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS
 timescaledb`, so the database user must own the database and either be a
 superuser (the image's `POSTGRES_USER` is) or the extension must already exist.
 
-**Routes the app serves itself** (Caddy proxies `api.rmx.lt/app` and `api.rmx.lt/app/*` as-is and
+**Routes the app serves itself** (Caddy proxies `rmx.lt/app` and `rmx.lt/app/*` as-is and
 must **not** strip the `/app` prefix). The app does its own login, so Caddy
 needs no `basic_auth` in front of it:
 

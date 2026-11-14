@@ -22,7 +22,7 @@ func (a *app) handler() http.Handler {
 }
 
 // router registers every route. Everything lives under /app, because Caddy
-// forwards api.rmx.lt/app/* without stripping the prefix.
+// forwards rmx.lt/app/* without stripping the prefix.
 //
 // Fail closed: data and live connections go in the Protected group, where
 // every route needs a valid session. Only the Public routes work without one:
