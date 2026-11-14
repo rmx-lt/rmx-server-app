@@ -1,45 +1,45 @@
-import WorkspaceNewButton from "@/features/workspace-manager/components/menu-bar/WorkspaceNewButton";
-import WorkspaceSaveButton from "@/features/workspace-manager/components/menu-bar/WorkspaceSaveButton";
-import WorkspaceSaveAsButton from "@/features/workspace-manager/components/menu-bar/WorkspaceSaveAsButton";
-import WorkspaceRenameButton from "@/features/workspace-manager/components/menu-bar/WorkspaceRenameButton";
-import WorkspaceCopyButton from "@/features/workspace-manager/components/menu-bar/WorkspaceCopyButton";
-import WorkspaceImportButton from "@/features/workspace-manager/components/menu-bar/WorkspaceImportButton";
-import WorkspaceExportButton from "@/features/workspace-manager/components/menu-bar/WorkspaceExportButton";
-// import WorkspaceCloseButton from "@/features/workspace-manager/components/menu-bar/WorkspaceCloseButton";
+import MapNewButton from "@/features/map-manager/components/menu-bar/MapNewButton";
+import MapSaveButton from "@/features/map-manager/components/menu-bar/MapSaveButton";
+import MapSaveAsButton from "@/features/map-manager/components/menu-bar/MapSaveAsButton";
+import MapRenameButton from "@/features/map-manager/components/menu-bar/MapRenameButton";
+import MapCopyButton from "@/features/map-manager/components/menu-bar/MapCopyButton";
+import MapImportButton from "@/features/map-manager/components/menu-bar/MapImportButton";
+import MapExportButton from "@/features/map-manager/components/menu-bar/MapExportButton";
+// import MapCloseButton from "@/features/map-manager/components/menu-bar/MapCloseButton";
 import MenuSeparator from "@/components/menu-bar/MenuBarSeparator";
-import WorkspaceOpenButton from "@/features/workspace-manager/components/menu-bar/WorkspaceOpenButton";
-import WorkspaceAutoSaveButton from "@/features/workspace-manager/components/menu-bar/WorkspaceAutoSaveButton";
+import MapOpenButton from "@/features/map-manager/components/menu-bar/MapOpenButton";
+import MapAutoSaveButton from "@/features/map-manager/components/menu-bar/MapAutoSaveButton";
 import MenuBarSubmenu from "@/components/menu-bar/MenuBarSubmenu";
 
 export default function MenuBarFileSubmenu() {
   return (
     <MenuBarSubmenu>
-      <WorkspaceNewButton />
-      <WorkspaceOpenButton />
+      <MapNewButton />
+      <MapOpenButton />
 
       <MenuSeparator />
 
-      <WorkspaceSaveButton />
-      <WorkspaceSaveAsButton />
+      <MapSaveButton />
+      <MapSaveAsButton />
 
       <MenuSeparator />
 
-      <WorkspaceRenameButton />
-      <WorkspaceCopyButton />
+      <MapRenameButton />
+      <MapCopyButton />
 
       <MenuSeparator />
 
-      <WorkspaceAutoSaveButton />
+      <MapAutoSaveButton />
 
       <MenuSeparator />
 
-      <WorkspaceImportButton />
-      <WorkspaceExportButton />
+      <MapImportButton />
+      <MapExportButton />
 
       {/* TODO: Home screen */}
       {/* <MenuSeparator />
 
-      <WorkspaceCloseButton /> */}
+      <MapCloseButton /> */}
     </MenuBarSubmenu>
   );
 }

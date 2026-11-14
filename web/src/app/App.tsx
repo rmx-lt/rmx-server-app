@@ -4,7 +4,7 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { initializeWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
+import { initializeMap } from "@/features/map-manager/data/mapBridge";
 import { useBeforeUnload } from "@/app/useBeforeUnload";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
 import { startConnections } from "./connections";
@@ -45,7 +45,7 @@ function Workbench() {
     resetSettings();
     forgetBrowserData();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
-    initializeWorkspace().catch(console.error);
+    initializeMap().catch(console.error);
     return () => {
       stopConnections();
     };

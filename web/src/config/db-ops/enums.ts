@@ -1,33 +1,33 @@
-// ─── Environment Type ───────────────────────────────────────────────────────
+// ─── Map Type ───────────────────────────────────────────────────────────────
 
-export const ENV_TYPE = {
+export const MAP_TYPE = {
     OFFLINE: "offline",
     ONLINE: "online",
     ANY_OFFLINE: "any_offline",
     ANY_ONLINE: "any_online",
 } as const;
 
-export type EnvType = (typeof ENV_TYPE)[keyof typeof ENV_TYPE];
+export type MapType = (typeof MAP_TYPE)[keyof typeof MAP_TYPE];
 
-export const ENV_TYPE_OPTIONS: { value: EnvType; label: string }[] = [
-    { value: ENV_TYPE.OFFLINE, label: "Off-Line" },
-    { value: ENV_TYPE.ONLINE, label: "On-Line" },
-    { value: ENV_TYPE.ANY_OFFLINE, label: "Any (default: Off-Line)" },
-    { value: ENV_TYPE.ANY_ONLINE, label: "Any (default: On-Line)" },
+export const MAP_TYPE_OPTIONS: { value: MapType; label: string }[] = [
+    { value: MAP_TYPE.OFFLINE, label: "Off-Line" },
+    { value: MAP_TYPE.ONLINE, label: "On-Line" },
+    { value: MAP_TYPE.ANY_OFFLINE, label: "Any (default: Off-Line)" },
+    { value: MAP_TYPE.ANY_ONLINE, label: "Any (default: On-Line)" },
 ];
 
-// ─── Environment Format ────────────────────────────────────────────────────────
+// ─── Map Format ───────────────────────────────────────────────────────────────
 
-export const ENV_FORMAT = {
+export const MAP_FORMAT = {
     POLYGON: "polygon",
     GRID: "grid",
 } as const;
 
-export type EnvFormat = (typeof ENV_FORMAT)[keyof typeof ENV_FORMAT];
+export type MapFormat = (typeof MAP_FORMAT)[keyof typeof MAP_FORMAT];
 
-export const ENV_FORMAT_OPTIONS: { value: EnvFormat; label: string }[] = [
-    { value: ENV_FORMAT.POLYGON, label: "Polygon" },
-    // { value: ENV_FORMAT.GRID, label: "Grid" }, // not yet implemented
+export const MAP_FORMAT_OPTIONS: { value: MapFormat; label: string }[] = [
+    { value: MAP_FORMAT.POLYGON, label: "Polygon" },
+    // { value: MAP_FORMAT.GRID, label: "Grid" }, // not yet implemented
 ];
 
 // ─── Coordinate System ────────────────────────────────────────────────────────
@@ -44,52 +44,56 @@ export const COORD_SYSTEM_OPTIONS: { value: CoordSystemType; label: string }[] =
     // { value: COORD_SYSTEM.GEOGRAPHIC, label: "Geographic" }, // not yet implemented
 ];
 
-// ─── Object Category ──────────────────────────────────────────────────────────
+// ─── Zone Category ────────────────────────────────────────────────────────────
 
-export const OBJECT_CATEGORY = {
-    ZONE: "zone",
-    OBSTACLE: "obstacle",
+/**
+ * The zone categories the web app draws: the server's values (wiki Server-App,
+ * "Planning API"). Navigation zones aren't drawn yet (rmx-server-app#81).
+ */
+export const ZONE_CATEGORY = {
+    MOWING: "mowing",
+    NO_GO: "no_go",
 } as const;
 
-export type ObjectCategory = (typeof OBJECT_CATEGORY)[keyof typeof OBJECT_CATEGORY];
+export type ZoneCategory = (typeof ZONE_CATEGORY)[keyof typeof ZONE_CATEGORY];
 
-export const OBJECT_CATEGORY_OPTIONS: { value: ObjectCategory; label: string }[] = [
-    { value: OBJECT_CATEGORY.ZONE, label: "Zone" },
-    { value: OBJECT_CATEGORY.OBSTACLE, label: "Obstacle" },
+export const ZONE_CATEGORY_OPTIONS: { value: ZoneCategory; label: string }[] = [
+    { value: ZONE_CATEGORY.MOWING, label: "Mowing zone" },
+    { value: ZONE_CATEGORY.NO_GO, label: "No-go zone" },
 ];
 
-// ─── Object Type ──────────────────────────────────────────────────────────────
+// ─── Zone Type ────────────────────────────────────────────────────────────────
 
-export const OBJECT_TYPE = {
+export const ZONE_TYPE = {
     EMPTY: "",
     OFFLINE: "offline",
     ONLINE: "online",
 } as const;
 
-export type ObjectType = (typeof OBJECT_TYPE)[keyof typeof OBJECT_TYPE];
+export type ZoneType = (typeof ZONE_TYPE)[keyof typeof ZONE_TYPE];
 
-export const OBJECT_TYPE_OPTIONS: { value: ObjectType; label: string }[] = [
-    { value: OBJECT_TYPE.EMPTY, label: "" },
-    { value: OBJECT_TYPE.OFFLINE, label: "Off-Line" },
-    { value: OBJECT_TYPE.ONLINE, label: "On-Line" },
+export const ZONE_TYPE_OPTIONS: { value: ZoneType; label: string }[] = [
+    { value: ZONE_TYPE.EMPTY, label: "" },
+    { value: ZONE_TYPE.OFFLINE, label: "Off-Line" },
+    { value: ZONE_TYPE.ONLINE, label: "On-Line" },
 ];
 
-// ─── Environment Type Helpers ────────────────────────────────────────────────
+// ─── Map Type Helpers ────────────────────────────────────────────────────────
 
 /**
- * Returns true when the env type is a fixed single type (offline or online),
- * meaning all objects are forced to that type and per-object selection is disabled.
+ * Returns true when the map type is a fixed single type (offline or online),
+ * meaning all zones are forced to that type and per-zone selection is disabled.
  */
-export function isEnvTypeFixed(type: EnvType): boolean {
-    return type === ENV_TYPE.OFFLINE || type === ENV_TYPE.ONLINE;
+export function isMapTypeFixed(type: MapType): boolean {
+    return type === MAP_TYPE.OFFLINE || type === MAP_TYPE.ONLINE;
 }
 
 /**
- * Returns the ObjectType that new (or bulk-updated) objects should receive
- * based on the active environment type.
+ * Returns the ZoneType that new (or bulk-updated) zones should receive
+ * based on the active map type.
  */
-export function defaultObjectTypeForEnv(type: EnvType): ObjectType {
-    return type === ENV_TYPE.ONLINE || type === ENV_TYPE.ANY_ONLINE
-        ? OBJECT_TYPE.ONLINE
-        : OBJECT_TYPE.OFFLINE;
+export function defaultZoneTypeForMap(type: MapType): ZoneType {
+    return type === MAP_TYPE.ONLINE || type === MAP_TYPE.ANY_ONLINE
+        ? ZONE_TYPE.ONLINE
+        : ZONE_TYPE.OFFLINE;
 }

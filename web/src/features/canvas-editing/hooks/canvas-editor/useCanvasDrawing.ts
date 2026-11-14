@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import type Konva from "konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
-import { OBJECT_CATEGORY, defaultObjectTypeForEnv, type ObjectCategory, type ObjectType } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY, defaultZoneTypeForMap, type ZoneCategory, type ZoneType } from "@/config/db-ops/enums";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
-import { useEnvStore } from "@/model/envStore";
-import { useEnvPointStore } from "@/model/envPointStore";
+import { useMapStore } from "@/model/mapStore";
+import { useMapPointStore } from "@/model/mapPointStore";
 import { useCanvasToolStore } from "@/features/canvas-editing/stores/canvasToolStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 
@@ -14,9 +14,9 @@ interface UseCanvasDrawingOptions {
     stageRef: React.RefObject<Konva.Stage | null>;
     clearSelection: () => void;
     addObject: (
-        category: ObjectCategory,
+        category: ZoneCategory,
         points: Point[],
-        type: ObjectType,
+        type: ZoneType,
     ) => void;
 }
 
@@ -65,7 +65,7 @@ export function useCanvasDrawing({
             const ptr = stage.getRelativePointerPosition();
             if (!ptr) return;
             pendingPointerPosRef.current = { x: ptr.x, y: ptr.y };
-            if (activeTool === "addZone" || activeTool === "addObstacle") {
+            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
                 pendingMousePosRef.current = { x: ptr.x, y: ptr.y };
             }
             if (rafIdRef.current === null) {
@@ -97,8 +97,8 @@ export function useCanvasDrawing({
                 const ptr = stage.getRelativePointerPosition();
                 if (!ptr) return;
                 const type = activeTool === "addStartPoint" ? "start" : activeTool === "addEndPoint" ? "end" : "start_end";
-                const environmentId = useEnvStore.getState().env.id;
-                const { startPoint, endPoint, startEndPoint, upsertPoint } = useEnvPointStore.getState();
+                const mapId = useMapStore.getState().map.id;
+                const { startPoint, endPoint, startEndPoint, upsertPoint } = useMapPointStore.getState();
 
                 let conflictMessage: string | null = null;
                 if (type === "start_end") {
@@ -114,7 +114,7 @@ export function useCanvasDrawing({
                 }
 
                 const doPlace = async () => {
-                    await upsertPoint(environmentId, type, { x: ptr.x, y: ptr.y });
+                    await upsertPoint(mapId, type, { x: ptr.x, y: ptr.y });
                     useCanvasToolStore.getState().setActiveTool(null);
                 };
 
@@ -132,7 +132,7 @@ export function useCanvasDrawing({
                 return;
             }
 
-            if (activeTool === "addZone" || activeTool === "addObstacle") {
+            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
                 const stage = stageRef.current;
                 if (!stage) return;
                 if (e.target !== stage) return;
@@ -153,12 +153,12 @@ export function useCanvasDrawing({
         (e: Konva.KonvaEventObject<PointerEvent>) => {
             e.evt.preventDefault();
             if (
-                (activeTool === "addZone" || activeTool === "addObstacle") &&
+                (activeTool === "addMowingZone" || activeTool === "addNoGoZone") &&
                 drawingPoints.length >= 3
             ) {
-                const objectType = defaultObjectTypeForEnv(useEnvStore.getState().env.type);
+                const objectType = defaultZoneTypeForMap(useMapStore.getState().map.type);
                 addObject(
-                    activeTool === "addZone" ? OBJECT_CATEGORY.ZONE : OBJECT_CATEGORY.OBSTACLE,
+                    activeTool === "addMowingZone" ? ZONE_CATEGORY.MOWING : ZONE_CATEGORY.NO_GO,
                     drawingPoints,
                     objectType,
                 );

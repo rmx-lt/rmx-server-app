@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Layer, Circle } from "react-konva";
 import { CanvasVertexIdLabel } from "@/features/canvas-editing/components/canvas-editor/shapes/CanvasVertexIdLabel";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
-import type { Object } from "@/data/planning/schemaTypes";
+import type { Zone } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import {
@@ -12,10 +12,10 @@ import {
 } from "@/config/canvas-editing/canvasConfig";
 import { deriveActiveFill } from "@/utils/colorUtils";
 import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";
-import { OBJECT_CATEGORY, type ObjectCategory } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
 
 interface CanvasVertexHandlesLayerProps {
-    selectedObject: Object | null;
+    selectedObject: Zone | null;
     selectedObjectVertices: Array<{ x: number; y: number }>;
     activeTool: ActiveTool | null;
     scale: number;
@@ -43,7 +43,7 @@ export function CanvasVertexHandlesLayerInner({
     onEdgeMidpointMouseDown,
     onHandleHoverChange,
 }: CanvasVertexHandlesLayerProps) {
-    const category = (selectedObject?.category ?? OBJECT_CATEGORY.ZONE) as ObjectCategory;
+    const category = (selectedObject?.category ?? ZONE_CATEGORY.MOWING) as ZoneCategory;
     const { stroke: accentColor, edgeWidth, showVertexIds } = usePolygonLayerStyle(category);
     const isLayerListening = activeTool === "select" && selectedObject !== null;
     const edgeMidpoints = selectedObject ? computeEdgeMidpoints(selectedObjectVertices) : [];

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { useEnvPointStore } from "@/model/envPointStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapPointStore } from "@/model/mapPointStore";
+import { useMapStore } from "@/model/mapStore";
 import {
     formatNumber,
     unitLabel,
@@ -66,26 +66,26 @@ function CoordInput({
 export default function PointPositionField() {
     const selectedObject = useCanvasSelectionStore((s) => s.selectedObject);
     const selectedVertexRefs = useCanvasSelectionStore((s) => s.selectedVertexRefs);
-    const selectedEnvPointType = useCanvasSelectionStore((s) => s.selectedEnvPointType);
-    const startPoint = useEnvPointStore((s) => s.startPoint);
-    const endPoint = useEnvPointStore((s) => s.endPoint);
-    const startEndPoint = useEnvPointStore((s) => s.startEndPoint);
-    const upsertPoint = useEnvPointStore((s) => s.upsertPoint);
+    const selectedMapPointType = useCanvasSelectionStore((s) => s.selectedMapPointType);
+    const startPoint = useMapPointStore((s) => s.startPoint);
+    const endPoint = useMapPointStore((s) => s.endPoint);
+    const startEndPoint = useMapPointStore((s) => s.startEndPoint);
+    const upsertPoint = useMapPointStore((s) => s.upsertPoint);
     const objects = useCanvasObjectStore((s) => s.objects);
     const moveVertexAt = useCanvasObjectStore((s) => s.moveVertexAt);
     const finalizeVertexMoveAt = useCanvasObjectStore((s) => s.finalizeVertexMoveAt);
-    const envId = useEnvStore((s) => s.env.id);
+    const mapId = useMapStore((s) => s.map.id);
     const selectedUnit = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
     const xLabel = unitLabel(selectedUnit) ? `X (${unitLabel(selectedUnit)})` : "X";
     const yLabel = unitLabel(selectedUnit) ? `Y (${unitLabel(selectedUnit)})` : "Y";
 
-    if (selectedEnvPointType) {
-        const envPointType = selectedEnvPointType;
+    if (selectedMapPointType) {
+        const mapPointType = selectedMapPointType;
         const currentPoint =
-            envPointType === "start"
+            mapPointType === "start"
                 ? startPoint
-                : envPointType === "end"
+                : mapPointType === "end"
                     ? endPoint
                     : startEndPoint;
         if (!currentPoint) return null;
@@ -93,11 +93,11 @@ export default function PointPositionField() {
         const { x, y } = currentPoint.point;
 
         function commitX(newX: number) {
-            upsertPoint(envId, envPointType, { x: newX, y });
+            upsertPoint(mapId, mapPointType, { x: newX, y });
         }
 
         function commitY(newY: number) {
-            upsertPoint(envId, envPointType, { x, y: newY });
+            upsertPoint(mapId, mapPointType, { x, y: newY });
         }
 
         return (

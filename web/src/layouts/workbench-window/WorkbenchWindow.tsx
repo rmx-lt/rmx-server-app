@@ -6,10 +6,10 @@ import StatusBar from "./status-bar/StatusBar";
 import CanvasEditorLayout from "./canvas-editor/CanvasEditorLayout";
 import ConfirmationModal from "@/components/modals/confirmation-modal/ConfirmationModal";
 import { useWorkbenchShortcuts } from "@/layouts/workbench-window/useWorkbenchShortcuts";
-import WorkspacePickerModal from "@/features/workspace-manager/components/workspace-picker-modal/WorkspacePickerModal";
-import SaveAsModal from "@/features/workspace-manager/components/save-as-modal/SaveAsModal";
-import CopyWorkspaceModal from "@/features/workspace-manager/components/copy-workspace-modal/CopyWorkspaceModal";
-import ImportModal from "@/features/workspace-manager/components/import-modal/ImportModal";
+import MapPickerModal from "@/features/map-manager/components/map-picker-modal/MapPickerModal";
+import SaveAsModal from "@/features/map-manager/components/save-as-modal/SaveAsModal";
+import CopyMapModal from "@/features/map-manager/components/copy-map-modal/CopyMapModal";
+import ImportModal from "@/features/map-manager/components/import-modal/ImportModal";
 import GeoAnchorModal from "@/features/geo-anchor/components/GeoAnchorModal";
 
 export default function WorkbenchWindow() {
@@ -28,10 +28,10 @@ export default function WorkbenchWindow() {
         </div>
       </div>
       <StatusBar />
-      <WorkspacePickerModal />
+      <MapPickerModal />
       <ConfirmationModal />
       <SaveAsModal />
-      <CopyWorkspaceModal />
+      <CopyMapModal />
       <ImportModal />
       <GeoAnchorModal />
     </div>

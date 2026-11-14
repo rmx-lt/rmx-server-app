@@ -5,7 +5,7 @@ export const useControlsPanelStore = create<ControlsPanelState>((set) => ({
     expandedSections: {
         general: true,
         algo: true,
-        env: true,
+        map: true,
         object: true,
         "computation-provider": true,
         debug: false,

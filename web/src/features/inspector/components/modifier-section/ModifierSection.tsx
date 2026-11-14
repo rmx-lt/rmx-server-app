@@ -3,7 +3,7 @@ import InspectorPanelSectionInput from "@/components/inspector-panel/InspectorPa
 import InspectorPanelSectionButton from "@/components/inspector-panel/InspectorPanelSectionButton";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
-import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 
 export default function ModifierSection() {
     const selectedObjectId = useCanvasSelectionStore((s) => s.selectedObject?.id);
@@ -19,8 +19,8 @@ export default function ModifierSection() {
 
     if (
         !selectedObjectId ||
-        (selectedObjectCategory !== OBJECT_CATEGORY.ZONE &&
-            selectedObjectCategory !== OBJECT_CATEGORY.OBSTACLE)
+        (selectedObjectCategory !== ZONE_CATEGORY.MOWING &&
+            selectedObjectCategory !== ZONE_CATEGORY.NO_GO)
     ) {
         return null;
     }

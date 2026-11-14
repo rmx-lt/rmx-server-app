@@ -1,1 +1,1 @@
-export const WORKSPACE_NAME_MAX_LENGTH = 100;
+export const MAP_NAME_MAX_LENGTH = 100;

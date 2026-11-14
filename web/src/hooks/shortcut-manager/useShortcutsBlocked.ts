@@ -7,12 +7,12 @@ import { blockShortcuts, unblockShortcuts } from "./useShortcut";
  * Uses a named token so multiple independent blockers can coexist —
  * shortcuts only resume when every blocker has been removed.
  *
- * @param token  Stable string that identifies this blocker (e.g. "workspace-picker-modal").
+ * @param token  Stable string that identifies this blocker (e.g. "map-picker-modal").
  * @param active Whether the block is currently active.
  *
  * @example
- * useShortcutsBlocked("workspace-picker-modal", isOpen);
- * useShortcutsBlocked("workspace-name-field", isEditing);
+ * useShortcutsBlocked("map-picker-modal", isOpen);
+ * useShortcutsBlocked("map-name-field", isEditing);
  */
 export function useShortcutsBlocked(token: string, active: boolean) {
     useEffect(() => {

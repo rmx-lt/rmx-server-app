@@ -49,22 +49,22 @@ function detail(id: number, revision: number, doc: MapDoc = DOC): MapDetail {
 }
 
 describe("loadMap", () => {
-    test("translates zones to the app's categories and keeps navigation zones out of the canvas", async () => {
+    test("keeps the server's zone categories and keeps navigation zones out of the canvas", async () => {
         answers.push({ status: 200, body: detail(7, 3) });
-        const map = await loadMap(7);
+        const content = await loadMap(7);
         expect(calls[0]).toMatchObject({ method: "GET", url: "/app/api/maps/7" });
-        expect(map.env).toMatchObject({ id: 7, name: "Garden", zoneCount: 1, obstacleCount: 1, headlandWidth: "10" });
-        expect(map.objects.map((o) => [o.id, o.category, o.environmentId])).toEqual([
-            [1, "zone", 7],
-            [2, "obstacle", 7],
+        expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingZoneCount: 1, noGoZoneCount: 1, headlandWidth: "10" });
+        expect(content.zones.map((z) => [z.id, z.category, z.mapId])).toEqual([
+            [1, "mowing", 7],
+            [2, "no_go", 7],
         ]);
-        expect(map.objects[0]!.vertexCount).toBe(3);
-        expect(map.objects[0]!.area).toBeGreaterThan(0);
-        expect(map.points).toEqual([{ environmentId: 7, type: "start_end", point: { x: 5, y: 5 } }]);
-        expect(map.geoAnchor).toEqual({ lat: 54.68, lon: 25.28 });
+        expect(content.zones[0]!.vertexCount).toBe(3);
+        expect(content.zones[0]!.area).toBeGreaterThan(0);
+        expect(content.points).toEqual([{ mapId: 7, type: "start_end", point: { x: 5, y: 5 } }]);
+        expect(content.geoAnchor).toEqual({ lat: 54.68, lon: 25.28 });
         // The stored value wins; every other setting gets its default.
-        expect(map.layerSettings.find((s) => s.id === 1 && s.layerId === 2)?.value).toBe("false");
-        expect(map.layerSettings.length).toBeGreaterThan(1);
+        expect(content.layerSettings.find((s) => s.id === 1 && s.layerId === 2)?.value).toBe("false");
+        expect(content.layerSettings.length).toBeGreaterThan(1);
     });
 });
 
@@ -75,9 +75,9 @@ describe("saveMap", () => {
     }
 
     test("puts the whole document with the loaded revision and writes navigation zones back", async () => {
-        const map = await loaded();
+        const content = await loaded();
         answers.push({ status: 200, body: detail(7, 4) });
-        expect(await saveMap({ ...map, env: { ...map.env, name: "  Front  " } })).toBe(7);
+        expect(await saveMap({ ...content, map: { ...content.map, name: "  Front  " } })).toBe(7);
         const put = calls[1]!;
         expect(put.method).toBe("PUT");
         expect(put.url).toBe("/app/api/maps/7");
@@ -94,15 +94,15 @@ describe("saveMap", () => {
 
         // The next save names the new revision.
         answers.push({ status: 200, body: detail(7, 5) });
-        await saveMap(map);
+        await saveMap(content);
         expect((calls[2]!.body as { revision: number }).revision).toBe(4);
     });
 
     test("moves a navigation zone whose id a new drawn zone took", async () => {
-        const map = await loaded();
-        const drawn = { ...map.objects[0]!, id: 3 };
+        const content = await loaded();
+        const drawn = { ...content.zones[0]!, id: 3 };
         answers.push({ status: 200, body: detail(7, 4) });
-        await saveMap({ ...map, objects: [...map.objects, drawn] });
+        await saveMap({ ...content, zones: [...content.zones, drawn] });
         const ids = (calls[1]!.body as { doc: MapDoc }).doc.zones.map((z) => [z.id, z.category]);
         expect(ids).toEqual([
             [1, "mowing"],
@@ -113,17 +113,17 @@ describe("saveMap", () => {
     });
 
     test("creates a map that has no id yet", async () => {
-        const map = await loaded();
+        const content = await loaded();
         answers.push({ status: 201, body: detail(9, 1) });
-        const id = await saveMap({ ...map, env: { ...map.env, id: 0, name: "New" } });
+        const id = await saveMap({ ...content, map: { ...content.map, id: 0, name: "New" } });
         expect(id).toBe(9);
         expect(calls[1]).toMatchObject({ method: "POST", url: "/app/api/maps" });
     });
 
     test("a stale revision is a conflict", async () => {
-        const map = await loaded();
+        const content = await loaded();
         answers.push({ status: 409, body: { code: "conflict", message: "changed elsewhere" } });
-        const err = await saveMap(map).catch((e: unknown) => e);
+        const err = await saveMap(content).catch((e: unknown) => e);
         expect(isConflict(err)).toBe(true);
     });
 });
@@ -131,9 +131,9 @@ describe("saveMap", () => {
 describe("copies and the list", () => {
     test("a copy carries the source's navigation zones", async () => {
         answers.push({ status: 200, body: detail(7, 3) });
-        const map = await loadMap(7);
+        const content = await loadMap(7);
         answers.push({ status: 201, body: detail(8, 1) });
-        expect(await createMap(map, "Copy")).toBe(8);
+        expect(await createMap(content, "Copy")).toBe(8);
         const body = calls[1]!.body as { name: string; doc: MapDoc };
         expect(body.name).toBe("Copy");
         expect(body.doc.zones.some((z) => z.category === "navigation")).toBe(true);
@@ -150,7 +150,7 @@ describe("copies and the list", () => {
             },
         });
         expect(await listMaps()).toEqual([
-            { id: 7, name: "Garden", zoneCount: 2, obstacleCount: 1, updatedAt: "2026-11-14T12:00:00Z" },
+            { id: 7, name: "Garden", mowingZoneCount: 2, noGoZoneCount: 1, updatedAt: "2026-11-14T12:00:00Z" },
         ]);
         answers.push({ status: 204 });
         await deleteMap(7);

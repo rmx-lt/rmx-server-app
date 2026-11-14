@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useShortcut, addShortcutBlockListener, removeShortcutBlockListener } from "@/hooks/shortcut-manager/useShortcut";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
-import { useWorkspacePickerStore } from "@/features/workspace-manager/stores/workspacePickerStore";
-import { useSaveModalStore } from "@/features/workspace-manager/stores/saveModalStore";
-import { useSaveAsModalStore } from "@/features/workspace-manager/stores/saveAsModalStore";
+import { useMapPickerStore } from "@/features/map-manager/stores/mapPickerStore";
+import { useSaveModalStore } from "@/features/map-manager/stores/saveModalStore";
+import { useSaveAsModalStore } from "@/features/map-manager/stores/saveAsModalStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useUiControlsPanelStore } from "@/features/ui-manager/stores/uiControlsPanelStore";
 import { useUiInspectorPanelStore } from "@/features/ui-manager/stores/uiInspectorPanelStore";
@@ -14,7 +14,7 @@ import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHi
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
 import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
-import { resetWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
+import { resetMap } from "@/features/map-manager/data/mapBridge";
 
 /**
  * Registers all shortcuts that are scoped to the Workbench.
@@ -32,19 +32,19 @@ export function useWorkbenchShortcuts() {
         return () => removeShortcutBlockListener(deactivateTools);
     }, []);
 
-    useShortcut("workspace.new", S["workspace.new"].keys, () =>
-        useSaveModalStore.getState().requestWithSaveGuard(resetWorkspace),
+    useShortcut("map.new", S["map.new"].keys, () =>
+        useSaveModalStore.getState().requestWithSaveGuard(resetMap),
     );
 
-    useShortcut("workspace.save-as", S["workspace.save-as"].keys, () =>
+    useShortcut("map.save-as", S["map.save-as"].keys, () =>
         useSaveAsModalStore.getState().open().catch(console.error),
     );
 
-    useShortcut("workspace.open", S["workspace.open"].keys, () =>
-        useWorkspacePickerStore.getState().open(),
+    useShortcut("map.open", S["map.open"].keys, () =>
+        useMapPickerStore.getState().open(),
     );
 
-    useShortcut("workspace.save", S["workspace.save"].keys, () => {
+    useShortcut("map.save", S["map.save"].keys, () => {
         const { mode, setMode, isAutoSaveEnabled } = useSaveModeStore.getState();
         saveCanvas()
             .then((saved) => {
@@ -75,16 +75,16 @@ export function useWorkbenchShortcuts() {
         setActiveTool(activeTool === "select" ? null : "select");
     });
 
-    useShortcut("canvas.tool-add-zone", S["canvas.tool-add-zone"].keys, () => {
+    useShortcut("canvas.tool-add-mowing-zone", S["canvas.tool-add-mowing-zone"].keys, () => {
         const { activeTool, setActiveTool } = useCanvasToolStore.getState();
         useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "addZone" ? null : "addZone");
+        setActiveTool(activeTool === "addMowingZone" ? null : "addMowingZone");
     });
 
-    useShortcut("canvas.tool-add-obstacle", S["canvas.tool-add-obstacle"].keys, () => {
+    useShortcut("canvas.tool-add-no-go-zone", S["canvas.tool-add-no-go-zone"].keys, () => {
         const { activeTool, setActiveTool } = useCanvasToolStore.getState();
         useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "addObstacle" ? null : "addObstacle");
+        setActiveTool(activeTool === "addNoGoZone" ? null : "addNoGoZone");
     });
 
     useShortcut("canvas.tool-delete", S["canvas.tool-delete"].keys, () => {

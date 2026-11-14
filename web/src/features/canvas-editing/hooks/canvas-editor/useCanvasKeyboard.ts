@@ -1,22 +1,22 @@
 import { useCallback } from "react";
-import type { Object } from "@/data/planning/schemaTypes";
-import type { EnvPointType } from "@/data/planning/schemaTypes";
+import type { Zone } from "@/data/planning/schemaTypes";
+import type { MapPointType } from "@/data/planning/schemaTypes";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
 
 interface UseCanvasKeyboardOptions {
     activeTool: ActiveTool | null;
     drawingPointsCount: number;
-    selectedObject: Object | null;
+    selectedObject: Zone | null;
     selectedVertexRefs: VertexRef[];
-    selectedEnvPointType: EnvPointType | null;
-    envPointEnvironmentId: number | null;
+    selectedMapPointType: MapPointType | null;
+    mapPointMapId: number | null;
     setActiveTool: (tool: ActiveTool | null) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
-    deleteObject: (obj: Object) => void;
-    deleteVertex: (obj: Object, index: number) => void;
-    deleteVertices: (obj: Object, refs: VertexRef[]) => void;
-    deleteEnvPoint: (environmentId: number, type: EnvPointType) => void;
+    deleteObject: (obj: Zone) => void;
+    deleteVertex: (obj: Zone, index: number) => void;
+    deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
+    deleteMapPoint: (mapId: number, type: MapPointType) => void;
     cancelDrawing: () => void;
 }
 
@@ -25,22 +25,22 @@ export function useCanvasKeyboard({
     drawingPointsCount,
     selectedObject,
     selectedVertexRefs,
-    selectedEnvPointType,
-    envPointEnvironmentId,
+    selectedMapPointType,
+    mapPointMapId,
     setActiveTool,
     clearSelection,
     selectVertex,
     deleteObject,
     deleteVertex,
     deleteVertices,
-    deleteEnvPoint,
+    deleteMapPoint,
     cancelDrawing,
 }: UseCanvasKeyboardOptions) {
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent<HTMLDivElement>) => {
             if (e.key === "Escape") {
                 e.preventDefault();
-                if (activeTool === "addZone" || activeTool === "addObstacle") {
+                if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
                     if (drawingPointsCount > 0) {
                         cancelDrawing();
                     } else {
@@ -51,7 +51,7 @@ export function useCanvasKeyboard({
                         selectVertex(null); // deselect vertices, keep object selected
                     } else if (selectedObject !== null) {
                         clearSelection();
-                    } else if (selectedEnvPointType !== null) {
+                    } else if (selectedMapPointType !== null) {
                         clearSelection();
                     } else {
                         setActiveTool(null);
@@ -69,8 +69,8 @@ export function useCanvasKeyboard({
                 } else if (selectedObject !== null) {
                     deleteObject(selectedObject);
                     clearSelection();
-                } else if (selectedEnvPointType !== null && envPointEnvironmentId !== null) {
-                    deleteEnvPoint(envPointEnvironmentId, selectedEnvPointType);
+                } else if (selectedMapPointType !== null && mapPointMapId !== null) {
+                    deleteMapPoint(mapPointMapId, selectedMapPointType);
                     clearSelection();
                 }
             }
@@ -80,15 +80,15 @@ export function useCanvasKeyboard({
             drawingPointsCount,
             selectedObject,
             selectedVertexRefs,
-            selectedEnvPointType,
-            envPointEnvironmentId,
+            selectedMapPointType,
+            mapPointMapId,
             setActiveTool,
             clearSelection,
             selectVertex,
             deleteObject,
             deleteVertex,
             deleteVertices,
-            deleteEnvPoint,
+            deleteMapPoint,
             cancelDrawing,
         ],
     );
