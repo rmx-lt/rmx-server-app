@@ -10,7 +10,7 @@ import {
     type ObjectCategory,
     type ObjectType,
 } from "@/config/db-ops/enums";
-import type { EnvPointType, GeoAnchor } from "@/data/local/schemaTypes";
+import type { EnvPointType, GeoAnchor } from "@/data/planning/schemaTypes";
 
 // ---------------------------------------------------------------------------
 // Types

@@ -3,7 +3,7 @@ import { Layer, Line, Group, Text } from "react-konva";
 import { MarkerShape } from "@/features/canvas-editing/utils/markerShape";
 import { textPlacementCenter, TEXT_W, TEXT_OX } from "@/features/canvas-editing/utils/textPlacement";
 import type { ResolvedPolygonResultLayerStyle } from "@/features/canvas-editing/types/layerStyles";
-import type { CanvasPolygonItem } from "@/data/local/serviceTypes";
+import type { CanvasPolygonItem } from "@/data/planning/serviceTypes";
 
 interface CanvasPolygonResultLayerProps {
     items: CanvasPolygonItem[];

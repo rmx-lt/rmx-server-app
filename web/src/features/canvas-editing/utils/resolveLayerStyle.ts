@@ -1,4 +1,4 @@
-import type { LayerSettingView } from "@/data/local/layerTypes";
+import type { LayerSettingView } from "@/data/planning/layerTypes";
 import type {
     ResolvedPolygonResultLayerStyle,
 } from "@/features/canvas-editing/types/layerStyles";

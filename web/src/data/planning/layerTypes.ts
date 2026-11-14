@@ -1,4 +1,4 @@
-import type { PointLabelColorEntry, StyleAttributeGroup, StyleAttributeKey, StyleType } from "@/data/local/serviceTypes";
+import type { PointLabelColorEntry, StyleAttributeGroup, StyleAttributeKey, StyleType } from "@/data/planning/serviceTypes";
 
 export type LayerId = number;
 

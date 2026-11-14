@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import type { Object } from "@/data/local/schemaTypes";
-import type { EnvPointType } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
+import type { EnvPointType } from "@/data/planning/schemaTypes";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
 
 interface UseCanvasKeyboardOptions {

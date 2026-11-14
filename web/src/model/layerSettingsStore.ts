@@ -1,9 +1,7 @@
 import { create } from "zustand";
-import { loadLayerSettingViews, saveAllLayerSettings } from "@/data/local/layerSettings";
-import { getAllLayers } from "@/data/local/layers";
-import { getSaveMode } from "@/model/saveModeStore";
-import type { LayerPK, LayerRecord, LayerSettingView, LayerWithSettings } from "@/data/local/layerTypes";
-import { LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
+import { getAllLayers, toLayerSettingViews } from "@/data/planning/layerSettings";
+import type { LayerPK, LayerRecord, LayerSettingParameter, LayerSettingView, LayerWithSettings } from "@/data/planning/layerTypes";
+import { LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 
 interface LayerSettingsState {
     layers: LayerWithSettings[];
@@ -22,16 +20,6 @@ interface LayerSettingsState {
     reorderLayers: (orderedPKs: LayerPK[]) => void;
     /** Clears the dirty flag. Called by canvas bridge after a successful save. */
     clearDirty: () => void;
-}
-
-function getAllParams(layers: LayerWithSettings[]): LayerSettingView[] {
-    return layers.flatMap((l) => l.settings);
-}
-
-function autosave(layers: LayerWithSettings[]): void {
-    if (getSaveMode() === "autosave") {
-        saveAllLayerSettings(getAllParams(layers)).catch(console.error);
-    }
 }
 
 function layerPKMatches(layer: LayerRecord, pk: LayerPK): boolean {
@@ -65,7 +53,6 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
             const item = state.layers.find((l) => layerPKMatches(l.layer, pk));
             if (!item || paramValue(item.settings, LAYER_PARAM_KEY.VISIBLE) === String(visible)) return {};
             const layers = updateParam(state.layers, pk, LAYER_PARAM_KEY.VISIBLE, String(visible));
-            autosave(layers);
             return { layers, isLayerSettingsDirty: true };
         });
     },
@@ -78,7 +65,6 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
                 if (l.layer.id !== layerKey) return l;
                 return { ...l, settings: l.settings.map((p) => (p.key === name ? { ...p, value } : p)) };
             });
-            autosave(layers);
             return { layers, isLayerSettingsDirty: true };
         });
     },
@@ -92,7 +78,6 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
             const zB = paramValue(b.settings, LAYER_PARAM_KEY.Z_INDEX) ?? "0";
             let layers = updateParam(state.layers, pkA, LAYER_PARAM_KEY.Z_INDEX, zB);
             layers = updateParam(layers, pkB, LAYER_PARAM_KEY.Z_INDEX, zA);
-            autosave(layers);
             return { layers, isLayerSettingsDirty: true };
         });
     },
@@ -104,7 +89,6 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
             orderedPKs.forEach((pk, idx) => {
                 layers = updateParam(layers, pk, "Z-Index", String((n - 1 - idx) * 10));
             });
-            autosave(layers);
             return { layers, isLayerSettingsDirty: true };
         });
     },
@@ -112,11 +96,17 @@ export const useLayerSettingsStore = create<LayerSettingsState>()((set) => ({
     clearDirty: () => set({ isLayerSettingsDirty: false }),
 }));
 
-export async function loadLayerSettings(environmentId: number): Promise<void> {
-    const [allLayers, allViews] = await Promise.all([
-        getAllLayers(),
-        loadLayerSettingViews(environmentId),
-    ]);
+/** The stored values of the layer settings, as a map document holds them. */
+export function getLayerSettingParameters(layers: LayerWithSettings[]): LayerSettingParameter[] {
+    return layers.flatMap((l) => l.settings).map(({ id, layerId, algorithmId, providerId, environmentId, value }) => ({
+        id, layerId, algorithmId, providerId, environmentId, value,
+    }));
+}
+
+/** Puts a map's layer setting values into the store, joined with the layers they belong to. */
+export function loadLayerSettings(params: LayerSettingParameter[]): void {
+    const allLayers = getAllLayers();
+    const allViews = toLayerSettingViews(params);
     const viewsByKey = new Map<string, LayerSettingView[]>();
     for (const view of allViews) {
         const key = `${view.layerId}:${view.algorithmId}:${view.providerId}`;

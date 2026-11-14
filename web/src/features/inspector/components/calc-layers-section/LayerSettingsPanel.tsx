@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { LayerSettingView } from "@/data/local/layerTypes";
-import type { PointLabelColorEntry } from "@/data/local/serviceTypes";
-import { LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
+import type { LayerSettingView } from "@/data/planning/layerTypes";
+import type { PointLabelColorEntry } from "@/data/planning/serviceTypes";
+import { LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import SettingsPanelRowInput from "@/components/settings-panel/SettingsPanelRowInput";
 import SettingsPanelRowColorInput from "@/components/settings-panel/SettingsPanelRowColorInput";
 import SettingsPanelRowToggle from "@/components/settings-panel/SettingsPanelRowToggle";

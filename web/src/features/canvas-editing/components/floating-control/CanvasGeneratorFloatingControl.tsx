@@ -26,7 +26,7 @@ import {
     COORD_SYSTEM_OPTIONS,
 } from "@/config/db-ops/enums";
 import { unitLabel } from "@/utils/unitOfMeasure";
-import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
+import { getUiPreference, setUiPreference } from "@/data/planning/uiPreferences";
 import type { CanvasGeneratorFloatingControlPrefs } from "@/features/canvas-editing/types/canvasGeneratorPrefs";
 
 const UI_PREF_KEY = "floatingControl.canvas-generator";

@@ -10,7 +10,7 @@ import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObj
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { unitLabel } from "@/utils/unitOfMeasure";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
-import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
+import { getUiPreference, setUiPreference } from "@/data/planning/uiPreferences";
 
 const UI_PREF_KEY = "floatingControl.canvas-modifier";
 

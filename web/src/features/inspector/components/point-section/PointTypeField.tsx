@@ -3,7 +3,7 @@ import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvas
 import { useEnvPointStore } from "@/model/envPointStore";
 import { useEnvStore } from "@/model/envStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
-import type { EnvPointType } from "@/data/local/schemaTypes";
+import type { EnvPointType } from "@/data/planning/schemaTypes";
 
 const POINT_TYPE_OPTIONS = [
     { value: "start", label: "Start" },

@@ -1,5 +1,5 @@
-import type { Object as CanvasObject } from "@/data/local/schemaTypes";
-import type { CanvasPolygonItem } from "@/data/local/serviceTypes";
+import type { Object as CanvasObject } from "@/data/planning/schemaTypes";
+import type { CanvasPolygonItem } from "@/data/planning/serviceTypes";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import { ensureWinding } from "@/utils/geometry";
 

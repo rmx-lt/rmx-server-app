@@ -1,8 +1,8 @@
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
 import { useEnvStore } from "@/model/envStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import LayerRow from "@/features/inspector/components/calc-layers-section/LayerRow";
-import type { LayerPK } from "@/data/local/layerTypes";
+import type { LayerPK } from "@/data/planning/layerTypes";
 
 function toLayerPK(layer: { id: number; algorithmId: number; providerId: number }): LayerPK {
     return { id: layer.id, algorithmId: layer.algorithmId, providerId: layer.providerId };
@@ -18,7 +18,7 @@ export default function LayersTab() {
     if (layers.length === 0) {
         return (
             <div className="px-4 py-3 text-xs text-gray-400">
-                No layers found. Clear IndexedDB to reload defaults.
+                No layers found.
             </div>
         );
     }

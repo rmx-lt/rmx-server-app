@@ -1,4 +1,4 @@
-import type { LayerDefinition, LayerSettingsSetup } from "@/data/local/layerTypes";
+import type { LayerDefinition, LayerSettingsSetup } from "@/data/planning/layerTypes";
 
 export const LAYER_NAME = {
     GRID: "Grid",

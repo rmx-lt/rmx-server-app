@@ -6,8 +6,8 @@ import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasToolStore } from "@/features/canvas-editing/stores/canvasToolStore";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
-import type { EnvPointType } from "@/data/local/schemaTypes";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
+import type { EnvPointType } from "@/data/planning/schemaTypes";
 
 export const CanvasEnvPointsLayer = memo(function CanvasEnvPointsLayer({
     onEnvPointHoverChange,
