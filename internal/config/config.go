@@ -11,8 +11,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+)
 
-	"github.com/rmx-lt/rmx-backend-probe/internal/firmware"
+// FIRMWARE_CHUNK_BYTES: the default and the bounds. The firmware domain
+// uses the same constants; the maximum fits the uint16 length of its chunk header.
+const (
+	DefaultFirmwareChunkBytes = 4096
+	MinFirmwareChunkBytes     = 256
+	MaxFirmwareChunkBytes     = 16384
 )
 
 // Config holds every setting of the server.
@@ -29,7 +35,7 @@ type Config struct {
 	// WebSocket. On the VPS https://api.rmx.lt. Everything else gets 403 (CSRF
 	// protection).
 	AllowedOrigins []string
-	// StaticDir is STATIC_DIR: built client files to serve under /probe/. Empty
+	// StaticDir is STATIC_DIR: built client files to serve under /app/. Empty
 	// in local development, where the Bun dev server serves the client instead.
 	StaticDir string
 	// FirmwareDir is FIRMWARE_DIR: a directory of *.bin images served to
@@ -50,7 +56,7 @@ type MQTT struct {
 	Username string
 	// Password is MQTT_PASSWORD, required. Never logged.
 	Password string
-	// ClientID is MQTT_CLIENT_ID, default probe-server.
+	// ClientID is MQTT_CLIENT_ID, default rmx-server.
 	ClientID string
 	// TopicPrefix is MQTT_TOPIC_PREFIX, default mower.
 	TopicPrefix string
@@ -101,12 +107,12 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			Port:        uint16(number("MQTT_PORT", 1883, 16)),
 			Username:    required("MQTT_USERNAME"),
 			Password:    required("MQTT_PASSWORD"),
-			ClientID:    "probe-server",
+			ClientID:    "rmx-server",
 			TopicPrefix: "mower",
 		},
 		StaticDir:          get("STATIC_DIR"),
 		FirmwareDir:        strings.TrimSpace(get("FIRMWARE_DIR")),
-		FirmwareChunkBytes: firmware.DefaultChunkBytes,
+		FirmwareChunkBytes: DefaultFirmwareChunkBytes,
 	}
 	if v := get("BIND_ADDR"); v != "" {
 		if _, err := netip.ParseAddrPort(strings.TrimSpace(v)); err != nil {
@@ -125,9 +131,9 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		c.MQTT.TopicPrefix = v
 	}
 	if v := get("FIRMWARE_CHUNK_BYTES"); v != "" {
-		n := number("FIRMWARE_CHUNK_BYTES", uint64(firmware.DefaultChunkBytes), 16)
-		if n < uint64(firmware.MinChunkBytes) || n > uint64(firmware.MaxChunkBytes) {
-			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", firmware.MinChunkBytes, firmware.MaxChunkBytes))
+		n := number("FIRMWARE_CHUNK_BYTES", uint64(DefaultFirmwareChunkBytes), 16)
+		if n < uint64(MinFirmwareChunkBytes) || n > uint64(MaxFirmwareChunkBytes) {
+			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", MinFirmwareChunkBytes, MaxFirmwareChunkBytes))
 		}
 		c.FirmwareChunkBytes = int(n)
 	}

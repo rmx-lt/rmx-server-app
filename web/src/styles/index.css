@@ -1,0 +1,6 @@
+@import 'material-symbols/outlined.css';
+
+::selection {
+    background-color: #0d9488; /* teal-600 */
+    color: #ffffff;
+}

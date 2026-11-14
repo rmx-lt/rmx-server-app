@@ -1,4 +1,7 @@
-// Package db connects to the database and applies the schema migrations.
+// Package db connects to the database, applies the schema migrations, and
+// gives the domains' stores one interface for "the pool or a transaction"
+// (DBTX), plus InTx. Together with the domains' store.go files it is the only
+// code that imports pgx.
 package db
 
 import (
@@ -7,15 +10,53 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
-	"github.com/rmx-lt/rmx-backend-probe/migrations"
+	"github.com/rmx-lt/rmx-server-app/migrations"
 )
 
+// Pool is the connection pool. The alias lets the app hold it without importing pgx.
+type Pool = pgxpool.Pool
+
+// DBTX is what a store runs its queries on: the pool, or a transaction from
+// InTx. A cross-domain write passes the same transaction to both stores.
+type DBTX interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var (
+	_ DBTX = (*pgxpool.Pool)(nil)
+	_ DBTX = (pgx.Tx)(nil)
+)
+
+// InTx runs fn in a transaction: committed when fn returns nil, else rolled
+// back. Publish events only after InTx has returned nil.
+func InTx(ctx context.Context, pool *Pool, fn func(tx DBTX) error) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Ping checks that the database answers a query.
+func Ping(ctx context.Context, q DBTX) error {
+	var one int
+	return q.QueryRow(ctx, "SELECT 1").Scan(&one)
+}
+
 // Connect opens a connection pool and checks that the database answers.
-func Connect(ctx context.Context, url string, maxConns int32) (*pgxpool.Pool, error) {
+func Connect(ctx context.Context, url string, maxConns int32) (*Pool, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("invalid DATABASE_URL: %w", err)
@@ -36,11 +77,11 @@ func Connect(ctx context.Context, url string, maxConns int32) (*pgxpool.Pool, er
 
 // Migrate applies the pending migrations.
 //
-// The Rust version of the probe applied the same files with sqlx and recorded
+// The earlier Rust version of this server applied the same files with sqlx and recorded
 // them in _sqlx_migrations. A database that has that table but no goose table
 // yet is adopted first: its versions are copied over, so nothing runs twice.
 // The old table stays, which keeps a rollback to the Rust image possible.
-func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+func Migrate(ctx context.Context, pool *Pool) error {
 	conn := stdlib.OpenDBFromPool(pool)
 	defer conn.Close()
 

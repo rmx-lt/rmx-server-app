@@ -1,4 +1,4 @@
-module github.com/rmx-lt/rmx-backend-probe
+module github.com/rmx-lt/rmx-server-app
 
 go 1.26.0
 

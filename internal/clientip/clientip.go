@@ -1,5 +1,4 @@
-// Package clientip finds the client's IP address, for the login rate limit
-// and for recording who changed a record.
+// Package clientip finds the client's IP address, for the login rate limit.
 package clientip
 
 import (

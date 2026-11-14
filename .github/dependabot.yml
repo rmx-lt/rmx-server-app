@@ -12,11 +12,11 @@ updates:
   # Bun has its own ecosystem: "npm" (npm_and_yarn) refuses to touch bun.lock
   # and fails with "Bun is misconfigured in this repository".
   - package-ecosystem: bun
-    directory: /client
+    directory: /web
     schedule:
       interval: weekly
     groups:
-      client:
+      web:
         patterns: ["*"]
         update-types: [minor, patch]
     ignore:

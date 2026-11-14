@@ -2,7 +2,7 @@
 .git
 .github
 **/node_modules
-client/dist
+web/dist
 .env
 .env.*
 !.env.example

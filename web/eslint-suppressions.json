@@ -1,0 +1,117 @@
+{
+  "src/components/env-preview/EnvPreview.tsx": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/components/env-preview/EnvPreviewGroup.tsx": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/components/floating-control/FloatingControl.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/components/inspector-panel/InspectorPanelSectionInput.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/modals/card-modal/CardModalField.tsx": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/components/modals/card-modal/internal/InternalCardModalListPart.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/modals/card-modal/internal/list-part/useInternalCardModalListPartColumnSizing.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/modals/list-modal/ListModal.tsx": {
+    "react-hooks/refs": {
+      "count": 6
+    }
+  },
+  "src/config/layers/layerRegistry.ts": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/config/layers/styleTypeEnumValues.ts": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/features/canvas-editing/components/canvas-editor/CanvasEditor.tsx": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  },
+  "src/features/coverage-planning/components/controls-panel/CoveragePlanningControlsPanel.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/features/geo-anchor/components/GeoAnchorModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 5
+    }
+  },
+  "src/features/inspector/components/point-section/PointPositionField.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/features/workspace-manager/components/app-header/WorkspaceNameField.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/features/workspace-manager/components/workspace-picker-modal/WorkspacePickerModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/modals/useInternalListModalInteractions.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/shortcut-manager/useShortcut.ts": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/hooks/shortcut-manager/useWorkbenchShortcuts.ts": {
+    "boundaries/dependencies": {
+      "count": 14
+    }
+  },
+  "src/hooks/useBeforeUnload.ts": {
+    "boundaries/dependencies": {
+      "count": 4
+    }
+  },
+  "src/hooks/useClickOutside.ts": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/model/saveStatusStore.ts": {
+    "boundaries/dependencies": {
+      "count": 2
+    }
+  },
+  "src/utils/geometry.ts": {
+    "boundaries/dependencies": {
+      "count": 1
+    }
+  }
+}
