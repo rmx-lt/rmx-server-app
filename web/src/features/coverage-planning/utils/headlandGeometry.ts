@@ -1,16 +1,9 @@
-import type { ComputationAlgorithmParameter, Object as CanvasObject } from "@/data/local/schemaTypes";
-import type { AlgorithmParameter, CanvasPolygonItem } from "@/data/local/serviceTypes";
+import type { Object as CanvasObject } from "@/data/local/schemaTypes";
+import type { CanvasPolygonItem } from "@/data/local/serviceTypes";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import { ensureWinding } from "@/utils/geometry";
 
-const PATH_WIDTH_PARAM_NAME = "Path Width";
-const FALLBACK_PATH_WIDTH = 20;
 const MITER_LIMIT_MULTIPLIER = 4;
-
-export const SYSTEM_HEADLAND_PROVIDER_PARAM_NAMES = new Set([
-    "Headland",
-    "Headland Width",
-]);
 
 function edgeOffsetNormal(
     begin: { x: number; y: number },
@@ -68,37 +61,6 @@ function offsetPolygonVertices(
     }
 
     return out;
-}
-
-export function resolvePathWidthForSelection(input: {
-    algorithmId: number;
-    providerId: number;
-    environmentId: number;
-    catalogParams: AlgorithmParameter[];
-    parameterValues: ComputationAlgorithmParameter[];
-    fallback?: number;
-}): number {
-    const { algorithmId, providerId, environmentId, catalogParams, parameterValues, fallback = FALLBACK_PATH_WIDTH } = input;
-
-    const pathWidthParam = catalogParams.find(
-        (p) =>
-            p.name === PATH_WIDTH_PARAM_NAME
-            && p.algorithmId === algorithmId
-            && p.computationProviderId === providerId,
-    );
-
-    if (!pathWidthParam) return fallback;
-
-    const persisted = parameterValues.find(
-        (v) =>
-            v.id === pathWidthParam.id
-            && v.algorithmId === algorithmId
-            && v.providerId === providerId
-            && v.environmentId === environmentId,
-    );
-
-    const parsed = parseFloat((persisted?.value ?? pathWidthParam.defaultValue ?? "").trim());
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function parseHeadlandWidth(rawWidth: string): number | null {

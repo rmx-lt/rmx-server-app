@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import ShortcutManager from "@/components/shortcut-manager/ShortcutManager";
-import { startCoverageCacheSync } from "@/features/coverage-planning/data/coverageCacheService";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
@@ -40,11 +39,9 @@ function Workbench() {
 
   useEffect(() => {
     const stopConnections = startConnections();
-    const stopCoverageSync = startCoverageCacheSync();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
     initializeWorkspace().catch(console.error);
     return () => {
-      stopCoverageSync();
       stopConnections();
     };
   }, []);

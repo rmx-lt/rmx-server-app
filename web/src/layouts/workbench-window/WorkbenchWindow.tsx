@@ -9,13 +9,7 @@ import { useWorkbenchShortcuts } from "@/hooks/shortcut-manager/useWorkbenchShor
 import WorkspacePickerModal from "@/features/workspace-manager/components/workspace-picker-modal/WorkspacePickerModal";
 import SaveAsModal from "@/features/workspace-manager/components/save-as-modal/SaveAsModal";
 import CopyWorkspaceModal from "@/features/workspace-manager/components/copy-workspace-modal/CopyWorkspaceModal";
-import ComputationProvidersListModal from "@/features/computation-provider/components/ComputationProvidersListModal";
-import ComputationProviderCardModal from "@/features/computation-provider/components/ComputationProviderCardModal";
-import AlgorithmCardModal from "@/features/computation-provider/components/AlgorithmCardModal";
-import ComputeExecuteModal from "@/components/modals/compute-execute-modal/ComputeExecuteModal";
 import ImportModal from "@/features/workspace-manager/components/import-modal/ImportModal";
-import PerformanceMonitorModal from "@/features/performance-monitor/PerformanceMonitorModal";
-import BenchmarkModal from "@/features/benchmark-manager/components/BenchmarkModal";
 import GeoAnchorModal from "@/features/geo-anchor/components/GeoAnchorModal";
 
 export default function WorkbenchWindow() {
@@ -38,13 +32,7 @@ export default function WorkbenchWindow() {
       <ConfirmationModal />
       <SaveAsModal />
       <CopyWorkspaceModal />
-      <ComputationProvidersListModal />
-      <ComputationProviderCardModal />
-      <AlgorithmCardModal />
-      <ComputeExecuteModal />
       <ImportModal />
-      <PerformanceMonitorModal />
-      <BenchmarkModal />
       <GeoAnchorModal />
     </div>
   );

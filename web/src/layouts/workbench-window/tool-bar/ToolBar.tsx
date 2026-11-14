@@ -6,9 +6,6 @@ import AddStartPointButton from "@/features/canvas-editing/components/tool-bar/A
 import AddEndPointButton from "@/features/canvas-editing/components/tool-bar/AddEndPointButton";
 import AddStartEndPointButton from "@/features/canvas-editing/components/tool-bar/AddStartEndPointButton";
 import DeleteButton from "@/features/canvas-editing/components/tool-bar/DeleteButton";
-import ExecuteCppButton from "@/features/coverage-planning/components/tool-bar/ExecuteCppButton";
-import ClearCppButton from "@/features/coverage-planning/components/tool-bar/ClearCppButton";
-import DebugCppButton from "@/features/coverage-planning/components/tool-bar/DebugCppButton";
 import OpenJobListButton from "@/features/job-runner/components/tool-bar/OpenJobListButton";
 import UiInspectorButton from "@/features/ui-manager/components/tool-bar/UiInspectorButton";
 import ToolSeparator from "@/components/tool-bar/ToolBarSeparator";
@@ -24,9 +21,6 @@ import { useCanvasToolStore } from "@/features/canvas-editing/stores/canvasToolS
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
-import { executeComputeRequest } from "@/features/coverage-planning/data/computeService";
-import { useCppDebugStore } from "@/features/coverage-planning/stores/cppDebugStore";
 
 interface ToolBarGroup {
   id: string;
@@ -34,7 +28,6 @@ interface ToolBarGroup {
   buttons: ReactNode;
   trailingSeparator?: "thin" | "thick";
   overflowItems: OverflowItem[];
-  disabledInDebug?: boolean;
 }
 
 export default function ToolBar() {
@@ -56,14 +49,6 @@ export default function ToolBar() {
   const { deleteObject, deleteVertices } = useCanvasObjectStore();
   const { selectedObject, selectedVertexRefs, clearSelection, selectVertex } =
     useCanvasSelectionStore();
-
-  // coverage
-  const computeStatus = useComputeResultStore((s) => s.status);
-  const isBusy = computeStatus === "submitting" || computeStatus === "polling";
-
-  // debug
-  const isDebugMode = useCppDebugStore((s) => s.isDebugMode);
-  const startDebug = useCppDebugStore((s) => s.startDebug);
 
   // derived
   const isSelectActive = activeTool === "select";
@@ -126,12 +111,6 @@ export default function ToolBar() {
     setActiveTool("delete");
   }
 
-  function handleExecuteCpp() {
-    executeComputeRequest().then((result) => {
-      if (!result.ok) console.error("[ExecuteCpp] error:", result.error);
-    });
-  }
-
   const groups: ToolBarGroup[] = [
     {
       id: "ui-controls",
@@ -160,7 +139,6 @@ export default function ToolBar() {
         </>
       ),
       trailingSeparator: "thick",
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "undo",
@@ -183,7 +161,6 @@ export default function ToolBar() {
       buttonCount: 1,
       buttons: <SelectButton />,
       trailingSeparator: "thin",
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "select",
@@ -204,7 +181,6 @@ export default function ToolBar() {
         </>
       ),
       trailingSeparator: "thin",
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "add-zone",
@@ -233,7 +209,6 @@ export default function ToolBar() {
         </>
       ),
       trailingSeparator: "thin",
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "add-start-point",
@@ -263,7 +238,6 @@ export default function ToolBar() {
       buttonCount: 1,
       buttons: <DeleteButton />,
       trailingSeparator: "thick",
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "delete",
@@ -275,47 +249,9 @@ export default function ToolBar() {
       ],
     },
     {
-      id: "coverage",
-      buttonCount: 3,
-      buttons: (
-        <>
-          <div className={isDebugMode ? "flex items-center gap-2 pointer-events-none opacity-40" : "flex items-center gap-2"}>
-            <ExecuteCppButton />
-            <ClearCppButton />
-          </div>
-          <DebugCppButton />
-        </>
-      ),
-      trailingSeparator: "thin",
-      overflowItems: [
-        {
-          id: "execute-cpp",
-          icon: "motion_play",
-          label: "Execute coverage path planning",
-          isDisabled: isBusy || isDebugMode,
-          onClick: handleExecuteCpp,
-        },
-        {
-          id: "clear-cpp",
-          icon: "ink_eraser",
-          label: "Clear coverage path planning output",
-          isDisabled: isDebugMode,
-          onClick: () => { },
-        },
-        {
-          id: "debug-cpp",
-          icon: "bug_report",
-          label: "Debug coverage path planning",
-          isActive: isDebugMode,
-          onClick: () => { if (!isDebugMode) startDebug(); },
-        },
-      ],
-    },
-    {
       id: "jobs",
       buttonCount: 1,
       buttons: <OpenJobListButton />,
-      disabledInDebug: true,
       overflowItems: [
         {
           id: "jobs",
@@ -366,7 +302,7 @@ export default function ToolBar() {
           {groups.slice(0, visibleCount).map((group) => (
             <div
               key={group.id}
-              className={`flex items-center gap-2${isDebugMode && group.disabledInDebug ? " pointer-events-none opacity-40" : ""}`}
+              className="flex items-center gap-2"
             >
               {group.buttons}
               {group.trailingSeparator === "thick" && <ToolGroupSeparator />}
@@ -376,11 +312,7 @@ export default function ToolBar() {
 
           {visibleCount < groups.length && (
             <ToolBarMoreButton
-              groups={groups.slice(visibleCount).map((group) =>
-                isDebugMode && group.disabledInDebug
-                  ? { ...group, overflowItems: group.overflowItems.map((item) => ({ ...item, isDisabled: true })) }
-                  : group
-              )}
+              groups={groups.slice(visibleCount)}
             />
           )}
         </div>

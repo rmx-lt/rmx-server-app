@@ -1,28 +1,4 @@
 {
-  "src/components/chart/BarChartCard.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 3
-    }
-  },
-  "src/components/chart/ChartCard.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    },
-    "react-hooks/refs": {
-      "count": 1
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 4
-    }
-  },
-  "src/components/chart/performanceMonitorModalStore.ts": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
   "src/components/env-preview/EnvPreview.tsx": {
     "boundaries/dependencies": {
       "count": 1
@@ -58,19 +34,9 @@
       "count": 1
     }
   },
-  "src/components/modals/compute-execute-modal/ComputeExecuteModal.tsx": {
-    "boundaries/dependencies": {
-      "count": 2
-    }
-  },
   "src/components/modals/list-modal/ListModal.tsx": {
     "react-hooks/refs": {
       "count": 6
-    }
-  },
-  "src/config/computation/supportedLayerAttributes.ts": {
-    "boundaries/dependencies": {
-      "count": 1
     }
   },
   "src/config/layers/layerRegistry.ts": {
@@ -83,90 +49,13 @@
       "count": 1
     }
   },
-  "src/features/benchmark-manager/components/BenchmarkAlgoSetupTab.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/features/benchmark-manager/components/BenchmarkModal.tsx": {
-    "react-hooks/preserve-manual-memoization": {
-      "count": 3
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 2
-    }
-  },
-  "src/features/benchmark-manager/data/benchmarkRunnerService.ts": {
-    "boundaries/dependencies": {
-      "count": 3
-    }
-  },
   "src/features/canvas-editing/components/canvas-editor/CanvasEditor.tsx": {
     "boundaries/dependencies": {
-      "count": 2
-    }
-  },
-  "src/features/canvas-editing/components/canvas-editor/layers/CanvasCoverageGridLayer.tsx": {
-    "react-hooks/refs": {
-      "count": 5
-    }
-  },
-  "src/features/canvas-editing/components/canvas-editor/layers/CppDebugResultLayer.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/features/canvas-editing/components/floating-control/CanvasGeneratorFloatingControl.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/features/computation-provider/components/ComputationProvidersListModal.tsx": {
-    "boundaries/dependencies": {
-      "count": 1
-    },
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/features/computation-provider/hooks/useAlgorithmCardController.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/features/computation-provider/hooks/useComputationProviderAutosave.ts": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/features/computation-provider/hooks/useComputationProviderCardController.ts": {
-    "boundaries/dependencies": {
-      "count": 1
-    },
-    "react-hooks/refs": {
-      "count": 1
-    },
-    "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
   "src/features/coverage-planning/components/controls-panel/CoveragePlanningControlsPanel.tsx": {
     "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/features/coverage-planning/components/floating-control/CppDebugFloatingControl.tsx": {
-    "react-hooks/refs": {
-      "count": 1
-    }
-  },
-  "src/features/coverage-planning/data/computeService.ts": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/features/coverage-planning/data/debugService.ts": {
-    "boundaries/dependencies": {
       "count": 1
     }
   },
@@ -176,11 +65,6 @@
     }
   },
   "src/features/inspector/components/point-section/PointPositionField.tsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/features/performance-monitor/PerformanceMonitorModal.tsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -221,21 +105,6 @@
     }
   },
   "src/model/saveStatusStore.ts": {
-    "boundaries/dependencies": {
-      "count": 2
-    }
-  },
-  "src/utils/computationResult.ts": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/utils/computationSelection.ts": {
-    "boundaries/dependencies": {
-      "count": 1
-    }
-  },
-  "src/utils/coverageGrid.ts": {
     "boundaries/dependencies": {
       "count": 2
     }

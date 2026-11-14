@@ -16,16 +16,13 @@
   "dependencies": {
     "@headlessui/react": "^2.2.10",
     "@uiw/react-color": "^2.10.3",
-    "chart.js": "^4.6.1",
     "dexie": "^4.4.7",
     "konva": "^10.9.1",
     "material-symbols": "^0.49.0",
     "polygon-clipping": "^0.15.7",
     "react": "^19.3.1",
-    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.3.1",
     "react-konva": "^19.3.2",
-    "zundo": "^2.3.0",
     "zustand": "^5.0.16"
   },
   "devDependencies": {

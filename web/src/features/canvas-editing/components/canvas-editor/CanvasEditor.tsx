@@ -22,24 +22,16 @@ import { useCanvasVertexDrag } from "@/features/canvas-editing/hooks/canvas-edit
 import { useCanvasKeyboard } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasKeyboard";
 import { useCanvasAutosave } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasSave";
 import { CanvasGridLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasGridLayer";
-import { CanvasCoverageGridLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasCoverageGridLayer";
 import { CanvasPolygonObjectsLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasPolygonObjectsLayer";
 import { CanvasVertexHandlesLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasVertexHandlesLayer";
 import { CanvasDrawingPreviewLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasDrawingPreviewLayer";
-import { CanvasDynamicLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasDynamicLayer";
 import { CanvasEnvPointsLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasEnvPointsLayer";
 import { CanvasMapTileLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasMapTileLayer";
 import { CanvasSystemPolygonResultLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasSystemPolygonResultLayer";
-import { CppDebugResultLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CppDebugResultLayer";
 import CanvasModifierFloatingControl from "@/features/canvas-editing/components/floating-control/CanvasModifierFloatingControl";
 import CanvasGeneratorFloatingControl from "@/features/canvas-editing/components/floating-control/CanvasGeneratorFloatingControl";
-import CanvasHeatMapScaleFloatingControl from "@/features/canvas-editing/components/floating-control/CanvasHeatMapScaleFloatingControl";
-import CppDebugFloatingControl from "@/features/coverage-planning/components/floating-control/CppDebugFloatingControl";
 import { useEnvPointStore } from "@/model/envPointStore";
 import { useEnvStore } from "@/model/envStore";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
-import { useProviderLayerStore } from "@/model/providerLayerStore";
-import { extractLayerData, getProviderLayersForResult } from "@/features/canvas-editing/utils/layerDataUtils";
 import {
   computeHeadlandDerivedGeometry,
   parseHeadlandWidth,
@@ -61,8 +53,6 @@ export default function CanvasEditor() {
   const setCanvasSize = useCanvasViewStore((s) => s.setCanvasSize);
   const { activeTool, setActiveTool } = useCanvasToolStore();
   const layerSettings = useLayerSettingsStore((s) => s.layers);
-  const result = useComputeResultStore((s) => s.result);
-  const providerLayers = useProviderLayerStore((s) => s.layers);
   const headlandEnabled = useEnvStore((s) => s.env.headlandEnabled);
   const headlandWidthRaw = useEnvStore((s) => s.env.headlandWidth);
   const {
@@ -188,7 +178,6 @@ export default function CanvasEditor() {
   const zonesVisible = getLayerParam(layerSettings, LAYER_ID.ZONES, LAYER_PARAM_KEY.VISIBLE) !== "false";
   const obstaclesVisible = getLayerParam(layerSettings, LAYER_ID.OBSTACLES, LAYER_PARAM_KEY.VISIBLE) !== "false";
   const gridZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.GRID, LAYER_PARAM_KEY.Z_INDEX) ?? "10", 10);
-  const coverageGridZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.COVERAGE_GRID, LAYER_PARAM_KEY.Z_INDEX) ?? "15", 10);
   const zoneZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "20", 10);
   const shrunkenZonesZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.SHRUNKEN_ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "25", 10);
   const obstacleZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.OBSTACLES, LAYER_PARAM_KEY.Z_INDEX) ?? "30", 10);
@@ -202,42 +191,14 @@ export default function CanvasEditor() {
     [objects, headlandEnabled, headlandWidth],
   );
 
-  // Memoize provider layers active for the current compute result.
-  const activeProviderLayers = useMemo(
-    () => (result ? getProviderLayersForResult(result, providerLayers) : []),
-    [result, providerLayers],
-  );
-
-  // Build per-layer entries for each active provider layer: settings + extracted items.
-  const dynamicEntries = useMemo(() => {
-    if (!result) return [];
-    return activeProviderLayers.map((pl) => {
-      const lws = layerSettings.find(
-        (l) => l.layer.id === pl.id && l.layer.algorithmId === pl.algorithmId && l.layer.providerId === pl.providerId,
-      );
-      const zIndex = lws
-        ? parseInt(lws.settings.find((s) => s.key === "Z-Index")?.value ?? "50", 10)
-        : 50;
-      return {
-        kind: "dynamic" as const,
-        providerLayer: pl,
-        settings: lws?.settings ?? [],
-        items: extractLayerData(result.result, pl.computeLayer),
-        zIndex,
-      };
-    });
-  }, [result, activeProviderLayers, layerSettings]);
-
-  // Unified layer order — system and dynamic layers interleaved by Z-Index ascending.
+  // Layer order by Z-Index ascending.
   const allLayerOrder = [
     { kind: "system" as const, id: "grid" as const, zIndex: gridZIndex },
-    { kind: "system" as const, id: "coverageGrid" as const, zIndex: coverageGridZIndex },
     { kind: "system" as const, id: "zones" as const, zIndex: zoneZIndex },
     { kind: "system" as const, id: "shrunkenZones" as const, zIndex: shrunkenZonesZIndex },
     { kind: "system" as const, id: "obstacles" as const, zIndex: obstacleZIndex },
     { kind: "system" as const, id: "expandedObstacles" as const, zIndex: expandedObstaclesZIndex },
     { kind: "system" as const, id: "envPoints" as const, zIndex: envPointsZIndex },
-    ...dynamicEntries,
   ].sort((a, b) => a.zIndex - b.zIndex);
 
   const selectedObjectForHandles =
@@ -367,21 +328,8 @@ export default function CanvasEditor() {
         onDragEnd={handleDragEnd}
       >
         {allLayerOrder.map((entry) => {
-          if (entry.kind === "dynamic") {
-            return (
-              <CanvasDynamicLayer
-                key={`dyn-${entry.providerLayer.algorithmId}-${entry.providerLayer.providerId}-${entry.providerLayer.id}`}
-                layerMeta={entry.providerLayer}
-                settings={entry.settings}
-                items={entry.items}
-              />
-            );
-          }
           if (entry.id === "grid") {
             return <CanvasGridLayer key="grid" width={size.width} height={size.height} />;
-          }
-          if (entry.id === "coverageGrid") {
-            return <CanvasCoverageGridLayer key="coverageGrid" width={size.width} height={size.height} />;
           }
           if (entry.id === "zones") {
             return (
@@ -466,13 +414,9 @@ export default function CanvasEditor() {
           mousePos={mousePos}
           scale={scale}
         />
-
-        <CppDebugResultLayer />
       </Stage>
       <CanvasModifierFloatingControl />
       <CanvasGeneratorFloatingControl />
-      <CanvasHeatMapScaleFloatingControl />
-      <CppDebugFloatingControl />
     </div>
   );
 }

@@ -402,9 +402,12 @@ whether the session still exists and shows the login form if not.
 - **Saving.** The status bar shows the save state; File → Save (Ctrl+S) or a
   click on "Unsaved changes" saves. A page load starts a new blank environment;
   saved ones open with File → Open (Ctrl+O).
-- **Algorithm providers.** The provider features (Computation Provider panel,
-  Run menu, benchmark, performance monitor) still call external providers and
-  fail when none runs; they are removed by rmx-server-app#52.
+- **No algorithm providers.** The client does not connect to external algorithm
+  providers: there is no provider, compute, debug, benchmark or performance
+  monitor feature, and the only `fetch` calls go to the app's own `/app/`
+  API. Schema changes in `web/src/data/local/db.ts` add a `db.version(n)`
+  block (with `upgrade()` where rows change) because browsers hold real data;
+  version 1 is never edited.
 
 ## Repository layout
 

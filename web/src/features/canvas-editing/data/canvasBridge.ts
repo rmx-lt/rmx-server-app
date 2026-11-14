@@ -1,17 +1,11 @@
 import { getLastEnvironmentId, saveEnvironment } from "@/data/local/environments";
-import { saveComputationSelection } from "@/data/local/computationSelection";
-import { saveAlgorithmParameters } from "@/data/local/computationAlgorithmParameters";
 import { saveAllLayerSettings } from "@/data/local/layerSettings";
 import { getObjectsByEnvironment, saveObjects, deleteObject } from "@/data/local/objects";
-import { saveComputeResult, deleteComputeResult } from "@/data/local/computeResults";
-import { deleteCoverageGridVisitCacheByEnvironment } from "@/data/local/coverageGridVisitCache";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import type { Object, Environment } from "@/data/local/schemaTypes";
 import { useCanvasObjectStore } from "../stores/canvasObjectStore";
 import { useEnvStore } from "@/model/envStore";
-import { useParameterValuesStore } from "@/model/parameterValuesStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useComputeResultStore } from "@/model/useComputeResultStore";
 import { useEnvPointStore } from "@/model/envPointStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
@@ -62,38 +56,24 @@ export async function saveCanvas(): Promise<boolean> {
 
     const { dirtyObjects, deletedObjects, clearDirty } =
         useCanvasObjectStore.getState();
-    const { env, isEnvDirty, computation, clearDirty: clearEnvDirty } = useEnvStore.getState();
-    const { parameterValues, isParameterValuesDirty, clearDirty: clearParamsDirty } = useParameterValuesStore.getState();
+    const { env, isEnvDirty, clearDirty: clearEnvDirty } = useEnvStore.getState();
     const { layers, isLayerSettingsDirty, clearDirty: clearLayersDirty } = useLayerSettingsStore.getState();
-    const { result, isComputeResultDirty, clearDirty: clearResultDirty } = useComputeResultStore.getState();
     const { isEnvPointsDirty, clearDirty: clearEnvPointsDirty } = useEnvPointStore.getState();
     const { isSystemGeoAnchorDirty, isEnvironmentGeoAnchorDirty, saveGeoAnchors } = useGeoAnchorStore.getState();
 
-    if (!isEnvDirty && !isParameterValuesDirty && !isLayerSettingsDirty && !dirtyObjects.length && !deletedObjects.length && !isComputeResultDirty && !isEnvPointsDirty && !isSystemGeoAnchorDirty && !isEnvironmentGeoAnchorDirty) return false;
+    if (!isEnvDirty && !isLayerSettingsDirty && !dirtyObjects.length && !deletedObjects.length && !isEnvPointsDirty && !isSystemGeoAnchorDirty && !isEnvironmentGeoAnchorDirty) return false;
 
     _isSaving = true;
     try {
         await Promise.all([
             saveEnvironment(env),
-            saveComputationSelection(computation),
-            isParameterValuesDirty ? saveAlgorithmParameters(parameterValues) : Promise.resolve(),
             isLayerSettingsDirty ? saveAllLayerSettings(layers.flatMap((l) => l.settings)) : Promise.resolve(),
             persistDirtyObjects(dirtyObjects, deletedObjects),
-            isComputeResultDirty
-                ? (result !== null
-                    ? saveComputeResult(result)
-                    : Promise.all([
-                        deleteComputeResult(env.id),
-                        deleteCoverageGridVisitCacheByEnvironment(env.id),
-                    ]).then(() => undefined))
-                : Promise.resolve(),
             saveGeoAnchors(),
         ]);
         clearDirty();
         clearEnvDirty();
-        clearParamsDirty();
         clearLayersDirty();
-        clearResultDirty();
         clearEnvPointsDirty();
         return true;
     } finally {

@@ -3,11 +3,7 @@ import { db } from "./db";
 import type { Environment } from "@/data/local/schemaTypes";
 import { WORKSPACE_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
 import { deleteObjectsByEnvironment } from "./objects";
-import { deleteAlgorithmParametersByEnvironment } from "./computationAlgorithmParameters";
-import { deleteComputationSelection } from "./computationSelection";
 import { deleteLayerSettingsForEnvironment } from "./layerSettings";
-import { deleteComputeResult } from "./computeResults";
-import { deleteCoverageGridVisitCacheByEnvironment } from "./coverageGridVisitCache";
 import { deleteEnvPointsByEnvironment } from "./envPoints";
 import { deleteEnvironmentGeoAnchor } from "./environmentGeoAnchor";
 
@@ -31,11 +27,7 @@ export async function saveEnvironment(env: Environment): Promise<void> {
 
 export async function deleteEnvironment(env: Environment): Promise<void> {
     await deleteObjectsByEnvironment(env);
-    await deleteAlgorithmParametersByEnvironment(env.id);
-    await deleteComputationSelection(env.id);
     await deleteLayerSettingsForEnvironment(env.id);
-    await deleteComputeResult(env.id);
-    await deleteCoverageGridVisitCacheByEnvironment(env.id);
     await deleteEnvPointsByEnvironment(env.id);
     await deleteEnvironmentGeoAnchor(env.id);
     await environmentsTable.delete(env.id);

@@ -5,10 +5,9 @@ import { LAYER_REGISTRY, LAYER_SETTINGS_SETUP_DEFAULTS } from "@/config/layers/l
 const db = new Dexie("blade-terminal");
 
 // Schema versioning policy:
-// Always modify the single version(1) block directly — never add a new version block.
-// This is a development environment where data loss from schema changes is acceptable.
-// Keeping a single version avoids accumulating migration code that serves no purpose here.
-// When the schema changes, clear the browser's IndexedDB to apply the new layout.
+// Browsers hold real data now. Never edit a released version block: add a new
+// db.version(n) below it with the changed tables (null drops a table) and, if
+// rows must change, an upgrade() function.
 db.version(1).stores({
     appEnumSetup: "[enumGroup+value], enumGroup",
     environments: "id, name",
@@ -29,6 +28,32 @@ db.version(1).stores({
     layerSettings: "[id+layerId+algorithmId+providerId+environmentId], [layerId+algorithmId+providerId+environmentId], [algorithmId+providerId+environmentId], environmentId, providerId",
     uiPreferences: "key",
 });
+
+// Version 2: the client no longer talks to algorithm providers. Drops the
+// provider, algorithm, parameter, metric, compute-result and coverage-cache
+// tables, and the layers that only showed provider output (the provider
+// layers and the coverage grid, layer id 5). Environments, objects, points,
+// geo anchors, layer settings of the remaining layers and preferences stay.
+const COVERAGE_GRID_LAYER_ID = 5;
+db.version(2)
+    .stores({
+        computationSelection: null,
+        computationProviders: null,
+        computationProviderAlgorithms: null,
+        computationAlgorithmParametersSetup: null,
+        algorithmMetricsSetup: null,
+        computationAlgorithmParameters: null,
+        computeResults: null,
+        coverageGridVisitCache: null,
+    })
+    .upgrade(async (tx) => {
+        // Layers of providers have algorithmId/providerId other than 0.
+        const isRemovedLayer = (row: { layerId?: number; id?: number; algorithmId: number; providerId: number }, layerId: number | undefined) =>
+            row.algorithmId !== 0 || row.providerId !== 0 || layerId === COVERAGE_GRID_LAYER_ID;
+        await tx.table("layers").filter((r) => isRemovedLayer(r, r.id)).delete();
+        await tx.table("layerSettingsSetup").filter((r) => isRemovedLayer(r, r.layerId)).delete();
+        await tx.table("layerSettings").filter((r) => isRemovedLayer(r, r.layerId)).delete();
+    });
 
 db.on("populate", () => {
     // seed appEnumSetup and layers/layerSettings for fresh databases

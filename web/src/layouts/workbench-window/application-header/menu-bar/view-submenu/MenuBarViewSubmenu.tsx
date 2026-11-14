@@ -9,7 +9,6 @@ import UiStatusBarButton from "@/features/ui-manager/components/menu-bar/UiStatu
 import CanvasModifierControlButton from "@/features/canvas-editing/components/menu-bar/CanvasModifierControlButton";
 import CanvasGeneratorControlButton from "@/features/canvas-editing/components/menu-bar/CanvasGeneratorControlButton";
 import GeoAnchorModalButton from "@/features/geo-anchor/components/menu-bar/GeoAnchorModalButton";
-import CanvasHeatMapScaleButton from "@/features/canvas-editing/components/menu-bar/CanvasHeatMapScaleButton";
 import MenuBarSubmenu from "@/components/menu-bar/MenuBarSubmenu";
 
 export default function MenuBarViewSubmenu() {
@@ -41,9 +40,6 @@ export default function MenuBarViewSubmenu() {
 
       <GeoAnchorModalButton />
 
-      <MenuSeparator />
-
-      <CanvasHeatMapScaleButton />
     </MenuBarSubmenu>
   );
 }
