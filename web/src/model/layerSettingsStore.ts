@@ -3,7 +3,7 @@ import { loadLayerSettingViews, saveAllLayerSettings } from "@/data/local/layerS
 import { getAllLayers } from "@/data/local/layers";
 import { getSaveMode } from "@/model/saveModeStore";
 import type { LayerPK, LayerRecord, LayerSettingView, LayerWithSettings } from "@/data/local/layerTypes";
-import { LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 
 interface LayerSettingsState {
     layers: LayerWithSettings[];

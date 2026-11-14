@@ -15,7 +15,6 @@ export default function WorkspaceNameField() {
 
   useEffect(() => {
     if (isEditing) {
-      setDraft(name);
       // rAF ensures focus runs after all pending React re-renders (e.g. canvas
       // tool deactivation triggered by the shortcut blocker) so focus isn't stolen.
       const id = requestAnimationFrame(() => inputRef.current?.select());
@@ -24,6 +23,7 @@ export default function WorkspaceNameField() {
   }, [isEditing]);
 
   function startEditing() {
+    setDraft(name);
     setIsEditing(true);
   }
 

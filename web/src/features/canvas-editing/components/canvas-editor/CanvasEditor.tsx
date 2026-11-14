@@ -14,7 +14,7 @@ import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasPanning } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasPanning";
 import { useCanvasZoom } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasZoom";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import { useCanvasDrawing } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasDrawing";
 import { useCanvasMidpointDrag } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasMidpointDrag";
@@ -35,7 +35,7 @@ import { useEnvStore } from "@/model/envStore";
 import {
   computeHeadlandDerivedGeometry,
   parseHeadlandWidth,
-} from "@/features/coverage-planning/utils/headlandGeometry";
+} from "@/features/canvas-editing/utils/headlandGeometry";
 
 export default function CanvasEditor() {
   const stageRef = useRef<Konva.Stage>(null);

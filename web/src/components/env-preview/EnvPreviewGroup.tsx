@@ -1,5 +1,5 @@
 import EnvPreview from "./EnvPreview";
-import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
+import type { Point } from "@/utils/geometry";
 
 export interface EnvPreviewItem {
     /** 0-based index; label renders as "Scenarijus {id + 1}" */

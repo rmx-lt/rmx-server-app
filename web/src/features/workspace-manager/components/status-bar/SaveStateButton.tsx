@@ -1,5 +1,5 @@
-import { useSaveStatusStore } from "@/model/saveStatusStore";
-import type { SaveStatus } from "@/model/saveStatusStore";
+import { useSaveStatusStore } from "@/features/canvas-editing/stores/saveStatusStore";
+import type { SaveStatus } from "@/features/canvas-editing/stores/saveStatusStore";
 
 const CONFIG: Record<SaveStatus, { dot: string; text: string; tooltip: string; label: string }> = {
     nothing_to_save: {

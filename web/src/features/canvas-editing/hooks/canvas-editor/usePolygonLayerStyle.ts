@@ -1,5 +1,5 @@
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 import { OBJECT_CATEGORY, type ObjectCategory } from "@/config/db-ops/enums";
 
 interface PolygonLayerStyle {

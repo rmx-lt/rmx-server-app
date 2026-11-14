@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
+import type { Point } from "@/utils/geometry";
 
 interface EnvPreviewProps {
     /** 0-based index; label renders as "Scenarijus {id + 1}" */

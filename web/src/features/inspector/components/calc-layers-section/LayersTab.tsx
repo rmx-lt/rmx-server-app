@@ -1,6 +1,6 @@
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
 import { useEnvStore } from "@/model/envStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 import LayerRow from "@/features/inspector/components/calc-layers-section/LayerRow";
 import type { LayerPK } from "@/data/local/layerTypes";
 

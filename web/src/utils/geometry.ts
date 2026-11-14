@@ -1,5 +1,9 @@
-import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { OBJECT_CATEGORY, type ObjectCategory } from "@/config/db-ops/enums";
+
+export interface Point {
+    x: number;
+    y: number;
+}
 
 /**
  * Computes the signed area of a closed polygon using the Shoelace (Gauss) formula.

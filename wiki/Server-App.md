@@ -504,11 +504,9 @@ eslint-plugin-boundaries):
   `__tests__/` next to the code.
 - When data moves between the browser and the server, only `data/` changes.
 
-Lint errors that blade-terminal brought along (layer boundaries and React
-Compiler rules of eslint-plugin-react-hooks) are recorded in
-`web/eslint-suppressions.json` (ESLint bulk suppressions): `bun run lint`
-fails only on new ones. They are burned down in rmx-server-app#66; after
-fixing some, run `bun --bun eslint . --prune-suppressions`.
+The React Compiler rules of eslint-plugin-react-hooks are errors too: derive
+state instead of syncing it in an effect (or adjust it during render when a
+prop changes), and write `ref.current` in an effect, never during render.
 
 ### Other files
 
