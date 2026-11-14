@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
+import { getUiPreference, setUiPreference } from "@/data/planning/uiPreferences";
 import { DEFAULT_UNIT_OF_MEASURE, type UnitOfMeasure } from "@/utils/unitOfMeasure";
 
 const UI_PREF_KEY = "ui.unitOfMeasure";

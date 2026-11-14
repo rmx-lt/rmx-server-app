@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { type ObjectCategory, type ObjectType } from "@/config/db-ops/enums";
@@ -77,7 +77,8 @@ export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
 
     addObject: (category, points, type) => {
         const envId = useEnvStore.getState().env.id;
-        const inMemoryMax = Math.max(0, ...get().objects.filter((o) => o.environmentId === envId).map((o) => o.id));
+        // All objects in memory belong to the open map (its id changes on the first save).
+        const inMemoryMax = Math.max(0, ...get().objects.map((o) => o.id));
         const objectId = inMemoryMax + 1;
         set((state) => {
             const newObj: Object = {

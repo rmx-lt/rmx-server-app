@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import type Konva from "konva";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
@@ -14,7 +14,7 @@ import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasPanning } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasPanning";
 import { useCanvasZoom } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasZoom";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import { useCanvasDrawing } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasDrawing";
 import { useCanvasMidpointDrag } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasMidpointDrag";

@@ -1,8 +1,6 @@
 import { create } from "zustand";
 import { COORD_SYSTEM, ENV_FORMAT, ENV_TYPE, type CoordSystemType, type EnvFormat, type EnvType } from "@/config/db-ops/enums";
-import type { Environment } from "@/data/local/schemaTypes";
-import { getSaveMode } from "@/model/saveModeStore";
-import { saveEnvironment } from "@/data/local/environments";
+import type { Environment } from "@/data/planning/schemaTypes";
 
 /** Fills in fields that environments saved by earlier versions may lack. */
 function normalizeEnvironment(env: Environment): Environment {
@@ -21,13 +19,13 @@ interface EnvState {
     isEnvDirty: boolean;
     /** Replaces the full environment record. Used by workspace bridge after load or init. Does not mark dirty. */
     setEnv: (env: Environment) => void;
-    /** Updates the environment name and marks the record as dirty. Triggers autosave when mode is "autosave". */
+    /** Updates the environment name and marks the record as dirty. Autosave (when on) picks the change up. */
     setName: (name: string) => void;
-    /** Updates the environment format and marks the record as dirty. Triggers autosave when mode is "autosave". */
+    /** Updates the environment format and marks the record as dirty. Autosave (when on) picks the change up. */
     setFormat: (format: EnvFormat) => void;
-    /** Updates the environment type and marks the record as dirty. Triggers autosave when mode is "autosave". */
+    /** Updates the environment type and marks the record as dirty. Autosave (when on) picks the change up. */
     setType: (type: EnvType) => void;
-    /** Updates the environment coordinate system and marks the record as dirty. Triggers autosave when mode is "autosave". */
+    /** Updates the environment coordinate system and marks the record as dirty. Autosave (when on) picks the change up. */
     setCoordSystem: (coordSystem: CoordSystemType) => void;
     /** Updates system headland enabled flag on the environment and marks dirty. */
     setHeadlandEnabled: (enabled: boolean) => void;
@@ -49,16 +47,9 @@ const INITIAL_ENV: Environment = {
     obstacleCount: 0,
 };
 
-function autosave(env: Environment): void {
-    if (getSaveMode() === "autosave") {
-        saveEnvironment(env).catch(console.error);
-    }
-}
-
 function markEnvDirty(set: (fn: (state: EnvState) => Partial<EnvState>) => void, updater: (env: Environment) => Environment): void {
     set((state) => {
         const env = updater(normalizeEnvironment(state.env));
-        autosave(env);
         return { env, isEnvDirty: true };
     });
 }

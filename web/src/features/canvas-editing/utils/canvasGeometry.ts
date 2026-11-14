@@ -1,5 +1,5 @@
 import polygonClipping from "polygon-clipping";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
 import { computePolygonArea, type Point } from "@/utils/geometry";
 

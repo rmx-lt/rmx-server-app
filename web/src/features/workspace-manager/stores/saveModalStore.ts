@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useSaveStatusStore } from "@/features/canvas-editing/stores/saveStatusStore";
-import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
+import { isMapDirty, saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 
@@ -33,6 +33,8 @@ export const useSaveModalStore = create<SaveModalState>()(() => ({
             cancelLabel: "Cancel",
             confirmAction: async () => {
                 const saved = await saveCanvas();
+                // The save failed (the user was told why): keep the changes, don't go on.
+                if (!saved && isMapDirty()) return;
 
                 if (saved) {
                     const { mode, setMode, isAutoSaveEnabled } = useSaveModeStore.getState();

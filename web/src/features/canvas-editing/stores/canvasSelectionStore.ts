@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { Object } from "@/data/local/schemaTypes";
-import type { EnvPointType } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
+import type { EnvPointType } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 

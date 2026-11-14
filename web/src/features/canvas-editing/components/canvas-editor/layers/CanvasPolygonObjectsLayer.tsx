@@ -2,7 +2,7 @@ import { memo, useMemo, useRef } from "react";
 import { Layer, Line } from "react-konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import type React from "react";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import { OBJECT_TYPE, type ObjectCategory } from "@/config/db-ops/enums";
 import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";

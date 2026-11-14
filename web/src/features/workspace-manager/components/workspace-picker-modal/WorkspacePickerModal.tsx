@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useWorkspacePickerStore } from "@/features/workspace-manager/stores/workspacePickerStore";
 import { useSaveModalStore } from "@/features/workspace-manager/stores/saveModalStore";
 import { useDeleteModalStore } from "@/features/workspace-manager/stores/deleteModalStore";
-import { getAllEnvironments, deleteEnvironment } from "@/data/local/environments";
+import { listMaps, deleteMap, type MapListItem } from "@/data/planning/maps";
 import { loadWorkspace, resetWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
 import { useEnvStore } from "@/model/envStore";
-import type { Environment } from "@/data/local/schemaTypes";
 import ModalFooterButton from "@/components/modal/modal-footer/ModalFooterButton";
 import ListModal, { type ListModalAction } from "@/components/modals/list-modal/ListModal";
 
@@ -14,7 +13,7 @@ export default function WorkspacePickerModal() {
     const close = useWorkspacePickerStore((s) => s.close);
     const currentEnvId = useEnvStore((s) => s.env.id);
 
-    const [environments, setEnvironments] = useState<Environment[]>([]);
+    const [environments, setEnvironments] = useState<MapListItem[]>([]);
     const [isLoading, setIsLoading] = useState(isOpen);
     const [selectedEnvId, setSelectedEnvId] = useState<number | null>(null);
 
@@ -28,15 +27,20 @@ export default function WorkspacePickerModal() {
 
     useEffect(() => {
         if (!isOpen) return;
-        getAllEnvironments()
+        listMaps()
             .then(setEnvironments)
-            .catch(console.error)
+            .catch((err: unknown) => {
+                console.error(err);
+                setEnvironments([]);
+            })
             .finally(() => setIsLoading(false));
     }, [isOpen]);
 
     function handleOpenById(id: number) {
+        // The open map can be opened again: that loads the server's version
+        // (after a save was refused because it changed elsewhere).
         const env = environments.find((e) => e.id === id);
-        if (!env || env.id === currentEnvId) return;
+        if (!env) return;
         useSaveModalStore.getState().requestWithSaveGuard(async () => {
             await loadWorkspace(env.id);
             close();
@@ -47,7 +51,7 @@ export default function WorkspacePickerModal() {
         const env = environments.find((e) => e.id === id);
         if (!env) return;
         useDeleteModalStore.getState().requestDelete(env.name, async () => {
-            await deleteEnvironment(env);
+            await deleteMap(env.id);
             setEnvironments((prev) => prev.filter((e) => e.id !== env.id));
             setSelectedEnvId((prev) => (prev === env.id ? null : prev));
             if (env.id === currentEnvId) {
@@ -56,7 +60,7 @@ export default function WorkspacePickerModal() {
         });
     }
 
-    const canOpen = selectedEnvId !== null && selectedEnvId !== currentEnvId;
+    const canOpen = selectedEnvId !== null;
     const actions: ListModalAction[] = [{ icon: "delete", title: "Delete", variant: "danger", onClick: handleDelete }];
 
     return (

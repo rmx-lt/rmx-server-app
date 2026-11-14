@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore } from "./canvasObjectStore";
 
 // ---------------------------------------------------------------------------

@@ -452,20 +452,38 @@ when there is no session; after login the workbench loads, with the user menu
 app keeps the WebSocket open; when it closes, the app asks `/app/api/auth/me`
 whether the session still exists and shows the login form if not.
 
-- **Data stays in the browser.** Environments, objects, layers and settings are
-  stored in IndexedDB through Dexie (database name `blade-terminal`, code in
-  `web/src/data/local/`), per browser profile, not on the server. The server
-  side exists ([Planning API](#planning-api)); switching the client to it is
-  [rmx-server-app#79](https://github.com/rmx-lt/rmx-server-app/issues/79).
-- **Saving.** The status bar shows the save state; File → Save (Ctrl+S) or a
-  click on "Unsaved changes" saves. A page load starts a new blank environment;
-  saved ones open with File → Open (Ctrl+O).
+- **Data lives on the server.** Each user's maps and settings are stored by the
+  [Planning API](#planning-api), so they follow the user to any browser. Code:
+  `web/src/data/planning/` (the API client is `web/src/data/api/planning.ts`).
+  The browser keeps no planning data; the IndexedDB database `blade-terminal`
+  of earlier versions is deleted at login, without import. The UI and the code
+  outside `src/data/` still say environment, zone and obstacle;
+  `src/data/planning/maps.ts` translates to the server's map and zone
+  categories (`zone` ↔ `mowing`, `obstacle` ↔ `no_go`). The web app can't draw
+  navigation zones yet
+  ([rmx-server-app#81](https://github.com/rmx-lt/rmx-server-app/issues/81)), so
+  it keeps a map's navigation zones out of the canvas and writes them back
+  unchanged on every save (renumbered if a drawn zone took their id). The
+  rename of the UI is
+  [rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82).
+- **Saving.** A save sends the whole map. The status bar shows the save state;
+  File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
+  starts a new blank map, which gets its id from the server on its first save;
+  saved ones open with File → Open (Ctrl+O), which can also reopen the open map
+  to get the server's version. With File → Autosave on, the map is saved one
+  second after the last change. When the map was saved elsewhere in between,
+  the save is refused (409) and a message says to use Save As or reopen it;
+  nothing is overwritten. The browser warns before leaving while a change is
+  not on the server yet.
+- **Settings.** UI preferences (unit of measure, floating panels) and the
+  default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
+  read once per login. The layers and the setup of their settings are
+  constants in `web/src/data/planning/layerRegistry.ts`; each map stores only
+  its layer setting values.
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
   monitor feature, and the only `fetch` calls go to the app's own `/app/`
-  API. Schema changes in `web/src/data/local/db.ts` add a `db.version(n)`
-  block (with `upgrade()` where rows change) because browsers hold real data;
-  version 1 is never edited.
+  API.
 
 ## Repository layout
 
@@ -540,7 +558,7 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
     model/              state several features share
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
-      local/            Dexie schema, row types, queries (the only importer of dexie)
+      planning/         maps (load, save, conversion to the wire format), settings, layer registry
     components/         generic widgets only
     hooks/ utils/ config/ styles/ assets/ testing/
 ```
@@ -556,8 +574,7 @@ eslint-plugin-boundaries):
 - Features don't import other features, except into an allow-list
   (`canvas-editing`, `ui-manager`); anything else they share moves to `model/`.
 - Only `src/data/` imports the generated wire types (`@/data/api/generated`);
-  the rest imports the types `data/api` exports. Only `src/data/local/`
-  imports `dexie`.
+  the rest imports the types `data/api` exports.
 - No `index.ts` re-export files; imports use the `@/` alias; tests sit in
   `__tests__/` next to the code.
 - When data moves between the browser and the server, only `data/` changes.

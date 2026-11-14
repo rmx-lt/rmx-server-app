@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Layer, Line } from "react-konva";
 import { GRID_SPACING, pickGridLevel } from "@/config/canvas-editing/canvasConfig";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 
 interface CanvasGridLayerProps {

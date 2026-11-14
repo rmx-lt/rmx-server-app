@@ -1,4 +1,4 @@
-import type { StyleType } from "@/data/local/serviceTypes";
+import type { StyleType } from "@/data/planning/serviceTypes";
 import type { SettingsPanelSelectOption } from "@/components/settings-panel/SettingsPanelRowSelect";
 
 const NONE: SettingsPanelSelectOption = { value: "", label: "" };

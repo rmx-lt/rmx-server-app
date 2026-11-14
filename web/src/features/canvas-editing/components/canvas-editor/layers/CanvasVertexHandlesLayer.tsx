@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Layer, Circle } from "react-konva";
 import { CanvasVertexIdLabel } from "@/features/canvas-editing/components/canvas-editor/shapes/CanvasVertexIdLabel";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import {

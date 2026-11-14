@@ -3,13 +3,12 @@ import { useEnvStore } from "@/model/envStore";
 import { copyWorkspace, loadWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 import { useSaveModalStore } from "@/features/workspace-manager/stores/saveModalStore";
-import { getAllEnvironments } from "@/data/local/environments";
-import type { Environment } from "@/data/local/schemaTypes";
+import { listMaps, type MapListItem } from "@/data/planning/maps";
 
 interface CopyWorkspaceModalState {
     isOpen: boolean;
     name: string;
-    environments: Environment[];
+    environments: MapListItem[];
     isCopying: boolean;
     open: () => Promise<void>;
     close: () => void;
@@ -25,7 +24,10 @@ export const useCopyWorkspaceModalStore = create<CopyWorkspaceModalState>((set, 
 
     open: async () => {
         const currentName = useEnvStore.getState().env.name;
-        const environments = await getAllEnvironments();
+        const environments = await listMaps().catch((err: unknown) => {
+            console.error(err);
+            return [];
+        });
         set({ isOpen: true, name: `${currentName} (copy)`, environments, isCopying: false });
     },
 

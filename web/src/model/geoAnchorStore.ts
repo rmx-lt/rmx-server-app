@@ -1,16 +1,12 @@
 import { create } from "zustand";
-import {
-    getEnvironmentGeoAnchor,
-    initEnvironmentGeoAnchorFromSystem,
-    setEnvironmentGeoAnchor as persistEnvironmentGeoAnchor,
-} from "@/data/local/environmentGeoAnchor";
-import {
-    getSystemGeoAnchor,
-    setSystemGeoAnchor as persistSystemGeoAnchor,
-} from "@/data/local/geoAnchorSystem";
-import type { GeoAnchor } from "@/data/local/schemaTypes";
+import { getDefaultGeoAnchor, setDefaultGeoAnchor } from "@/data/planning/geoAnchorDefault";
+import type { GeoAnchor } from "@/data/planning/schemaTypes";
 import { getSaveMode } from "@/model/saveModeStore";
-import { useEnvStore } from "@/model/envStore";
+
+// Two geo anchors: the user's default ("system", a per-user setting on the
+// server, used for new maps) and the open map's ("environment", saved with
+// the map). The fields are edited as text drafts; a draft that doesn't parse
+// leaves the anchor unchanged.
 
 interface GeoAnchorDraft {
     lat: string;
@@ -45,6 +41,19 @@ function draftsEqual(a: GeoAnchorDraft, b: GeoAnchorDraft): boolean {
     return a.lat === b.lat && a.lon === b.lon;
 }
 
+/** A draft that is blank or a valid anchor (one that can be saved). */
+function isSavable(draft: GeoAnchorDraft): boolean {
+    return parseDraft(draft) !== undefined || isBlankDraft(draft);
+}
+
+/**
+ * The open map's anchor to save: the draft when it is blank or valid, else
+ * the anchor last saved (a half-typed coordinate is not saved).
+ */
+export function getSavableEnvironmentGeoAnchor(state: Pick<GeoAnchorState, "environmentDraft" | "savedEnvironmentDraft">): GeoAnchor | undefined {
+    return isSavable(state.environmentDraft) ? parseDraft(state.environmentDraft) : parseDraft(state.savedEnvironmentDraft);
+}
+
 interface GeoAnchorState {
     systemGeoAnchor?: GeoAnchor;
     environmentGeoAnchor?: GeoAnchor;
@@ -54,12 +63,18 @@ interface GeoAnchorState {
     savedEnvironmentDraft: GeoAnchorDraft;
     isSystemGeoAnchorDirty: boolean;
     isEnvironmentGeoAnchorDirty: boolean;
+    /** Reads the user's default anchor from the server. */
     loadSystemGeoAnchor: () => Promise<void>;
-    loadEnvironmentGeoAnchor: (environmentId: number) => Promise<void>;
+    /** Sets the open map's anchor as loaded or created (not dirty). */
+    setLoadedEnvironmentGeoAnchor: (geoAnchor: GeoAnchor | undefined) => void;
     setSystemGeoAnchorDraft: (draft: GeoAnchorDraft) => Promise<void>;
     setEnvironmentGeoAnchorDraft: (environmentId: number, draft: GeoAnchorDraft) => Promise<void>;
     setSystemGeoAnchor: (geoAnchor: GeoAnchor | null) => Promise<void>;
     setEnvironmentGeoAnchor: (environmentId: number, geoAnchor: GeoAnchor | null) => Promise<void>;
+    /**
+     * Called after the map was saved: stores the default anchor if it changed,
+     * and marks both anchors saved. Returns whether anything was dirty.
+     */
     saveGeoAnchors: () => Promise<boolean>;
     clearEnvironmentGeoAnchor: () => void;
 }
@@ -75,7 +90,7 @@ export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
     isEnvironmentGeoAnchorDirty: false,
 
     loadSystemGeoAnchor: async () => {
-        const geoAnchor = await getSystemGeoAnchor();
+        const geoAnchor = await getDefaultGeoAnchor();
         set({
             systemGeoAnchor: geoAnchor,
             systemDraft: toDraft(geoAnchor),
@@ -84,18 +99,7 @@ export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
         });
     },
 
-    loadEnvironmentGeoAnchor: async (environmentId: number) => {
-        if (environmentId <= 0) {
-            set({
-                environmentGeoAnchor: undefined,
-                environmentDraft: toDraft(),
-                savedEnvironmentDraft: toDraft(),
-                isEnvironmentGeoAnchorDirty: false,
-            });
-            return;
-        }
-        await initEnvironmentGeoAnchorFromSystem(environmentId);
-        const geoAnchor = await getEnvironmentGeoAnchor(environmentId);
+    setLoadedEnvironmentGeoAnchor: (geoAnchor) => {
         set({
             environmentGeoAnchor: geoAnchor,
             environmentDraft: toDraft(geoAnchor),
@@ -106,10 +110,11 @@ export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
 
     setSystemGeoAnchorDraft: async (draft) => {
         const nextGeoAnchor = parseDraft(draft);
-        const shouldAutosave = getSaveMode() === "autosave" && (nextGeoAnchor !== undefined || isBlankDraft(draft));
 
-        if (shouldAutosave) {
-            await persistSystemGeoAnchor(nextGeoAnchor ?? null);
+        // The default is the user's setting, not part of the map: with
+        // autosave on it is stored at once.
+        if (getSaveMode() === "autosave" && isSavable(draft)) {
+            await setDefaultGeoAnchor(nextGeoAnchor ?? null);
             set({
                 systemGeoAnchor: nextGeoAnchor,
                 systemDraft: draft,
@@ -126,25 +131,10 @@ export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
         }));
     },
 
-    setEnvironmentGeoAnchorDraft: async (environmentId, draft) => {
-        if (environmentId <= 0) return;
-
-        const nextGeoAnchor = parseDraft(draft);
-        const shouldAutosave = getSaveMode() === "autosave" && (nextGeoAnchor !== undefined || isBlankDraft(draft));
-
-        if (shouldAutosave) {
-            await persistEnvironmentGeoAnchor(environmentId, nextGeoAnchor ?? null);
-            set({
-                environmentGeoAnchor: nextGeoAnchor,
-                environmentDraft: draft,
-                savedEnvironmentDraft: draft,
-                isEnvironmentGeoAnchorDirty: false,
-            });
-            return;
-        }
-
+    setEnvironmentGeoAnchorDraft: async (_environmentId, draft) => {
+        // Part of the map: marked dirty, saved with the map (autosave picks it up).
         set((state) => ({
-            environmentGeoAnchor: nextGeoAnchor,
+            environmentGeoAnchor: parseDraft(draft),
             environmentDraft: draft,
             isEnvironmentGeoAnchorDirty: !draftsEqual(draft, state.savedEnvironmentDraft),
         }));
@@ -155,37 +145,29 @@ export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
     },
 
     setEnvironmentGeoAnchor: async (environmentId, geoAnchor) => {
-        if (environmentId <= 0) return;
         await useGeoAnchorStore.getState().setEnvironmentGeoAnchorDraft(environmentId, toDraft(geoAnchor ?? undefined));
     },
 
     saveGeoAnchors: async () => {
         const state = useGeoAnchorStore.getState();
-        const systemGeoAnchor = parseDraft(state.systemDraft);
-        const environmentGeoAnchor = parseDraft(state.environmentDraft);
-        const shouldSaveSystem = state.isSystemGeoAnchorDirty && (systemGeoAnchor !== undefined || isBlankDraft(state.systemDraft));
-        const shouldSaveEnvironment = state.isEnvironmentGeoAnchorDirty && (environmentGeoAnchor !== undefined || isBlankDraft(state.environmentDraft));
+        const shouldSaveSystem = state.isSystemGeoAnchorDirty && isSavable(state.systemDraft);
+        const environmentSaved = state.isEnvironmentGeoAnchorDirty && isSavable(state.environmentDraft);
 
-        if (!shouldSaveSystem && !shouldSaveEnvironment) return false;
+        if (!shouldSaveSystem && !environmentSaved) return false;
 
-        const environmentId = useEnvStore.getState().env.id;
-
-        await Promise.all([
-            shouldSaveSystem ? persistSystemGeoAnchor(systemGeoAnchor ?? null) : Promise.resolve(),
-            shouldSaveEnvironment
-                ? persistEnvironmentGeoAnchor(environmentId, environmentGeoAnchor ?? null)
-                : Promise.resolve(),
-        ]);
+        if (shouldSaveSystem) await setDefaultGeoAnchor(parseDraft(state.systemDraft) ?? null);
 
         set({
-            systemGeoAnchor,
-            systemDraft: state.systemDraft,
-            savedSystemDraft: state.systemDraft,
-            isSystemGeoAnchorDirty: false,
-            environmentGeoAnchor,
-            environmentDraft: state.environmentDraft,
-            savedEnvironmentDraft: state.environmentDraft,
-            isEnvironmentGeoAnchorDirty: false,
+            ...(shouldSaveSystem && {
+                systemGeoAnchor: parseDraft(state.systemDraft),
+                savedSystemDraft: state.systemDraft,
+                isSystemGeoAnchorDirty: false,
+            }),
+            ...(environmentSaved && {
+                environmentGeoAnchor: parseDraft(state.environmentDraft),
+                savedEnvironmentDraft: state.environmentDraft,
+                isEnvironmentGeoAnchorDirty: false,
+            }),
         });
 
         return true;

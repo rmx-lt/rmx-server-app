@@ -1,12 +1,11 @@
 import { create } from "zustand";
-import type { Environment } from "@/data/local/schemaTypes";
-import { getAllEnvironments } from "@/data/local/environments";
+import { listMaps, type MapListItem } from "@/data/planning/maps";
 import { useEnvStore } from "@/model/envStore";
 import { saveAsWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
 
 interface SaveAsModalState {
     isOpen: boolean;
-    environments: Environment[];
+    environments: MapListItem[];
     name: string;
     /** The name the user typed before picking an overwrite target. Restored on deselect. */
     customName: string;
@@ -30,7 +29,10 @@ export const useSaveAsModalStore = create<SaveAsModalState>((set, get) => ({
 
     open: async () => {
         const currentName = useEnvStore.getState().env.name;
-        const environments = await getAllEnvironments();
+        const environments = await listMaps().catch((err: unknown) => {
+            console.error(err);
+            return [];
+        });
         set({
             isOpen: true,
             environments,

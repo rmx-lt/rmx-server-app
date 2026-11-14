@@ -1,6 +1,6 @@
-import type { Environment, GeoAnchor } from "@/data/local/schemaTypes";
-import type { Object } from "@/data/local/schemaTypes";
-import type { EnvPoint } from "@/data/local/schemaTypes";
+import type { Environment, GeoAnchor } from "@/data/planning/schemaTypes";
+import type { Object } from "@/data/planning/schemaTypes";
+import type { EnvPoint } from "@/data/planning/schemaTypes";
 
 function escapeXmlText(value: string): string {
     return value

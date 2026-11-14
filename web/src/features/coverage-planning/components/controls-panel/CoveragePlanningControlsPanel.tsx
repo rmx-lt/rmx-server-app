@@ -9,7 +9,7 @@ import EnvTypeSelection from "@/features/coverage-planning/components/controls-p
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { useEnvStore } from "@/model/envStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { LAYER_ID } from "@/data/local/layerRegistry";
+import { LAYER_ID } from "@/data/planning/layerRegistry";
 import { parseHeadlandWidth } from "@/features/canvas-editing/utils/headlandGeometry";
 import { unitLabel } from "@/utils/unitOfMeasure";
 
