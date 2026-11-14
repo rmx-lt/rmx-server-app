@@ -20,7 +20,6 @@ export default function SaveAsModal() {
 
     const canSave = name.trim().length > 0 && !isSaving;
     const input: ListModalInputConfig = {
-        inputRef,
         value: name,
         placeholder: "Enter workspace name",
         onChange: setName,
@@ -53,6 +52,7 @@ export default function SaveAsModal() {
                 </>
             )}
             input={input}
+            inputRef={inputRef}
         />
     );
 }

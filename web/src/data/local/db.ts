@@ -1,6 +1,6 @@
 import Dexie from "dexie";
 import type { AppEnumValue } from "@/data/local/serviceTypes";
-import { LAYER_REGISTRY, LAYER_SETTINGS_SETUP_DEFAULTS } from "@/config/layers/layerRegistry";
+import { LAYER_REGISTRY, LAYER_SETTINGS_SETUP_DEFAULTS } from "@/data/local/layerRegistry";
 
 const db = new Dexie("blade-terminal");
 

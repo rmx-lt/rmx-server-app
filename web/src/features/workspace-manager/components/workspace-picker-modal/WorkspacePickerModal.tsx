@@ -15,15 +15,19 @@ export default function WorkspacePickerModal() {
     const currentEnvId = useEnvStore((s) => s.env.id);
 
     const [environments, setEnvironments] = useState<Environment[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(isOpen);
     const [selectedEnvId, setSelectedEnvId] = useState<number | null>(null);
 
+    // Opening starts a load; closing drops the selection (adjusted during render, not in an effect).
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen) setIsLoading(true);
+        else setSelectedEnvId(null);
+    }
+
     useEffect(() => {
-        if (!isOpen) {
-            setSelectedEnvId(null);
-            return;
-        }
-        setIsLoading(true);
+        if (!isOpen) return;
         getAllEnvironments()
             .then(setEnvironments)
             .catch(console.error)

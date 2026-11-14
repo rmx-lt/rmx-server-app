@@ -1,12 +1,9 @@
 import polygonClipping from "polygon-clipping";
 import type { Object } from "@/data/local/schemaTypes";
 import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
-import { computePolygonArea } from "@/utils/geometry";
+import { computePolygonArea, type Point } from "@/utils/geometry";
 
-export interface Point {
-    x: number;
-    y: number;
-}
+export type { Point };
 
 export interface EdgeMidpoint extends Point {
     /** Index of the edge's start vertex (edge goes from vertices[afterIndex] to vertices[afterIndex+1]) */

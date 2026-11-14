@@ -18,7 +18,6 @@ export interface ListModalAction {
 }
 
 export interface ListModalInputConfig {
-    inputRef?: Ref<HTMLInputElement>;
     label?: string;
     value: string;
     placeholder?: string;
@@ -45,6 +44,8 @@ export interface ListModalProps {
     footerStart?: ReactNode;
     footerEnd?: ReactNode;
     input?: ListModalInputConfig;
+    /** Ref to the input field of `input`. Kept out of `input`: a ref inside a plain object makes the React Compiler treat the whole object as a ref. */
+    inputRef?: Ref<HTMLInputElement>;
     children?: ReactNode;
     widthClassName?: string;
 }
@@ -68,6 +69,7 @@ export default function ListModal({
     footerStart,
     footerEnd,
     input,
+    inputRef,
     children,
     widthClassName = "w-130",
 }: ListModalProps) {
@@ -123,7 +125,7 @@ export default function ListModal({
 
                 {input ? (
                     <InternalListModalInputField
-                        ref={input.inputRef}
+                        ref={inputRef}
                         label={input.label}
                         value={input.value}
                         placeholder={input.placeholder}

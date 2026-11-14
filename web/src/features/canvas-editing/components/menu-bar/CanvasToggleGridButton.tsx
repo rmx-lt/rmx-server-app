@@ -1,6 +1,6 @@
 import MenuBarItem from "@/components/menu-bar/MenuBarItem";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 
 export default function CanvasToggleGridButton() {
   const layers = useLayerSettingsStore((s) => s.layers);

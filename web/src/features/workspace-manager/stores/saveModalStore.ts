@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useSaveStatusStore } from "@/model/saveStatusStore";
+import { useSaveStatusStore } from "@/features/canvas-editing/stores/saveStatusStore";
 import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";

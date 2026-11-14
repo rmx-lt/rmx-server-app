@@ -19,7 +19,6 @@ export default function CopyWorkspaceModal() {
 
     const canCopy = name.trim().length > 0 && !isCopying;
     const input: ListModalInputConfig = {
-        inputRef,
         value: name,
         placeholder: "Enter workspace name",
         onChange: setName,
@@ -45,6 +44,7 @@ export default function CopyWorkspaceModal() {
                 </>
             )}
             input={input}
+            inputRef={inputRef}
         />
     );
 }

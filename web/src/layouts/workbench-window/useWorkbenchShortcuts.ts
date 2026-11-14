@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useShortcut, addShortcutBlockListener, removeShortcutBlockListener } from "./useShortcut";
+import { useShortcut, addShortcutBlockListener, removeShortcutBlockListener } from "@/hooks/shortcut-manager/useShortcut";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
 import { useWorkspacePickerStore } from "@/features/workspace-manager/stores/workspacePickerStore";
 import { useSaveModalStore } from "@/features/workspace-manager/stores/saveModalStore";

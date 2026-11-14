@@ -2,7 +2,7 @@ import { Layer, Line, Circle } from "react-konva";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 
 interface CanvasDrawingPreviewLayerProps {
     activeTool: ActiveTool | null;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { StyleAttributeGroup } from "@/data/local/serviceTypes";
 import type { LayerRecord, LayerSettingView } from "@/data/local/layerTypes";
-import { LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 import LayerSettingsPanel, { type SettingsSectionData } from "@/features/inspector/components/calc-layers-section/LayerSettingsPanel";
 
 const GROUP_ORDER: StyleAttributeGroup[] = ["general", "point", "startPoint", "endPoint", "startEndPoint", "line", "polygon"];

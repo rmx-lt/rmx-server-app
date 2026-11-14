@@ -5,7 +5,7 @@ import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { initializeWorkspace } from "@/features/workspace-manager/data/workspaceBridge";
-import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import { useBeforeUnload } from "@/app/useBeforeUnload";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
 import { startConnections } from "./connections";
 

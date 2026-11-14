@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface InspectorPanelSectionInputProps {
     label: string;
@@ -19,20 +19,14 @@ export default function InspectorPanelSectionInput({
     max,
     step,
 }: InspectorPanelSectionInputProps) {
-    const [local, setLocal] = useState(value);
-    const [isFocused, setIsFocused] = useState(false);
+    // The text being edited while the input has focus; null shows `value`.
+    const [draft, setDraft] = useState<string | null>(null);
+    const isFocused = draft !== null;
 
-    useEffect(() => {
-        if (!isFocused) setLocal(value);
-    }, [value, isFocused]);
-
-    function commit() {
+    function commit(local: string) {
         if (type === "number") {
             const parsed = parseFloat(local);
-            if (isNaN(parsed)) {
-                setLocal(value);
-                return;
-            }
+            if (isNaN(parsed)) return;
             const clamped =
                 min !== undefined && parsed < min
                     ? min
@@ -40,7 +34,6 @@ export default function InspectorPanelSectionInput({
                         ? max
                         : parsed;
             const str = String(clamped);
-            setLocal(str);
             if (str !== value) onChange(str);
         } else {
             if (local !== value) onChange(local);
@@ -54,13 +47,13 @@ export default function InspectorPanelSectionInput({
             </span>
             <input
                 type={type}
-                value={local}
+                value={draft ?? value}
                 step={step}
-                onChange={(e) => setLocal(e.target.value)}
-                onFocus={() => setIsFocused(true)}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={() => setDraft(value)}
                 onBlur={() => {
-                    setIsFocused(false);
-                    commit();
+                    if (draft !== null) commit(draft);
+                    setDraft(null);
                 }}
                 onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();

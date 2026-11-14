@@ -3,7 +3,7 @@ import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewS
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/local/layerRegistry";
 import { convertLinearToBase } from "@/utils/unitOfMeasure";
 import {
     TILE_SIZE,

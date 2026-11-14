@@ -9,8 +9,8 @@ import EnvTypeSelection from "@/features/coverage-planning/components/controls-p
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { useEnvStore } from "@/model/envStore";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { LAYER_ID } from "@/config/layers/layerRegistry";
-import { parseHeadlandWidth } from "@/features/coverage-planning/utils/headlandGeometry";
+import { LAYER_ID } from "@/data/local/layerRegistry";
+import { parseHeadlandWidth } from "@/features/canvas-editing/utils/headlandGeometry";
 import { unitLabel } from "@/utils/unitOfMeasure";
 
 export default function CoveragePlanningControlsPanel() {
@@ -19,15 +19,9 @@ export default function CoveragePlanningControlsPanel() {
     const headlandWidth = useEnvStore((state) => state.env.headlandWidth);
     const setHeadlandEnabled = useEnvStore((state) => state.setHeadlandEnabled);
     const setHeadlandWidth = useEnvStore((state) => state.setHeadlandWidth);
-    const [headlandWidthDraft, setHeadlandWidthDraft] = useState(headlandWidth);
-    const [headlandWidthFocused, setHeadlandWidthFocused] = useState(false);
+    // The width being edited while the input has focus; null shows the stored width.
+    const [headlandWidthDraft, setHeadlandWidthDraft] = useState<string | null>(null);
     const selectedUnitOfMeasure = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
-
-    useEffect(() => {
-        if (!headlandWidthFocused) {
-            setHeadlandWidthDraft(headlandWidth);
-        }
-    }, [headlandWidth, headlandWidthFocused]);
 
     const uom = unitLabel(selectedUnitOfMeasure);
     const headlandWidthLabel = uom ? `Headland Width (${uom})` : "Headland Width";
@@ -58,12 +52,13 @@ export default function CoveragePlanningControlsPanel() {
                 {headlandEnabled && (
                     <ControlsPanelSectionInput
                         label={headlandWidthLabel}
-                        value={headlandWidthDraft}
+                        value={headlandWidthDraft ?? headlandWidth}
                         onChange={setHeadlandWidthDraft}
-                        onFocus={() => setHeadlandWidthFocused(true)}
+                        onFocus={() => setHeadlandWidthDraft(headlandWidth)}
                         onBlur={() => {
-                            setHeadlandWidthFocused(false);
-                            const parsed = parseHeadlandWidth(headlandWidthDraft);
+                            const draft = headlandWidthDraft ?? headlandWidth;
+                            setHeadlandWidthDraft(null);
+                            const parsed = parseHeadlandWidth(draft);
                             if (parsed === null) {
                                 setHeadlandWidth("");
                                 return;

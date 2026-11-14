@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
@@ -20,12 +20,10 @@ function CoordInput({
     unit: UnitOfMeasure;
     onCommit: (v: number) => void;
 }) {
-    const [local, setLocal] = useState(formatNumber(baseValue, 2));
-    const [isFocused, setIsFocused] = useState(false);
-
-    useEffect(() => {
-        if (!isFocused) setLocal(formatNumber(baseValue, 2));
-    }, [baseValue, isFocused]);
+    // The text being edited while the input has focus; null shows `baseValue`.
+    const [draft, setDraft] = useState<string | null>(null);
+    const isFocused = draft !== null;
+    const local = draft ?? formatNumber(baseValue, 2);
 
     const isFloated = local !== "" || isFocused;
 
@@ -49,10 +47,10 @@ function CoordInput({
             <input
                 type="number"
                 value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                onFocus={() => setIsFocused(true)}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={() => setDraft(formatNumber(baseValue, 2))}
                 onBlur={() => {
-                    setIsFocused(false);
+                    setDraft(null);
                     commit();
                 }}
                 onKeyDown={(e) => {

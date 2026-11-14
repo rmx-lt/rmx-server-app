@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import CardModal, { type CardModalFastTabConfig, type CardModalSavedState } from "@/components/modals/card-modal/CardModal";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useEnvStore } from "@/model/envStore";
 import { useGeoAnchorModalStore } from "@/features/geo-anchor/stores/geoAnchorModalStore";
-import { useSaveStatusStore } from "@/model/saveStatusStore";
+import { useSaveStatusStore } from "@/features/canvas-editing/stores/saveStatusStore";
 
 function validateLat(v: string): string | undefined {
     const n = Number.parseFloat(v);
@@ -39,13 +39,15 @@ function GeoAnchorSystemModal({
     const [isEditMode, setIsEditMode] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        if (!isOpen) setIsEditMode(false);
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) setIsSaving(false);
-    }, [isOpen]);
+    // Closing resets edit mode and the saving flag (adjusted during render, not in an effect).
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (!isOpen) {
+            setIsEditMode(false);
+            setIsSaving(false);
+        }
+    }
 
     const systemLatError = validateLat(systemDraft.lat);
     const systemLonError = validateLon(systemDraft.lon);
@@ -140,17 +142,17 @@ export default function GeoAnchorModal() {
     const [isEditMode, setIsEditMode] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        if (!isOpen) setSystemModalOpen(false);
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) setIsEditMode(false);
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) setIsSaving(false);
-    }, [isOpen]);
+    // Closing closes the system modal and resets edit mode and the saving flag
+    // (adjusted during render, not in an effect).
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+        if (!isOpen) {
+            setSystemModalOpen(false);
+            setIsEditMode(false);
+            setIsSaving(false);
+        }
+    }
 
     const envLatError = validateLat(envDraft.lat);
     const envLonError = validateLon(envDraft.lon);
