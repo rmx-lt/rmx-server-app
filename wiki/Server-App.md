@@ -2,9 +2,10 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
-for the browser, firmware images to the mower's devices over MQTT, and the web
-app: the planning workbench ported from blade-terminal (see [Web app](#web-app));
-the mower features build on that.
+for the browser, firmware images to the mower's devices over MQTT, what the
+mower reports (state, metric catalogues, telemetry, events; see
+[Mower ingest](#mower-ingest)), and the web app: the planning workbench ported
+from blade-terminal (see [Web app](#web-app)); the other mower features build on that.
 
 The stack: a Go server (`net/http`, pgx, goose, paho.golang,
 coder/websocket), a TypeScript + React client on Bun's bundler, TimescaleDB,
@@ -16,6 +17,7 @@ and ported to Go in November 2026, when the backend language was decided
 
 - [How it works](#how-it-works)
 - [Firmware over MQTT](#firmware-over-mqtt)
+- [Mower ingest](#mower-ingest)
 - [Login and sessions](#login-and-sessions)
 - [Planning API](#planning-api)
 - [Web app](#web-app)
@@ -41,14 +43,18 @@ Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
 - **HTTPS**: login and logout under `/api/auth`, the user's maps
-  and settings under `/api/maps` and `/api/settings` (see [Planning API](#planning-api)), `/health`,
+  and settings under `/api/maps` and `/api/settings` (see [Planning API](#planning-api)), the
+  devices under `/api/devices` (see [Mower ingest](#mower-ingest)), `/health`,
   and the built client at `/`.
-- **WSS**: `/ws`, JSON request/response with a `request_id`. The only
-  request today is `ping`; the connection (session check, keep-alive, close
+- **WSS**: `/ws`, JSON request/response with a `request_id`, plus messages the
+  server pushes. Requests: `ping` and the device requests of
+  [Mower ingest](#mower-ingest); the connection (session check, keep-alive, close
   codes) is what later features build on.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
-  `mower/status/server`, and sends firmware images as binary chunks on
-  `mower/<client-id>/fw/chunk` (see [Firmware over MQTT](#firmware-over-mqtt)).
+  `mower/status/server`, sends firmware images as binary chunks on
+  `mower/<client-id>/fw/chunk` (see [Firmware over MQTT](#firmware-over-mqtt)),
+  and stores what the gateway and the autopilot publish under
+  `mower/<name>/gateway/…` and `mower/<name>/autopilot/…` (see [Mower ingest](#mower-ingest)).
 - **Login**: the app's own login page and server-side sessions in a cookie
   protect the API and the WebSocket (see
   [Login and sessions](#login-and-sessions)).
@@ -66,6 +72,13 @@ stays, so nothing runs twice.
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
 | `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, points, layer settings and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
 | `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
+| `devices` | plain table | `name` (primary key; the device name from the topics), `first_seen_at`, `last_seen_at`, `gateway_status` (`online` / `offline` / null), `gateway_status_at` |
+| `board_state` | plain table | `device` (→ devices, cascade), `board` (`gateway` / `autopilot`), `boot` and `boot_seen_at` (last boot counter seen in any message of the board), `state` (JSONB: the last state message as published) and `state_received_at`; primary key `device` + `board` |
+| `catalogue_parts` | plain table | every catalogue message as received: `device`, `board`, `part` (`index` or a part name), `revision`, `doc` (JSONB), `received_at`; primary key `device` + `board` + `part` |
+| `catalogues` | plain table | the catalogue in use per `device` + `board`: `revision`, `doc` (JSONB), `updated_at` |
+| `device_events` | plain table | autopilot events: `device`, `board`, `boot`, `seq`, `time`, `event`, `data` (JSONB: the other fields), `received_at`; primary key `device` + `board` + `boot` + `seq` |
+| `metric_latest` | plain table | the newest value per `device` + `board` + `metric`: `time`, `boot`, `value` (null: not known) |
+| `telemetry` | hypertable | `time`, `device`, `board`, `metric`, `boot`, `value` (double): one row per known value; daily chunks, compressed after a day, no retention policy yet |
 
 The first migrations still create the old `records` and `record_events`
 tables; a later one drops them, so every database runs the same sequence.
@@ -116,8 +129,11 @@ An unknown or malformed request gets a `bad_request` error with its
 `request_id` (empty if the message was not JSON); the socket stays open.
 
 The contract between the mower and the server is wiki [Mower-Protocol](Mower-Protocol): topics, payloads,
-commands, chunk transfer. The server does not implement it yet
-([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)); the topics below are what it serves today.
+commands, chunk transfer. The server implements the state, catalogue, telemetry
+and event topics of it (see [Mower ingest](#mower-ingest)); commands, chunk
+transfer, jobs, recording and the monitor follow
+([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)). The firmware topics below are the older
+subset it still serves.
 
 MQTT topics (`<prefix>` is `mower`):
 
@@ -127,6 +143,7 @@ MQTT topics (`<prefix>` is `mower`):
 | `<prefix>/<client-id>/fw/req` | client → server | firmware request (JSON) |
 | `<prefix>/<client-id>/fw/chunk` | server → client | one firmware chunk (binary) |
 | `<prefix>/<client-id>/fw/res` | server → client | firmware info, or a JSON error |
+| `<prefix>/<name>/gateway/#`, `<prefix>/<name>/autopilot/#` | device → server | subscribed as a whole; the topics handled are in [Mower ingest](#mower-ingest) |
 
 The byte layout of a chunk, and the firmware request, are in
 [Firmware over MQTT](#firmware-over-mqtt). Nothing on the `fw` topics is retained.
@@ -300,6 +317,143 @@ serves it; its name follows the stack's rename in
 files `0644` are enough). No Mosquitto ACL change: `app` already has
 readwrite `mower/#`, and each device already has `mower/<its username>/#`,
 which covers `fw/req`, `fw/chunk` and `fw/res`.
+
+## Mower ingest
+
+What the mower tells the server, and what the server shows of it. The contract
+is wiki [Mower-Protocol](Mower-Protocol) §3, §4, §6, §7 and §16; this section
+says what the server does with it. Code: `internal/mower/` (`mqtt.go` payloads,
+`catalogue.go`, `store.go`, `service.go`, `http.go`, `ws.go`), wire types in
+`internal/api/mower.go`.
+
+**The server holds no formulas or hardware constants.** It stores and shows
+what the mower sends. The one thing it knows about a mower is the list of keys
+of §16.4 (`Keys` in `catalogue.go`); everything else (which values exist,
+their units, ranges and warning levels) comes from the board's catalogue.
+
+### What is subscribed and handled
+
+The server subscribes to `<prefix>/+/gateway/#` and `<prefix>/+/autopilot/#`
+with a clean session, so retained state and catalogues arrive again after every
+connect. Messages of one subscription are handled one at a time, in order
+(`mqtt.HandleTree`); at most 4096 wait, a later one is dropped and logged. The
+topics the domain handles:
+
+| Topic | What the server does |
+|---|---|
+| `gateway/status` | `online` / `offline` into `devices.gateway_status` |
+| `gateway/state`, `autopilot/state` | keeps the message as published in `board_state` |
+| `gateway/telemetry`, `autopilot/telemetry` | stores every value (below) |
+| `autopilot/event` | stores the event unless it was seen (below) |
+| `gateway/metrics/<part>`, `autopilot/metrics/<part>` | catalogue (below) |
+
+Everything else under these trees (commands, acks, monitor, chunk transfer) is
+ignored until its feature exists. A device is **learned from its topics**: the
+first valid message creates it, and every message sets `last_seen_at`. A
+message over 4096 bytes, one that is not the JSON object the contract
+describes, or an unknown status text is dropped and logged; an empty payload
+(an emptied retained topic) is ignored.
+
+### State and the boot counter
+
+The state is stored as sent (shown unchanged in the API). Each board's `boot`
+(§4.1) is read from its state, telemetry and events. A `boot` higher than the
+stored one means the board restarted: the server records it (`boot_seen_at`)
+and pushes a `device_changed` with change `boot`. A lower one is ignored for
+this purpose, because the counter only grows and a lower value is a message
+held up from before the restart. Every stored value carries its `boot`.
+
+`autopilot_stale` is true while the gateway's status is not `online` or the
+gateway's state says `autopilot_link` is not `up` (§7.1), and also while the
+server has neither yet. The autopilot's state is still returned, marked out of
+date. `protocol_supported` says whether the server supports the protocol a
+board reports (§2): the same major version, and while the major version is 0,
+the same minor too (the server implements 0.1). The server sends no commands
+yet, so nothing is withheld from an unsupported board.
+
+### Catalogues
+
+Each board publishes an `index` (revision and part names) and one message per
+part (§16.1). Every message is stored as received (`catalogue_parts`); after
+each one the server tries to assemble the catalogue. It **uses a catalogue only
+when complete**: the index, and every part it lists, all with the index's
+revision. Until then the catalogue in use stays as it was, and the device
+shows the waiting revision as `pending_revision` with the `missing_parts`.
+Retained parts the index does not list are ignored.
+
+An entry that does not follow §16.2 (a missing required field, a bad name, an
+enum without values, a name twice) is left out and logged, so one bad entry
+does not hide the rest; a key it would have linked is then not linked. A key
+on a family entry (`usage.mqtt.up.*`) is ignored: its members are not known.
+
+### Keys
+
+The keys of §16.4 are resolved over the catalogues in use of both boards,
+whenever a device is read. Each key gets one state:
+
+| State | When |
+|---|---|
+| `linked` | exactly one metric names the key (`board` and `metric` say which), with the key's type; for `gnss.fix` the metric's `values` are the key's, in order |
+| `missing` | no metric names it, or no catalogue is in use yet |
+| `duplicate` | more than one metric names it; it counts as not linked and `candidates` lists them |
+| `wrong_type` | one metric names it, but with another type than the key |
+
+The app reports the keys that are not `linked`; what depends on them is not shown.
+
+### Telemetry
+
+A telemetry message is stored under its `time` (§4.1), or under the time of
+arrival when the board has no clock (`time: null`) or its time is more than a
+day from the server's. Every value becomes one row in `telemetry` by metric
+name, whether or not the catalogue lists it: a number as sent, a bool as 1 or
+0, an enum as its index. A `null` value (not known) is not stored in the time
+series but is the metric's latest value, shown as unknown. Values that are
+neither number, bool nor null, and names with control characters, are left out.
+`metric_latest` keeps the newest value per metric.
+
+**Counters** (§16.3) are stored as the count since boot, together with `boot`.
+The history API returns a counter as a rate: the growth since the previous
+point divided by the seconds between them. The first point after a new `boot`
+has no rate (the counter started again from 0), and neither has a pair of
+points with the same time or a count that went down within one boot.
+
+### Events
+
+An event needs `time`, `boot`, `seq` and `event`; its other fields are kept as
+`data`. The server drops an event whose `boot` and `seq` it has already stored
+(`device_events` has that as its primary key, so a repeat after a QoS 1 resend
+or a restart of the server changes nothing); the same `seq` under another
+`boot` is a different event.
+
+### API
+
+All routes need a session; every user sees every device.
+
+| Route | Answer |
+|---|---|
+| `GET /api/devices` | `DeviceList`: name, first and last seen, `gateway_status`, `autopilot_mode`, `autopilot_stale` |
+| `GET /api/devices/{name}` | `DeviceDetail`: both boards' `BoardState` (state as sent, `boot`, `protocol_supported`), `catalogues` (one per board: the revision in use, its parts and metrics, and the pending revision), `keys`, `latest` values; 404 for an unknown device |
+| `GET /api/devices/{name}/history?board=&metric=` | `MetricHistory`; optional `from`, `to` (RFC 3339; default the hour before now), `limit` (default 2000, at most 10000; the newest are kept and `truncated` says so), `rate` (default `true` for a counter, `false` otherwise) |
+| `GET /api/devices/{name}/events?limit=` | `DeviceEventList`, newest first (default 100, at most 1000) |
+
+`board` is `gateway` or `autopilot`, because both can have a metric of the same
+name (`system.cpu`). A metric name in a family (`usage.mqtt.up.autopilot/telemetry`)
+goes in `metric` as it is; the history looks the kind up in the family's entry.
+
+WebSocket requests (envelope as in [Wire protocol](#wire-protocol)):
+
+| `op` | Fields | Answer (`data.kind`) |
+|---|---|---|
+| `devices` | | `devices`: a `DeviceList` |
+| `device` | `name` | `device`: a `DeviceDetail` |
+| `metric_history` | `device`, `board`, `metric`, optional `from`, `to`, `limit`, `rate` | `metric_history`: a `MetricHistory` |
+
+Pushed to every open socket (no request):
+
+| `type` | Fields | When |
+|---|---|---|
+| `device_changed` | `device`, `board` (null for the gateway status), `change` | `status`, `state`, `boot`, `catalogue` (the catalogue in use changed, so the keys may have), or `event`; the client loads the device again |
+| `telemetry` | `device`, `board`, `time`, `boot`, `values` (`metric`, `value`) | every telemetry message stored, so a live view needs no polling |
 
 ## Login and sessions
 
@@ -522,7 +676,7 @@ internal/
   httpx/                Router with Public() / Protected() only, JSON helpers
   mqtt/                 broker client, topic grammar <prefix>/<device>/<suffix>, suffix → handler
   ws/                   connections, op → handler routing, event push
-  auth/ firmware/       domains (planning/ too; later: devices, telemetry, commands), files:
+  auth/ firmware/       domains (planning/ and mower/ too; later: commands), files:
                           service.go, store.go (all SQL, takes db.DBTX), http.go, ws.go,
                           mqtt.go (device payloads + topic suffixes), as far as the domain needs them
   integration/          harness (fresh database, own topic prefix, logged-in client)
@@ -743,7 +897,7 @@ Then open <http://localhost:8080/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `firmware_test.go`, `planning_test.go`) start the real
+`app_test.go`, `auth_test.go`, `firmware_test.go`, `mower_test.go`, `planning_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
 ping, a firmware download (every chunk, including a resume from the middle,
@@ -756,7 +910,11 @@ sessions, logout and "log out everywhere", password change, session
 fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
 the planning API: a map's create/read/update/delete, zone counts per
 category, the revision conflict, invalid input, that users can't see each
-other's maps, and settings.
+other's maps, and settings; and the mower domain: a simulated gateway publishes
+state, catalogues, telemetry and events, and the API and WebSocket show the
+device, its keys, latest values, the history of a gauge and of a counter across
+a restart, an incomplete catalogue that is not used, duplicate events that are
+dropped, and an autopilot state that is out of date.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
