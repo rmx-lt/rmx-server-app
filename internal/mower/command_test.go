@@ -569,25 +569,37 @@ const (
 )
 
 // The gateway is restarted or updated only while the autopilot is idle (§6.4).
-func TestGatewayRestartAndOtaOnlyWhileTheAutopilotIsIdle(t *testing.T) {
+func TestGatewayRestartAndOtaRefusedOnlyForAKnownBusyAutopilot(t *testing.T) {
 	for _, cmd := range []string{"restart", "ota"} {
 		if err := checkAllowed(rowWith("online", gwUp, apIdle), api.BoardGateway, cmd); err != nil {
 			t.Errorf("%s with an idle autopilot: %v", cmd, err)
 		}
 		for name, row := range map[string]deviceRow{
-			"a job runs":                     rowWith("online", gwUp, apJob),
-			"manual":                         rowWith("online", gwUp, apManual),
-			"fault":                          rowWith("online", gwUp, apFault),
-			"no autopilot state":             rowWith("online", gwUp, ""),
-			"a state without a mode":         rowWith("online", gwUp, apUnknown),
-			"the link to the autopilot down": rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apIdle),
-			"the link is incompatible":       rowWith("online", `{"protocol":"0.1","autopilot_link":"incompatible"}`, apIdle),
-			"no gateway state":               rowWith("online", "", apIdle),
-			"no gateway status":              rowWith("", gwUp, apIdle),
+			"a job runs":             rowWith("online", gwUp, apJob),
+			"manual":                 rowWith("online", gwUp, apManual),
+			"fault":                  rowWith("online", gwUp, apFault),
+			"a state without a mode": rowWith("online", gwUp, apUnknown),
+			"link not reported, job": rowWith("online", "", apJob),
 		} {
 			err := checkAllowed(row, api.BoardGateway, cmd)
 			if e := apperr.From(err); err == nil || e.Code != api.CodeConflict {
 				t.Errorf("%s refused? %s: %v", cmd, name, err)
+			}
+		}
+	}
+	// Allowed: the board link is down (or incompatible), whatever the stale autopilot state
+	// says, and no autopilot state was ever received.
+	for _, cmd := range []string{"restart", "ota"} {
+		for name, row := range map[string]deviceRow{
+			"link down, stale job":    rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apJob),
+			"link incompatible":       rowWith("online", `{"protocol":"0.1","autopilot_link":"incompatible"}`, apJob),
+			"link down, idle":         rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apIdle),
+			"no autopilot state ever": rowWith("online", gwUp, ""),
+			"no states at all":        rowWith("", "", ""),
+			"link not reported, idle": rowWith("online", "", apIdle),
+		} {
+			if err := checkAllowed(row, api.BoardGateway, cmd); err != nil {
+				t.Errorf("%s refused with %s: %v", cmd, name, err)
 			}
 		}
 	}

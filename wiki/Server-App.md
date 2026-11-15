@@ -493,9 +493,12 @@ QoS 1. The API answers at once; the outcome follows.
 - **Refused before sending.** The device must exist (404). The mower must not be
   offline (the gateway's retained status `offline`: 409). A board that reports a
   protocol this server does not support gets nothing but `ota` (409). The
-  gateway's `restart` and `ota` are refused (409) unless the autopilot is known to
-  be idle: its state must be current (the gateway online and its `autopilot_link`
-  `up`, §7.1) and say `mode: idle`; the reason names the mode. The autopilot's own
+  gateway's `restart` and `ota` are refused (409) only when the autopilot is known
+  and not idle: with the board link up (the gateway state's `autopilot_link` is
+  `up`, or not reported) its state must say `mode: idle`, and the reason names the
+  mode. They are allowed when the gateway reports the link as not up (`down` or
+  `incompatible`) or when no autopilot state was ever received, because then the
+  autopilot cannot be working under the gateway's control. The autopilot's own
   restart and update are the board's to refuse (`wrong_mode`).
 - **Parameters** are checked against §6.4 and §8 and refused (400) when missing,
   of the wrong type or not defined for the command; a command message is at most
@@ -1052,7 +1055,7 @@ its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
 ping, chunk transfer (a job file and firmware images side by side, every chunk
 checked against the file's SHA-256, the three sets kept apart), the commands
 (an ack, the resend of a lost ack after 5 s with the same id, open commands
-failed by a new boot, a gateway restart refused while the autopilot is not idle),
+failed by a new boot, a gateway restart and ota refused while the autopilot is in a job, allowed with the board link down or the autopilot idle),
 live driving, a monitor stream that runs only while watched, the caster settings
 sent once and on change (the password only on the wire), health, that the records routes and
 tables are gone, the retained server status and graceful shutdown, and the

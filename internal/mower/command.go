@@ -696,19 +696,24 @@ func checkAllowed(row deviceRow, board api.Board, cmd string) error {
 	return nil
 }
 
-// checkAutopilotIdle refuses a gateway restart or update unless the autopilot
-// is known to be idle: its state must be current (§7.1) and say "idle". A
-// state that is out of date does not count, because the job it shows may still run.
+// checkAutopilotIdle refuses a gateway restart or update only when the
+// autopilot is known and not idle. It is allowed when no autopilot state was
+// ever received, and when the gateway's state reports the board link as not up
+// ("down" or "incompatible"): then the autopilot cannot be working under the
+// gateway's control. With the link up (or not reported), the autopilot's state
+// must say "idle".
 func checkAutopilotIdle(row deviceRow, cmd string) error {
 	if row.autopilot.state == nil {
-		return apperr.Conflict("the gateway %s is refused: the autopilot's state is not known", cmd)
+		return nil
 	}
-	if stale(row) {
-		return apperr.Conflict("the gateway %s is refused: the autopilot's state is out of date (the gateway is offline or has no link to it)", cmd)
+	if row.gateway.state != nil {
+		if gw, err := ParseState(row.gateway.state); err == nil && gw.AutopilotLink != "" && gw.AutopilotLink != "up" {
+			return nil
+		}
 	}
 	st, err := ParseState(row.autopilot.state)
 	if err != nil || st.Mode == "" {
-		return apperr.Conflict("the gateway %s is refused: the autopilot's state is not known", cmd)
+		return apperr.Conflict("the gateway %s is refused: the autopilot's state does not say its mode", cmd)
 	}
 	if st.Mode != "idle" {
 		return apperr.Conflict("the gateway %s is refused: the autopilot is %s, not idle", cmd, st.Mode)

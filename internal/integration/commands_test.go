@@ -332,6 +332,19 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 	eq(t, status, 202)
 	eq(t, m.mustCmd("gateway", "restart").ID, sent.ID)
 	t.Logf("restart with an idle autopilot: %d, sent as %s", status, sent.ID)
+
+	// The autopilot is busy again, but the gateway reports the board link down:
+	// the stale job state does not count, and ota goes out.
+	m.pub("autopilot/state", `{"protocol":"0.1","boot":5,"mode":"job","job":"j-2","time":1794650300.0}`)
+	app.waitDevice(name, "job again", func(d api.DeviceDetail) bool { return strings.Contains(string(d.Autopilot.State), `"j-2"`) })
+	status, _, _ = app.sendCommand(name, map[string]any{"board": "gateway", "cmd": "ota", "params": map[string]any{"version": "0.5.0"}})
+	eq(t, status, 409)
+	m.pub("gateway/state", `{"protocol":"0.1","boot":10,"autopilot_link":"down","time":1794650310}`)
+	app.waitDevice(name, "link down", func(d api.DeviceDetail) bool { return strings.Contains(string(d.Gateway.State), `"down"`) })
+	status, sent, _ = app.sendCommand(name, map[string]any{"board": "gateway", "cmd": "ota", "params": map[string]any{"version": "0.5.0"}})
+	eq(t, status, 202)
+	eq(t, m.mustCmd("gateway", "ota").ID, sent.ID)
+	t.Logf("ota with the board link down and a stale job state: %d", status)
 }
 
 // Live driving: the browser's setpoint goes to autopilot/drive about 10 times
