@@ -12,9 +12,9 @@ import (
 // A path (§11): download over chunk transfer, check, follow, path.point, done.
 
 func (r *rig) twoSegmentPath(id string) []byte {
-	return pathFile(id, 0.6,
-		seg{false, [][2]float64{r.geo(1, 0), r.geo(2, 0)}},
-		seg{true, [][2]float64{r.geo(2, 0), r.geo(2, 1.5)}})
+	return pathFile(id,
+		seg{"transit", [][2]float64{r.geo(1, 0), r.geo(2, 0)}},
+		seg{"edge", [][2]float64{r.geo(2, 0), r.geo(2, 1.5)}})
 }
 
 // bigPath is a file of several chunks whose points all lie at the mower.
@@ -23,7 +23,7 @@ func (r *rig) bigPath(id string, points int) []byte {
 	for i := 0; i < points; i++ {
 		pts = append(pts, r.geo(0.01*float64(i%3), 0))
 	}
-	return pathFile(id, 0.5, seg{false, pts})
+	return pathFile(id, seg{"transit", pts})
 }
 
 func TestPathDownloadAndFollow(t *testing.T) {
@@ -193,11 +193,11 @@ func TestPathBadFiles(t *testing.T) {
 		"size differs":     {good, 1, "", "bad_path"},
 		"sha differs":      {good, 0, strings.Repeat("0", 64), "bad_path"},
 		"not json":         {func(*rig) []byte { return []byte("nope") }, 0, "", "bad_path"},
-		"other path id":    {func(r *rig) []byte { return pathFile("j-other", 0.5, seg{false, [][2]float64{r.geo(1, 0)}}) }, 0, "", "bad_path"},
-		"no segments":      {func(*rig) []byte { return pathFile("j-x", 0.5) }, 0, "", "bad_path"},
-		"empty segment":    {func(*rig) []byte { return pathFile("j-x", 0.5, seg{false, nil}) }, 0, "", "bad_path"},
-		"bad position":     {func(*rig) []byte { return pathFile("j-x", 0.5, seg{false, [][2]float64{{99, 0}}}) }, 0, "", "bad_path"},
-		"point not a pair": {func(*rig) []byte { return []byte(`{"path":"j-x","segments":[{"blade":false,"points":[[1]]}]}`) }, 0, "", "bad_path"},
+		"other path id":    {func(r *rig) []byte { return pathFile("j-other", seg{"transit", [][2]float64{r.geo(1, 0)}}) }, 0, "", "bad_path"},
+		"no segments":      {func(*rig) []byte { return pathFile("j-x") }, 0, "", "bad_path"},
+		"empty segment":    {func(*rig) []byte { return pathFile("j-x", seg{"transit", nil}) }, 0, "", "bad_path"},
+		"bad position":     {func(*rig) []byte { return pathFile("j-x", seg{"transit", [][2]float64{{99, 0}}}) }, 0, "", "bad_path"},
+		"point not a pair": {func(*rig) []byte { return []byte(`{"path":"j-x","segments":[{"type":"transit","points":[[1]]}]}`) }, 0, "", "bad_path"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newRig(t).online()
@@ -298,7 +298,7 @@ func TestPathFaultEndsWithFaultCode(t *testing.T) {
 // the path continues (resume after a pause by command or link).
 func TestPathBladeBackAfterResume(t *testing.T) {
 	r := newRig(t).online()
-	file := pathFile("j-b", 0.6, seg{true, [][2]float64{r.geo(0, 0.05), r.geo(0, 40)}})
+	file := pathFile("j-b", seg{"edge", [][2]float64{r.geo(0, 0.05), r.geo(0, 40)}})
 	r.startPath("j-b", file)
 	r.advance(4 * time.Second)
 	if !r.m.ap.blade || r.m.ap.mode != "path" {

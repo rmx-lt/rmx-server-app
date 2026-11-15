@@ -235,12 +235,12 @@ func (r *rig) geo(east, north float64) [2]float64 {
 }
 
 type seg struct {
-	Blade  bool         `json:"blade"`
+	Type   string       `json:"type"`
 	Points [][2]float64 `json:"points"`
 }
 
-func pathFile(id string, speed float64, segs ...seg) []byte {
-	b, _ := json.Marshal(map[string]any{"path": id, "speed": speed, "segments": segs})
+func pathFile(id string, segs ...seg) []byte {
+	b, _ := json.Marshal(map[string]any{"path": id, "segments": segs})
 	return b
 }
 

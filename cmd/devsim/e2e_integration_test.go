@@ -464,9 +464,9 @@ func TestMowerOverMQTT(t *testing.T) {
 		for i := 0; i < 400; i++ {
 			pad = append(pad, pt(0, 0))
 		}
-		file := pathFile("j-e2e", 0.6,
-			seg{false, append(pad, pt(0, 1.5))},
-			seg{true, [][2]float64{pt(0, 1.5), pt(1.5, 1.5)}})
+		file := pathFile("j-e2e",
+			seg{"transit", append(pad, pt(0, 1.5))},
+			seg{"edge", [][2]float64{pt(0, 1.5), pt(1.5, 1.5)}})
 		if len(file) < 2*chunkSize {
 			t.Fatalf("file of %d bytes", len(file))
 		}

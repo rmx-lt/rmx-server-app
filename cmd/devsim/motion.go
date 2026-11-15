@@ -29,13 +29,13 @@ type pathRun struct {
 	env        cmdEnv
 	returnMode string
 	reverse    bool
-	speed      float64 // limit from the command or the file; 0 = none
-	phase      string  // "download" or "drive"
+	phase      string // "download" or "drive"
 	pts        []pt2
-	bladeOn    []bool // blade while driving to point i
-	segFirst   []bool // point i opens a segment
-	idx        int    // the point being driven to
-	reached    int    // the last point reached, -1 before the first
+	bladeOn    []bool   // blade while driving to point i
+	types      []string // segment type of point i
+	segFirst   []bool   // point i opens a segment
+	idx        int      // the point being driven to
+	reached    int      // the last point reached, -1 before the first
 
 	pathID string
 	size   int64
@@ -278,10 +278,7 @@ func (a *autopilot) stepPath(now time.Time) {
 		h += 180
 	}
 	errDeg := wrap180(bearing - h)
-	vmax := maxSpeed
-	if p.speed > 0 {
-		vmax = math.Min(vmax, p.speed)
-	}
+	vmax := a.limitFor(p.types[p.idx]) // read every tick: a new limit applies at once
 	w := clamp(-errDeg*math.Pi/180*1.8, -1.2, 1.2)
 	v := 0.0
 	if math.Abs(errDeg) < 30 {

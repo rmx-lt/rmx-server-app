@@ -26,6 +26,8 @@ type boardStore struct {
 	Previous   *string     `json:"previous"`
 	Partition  string      `json:"partition"`
 	PendingOTA *pendingOTA `json:"pending_ota,omitempty"`
+	// SpeedLimit holds the limits the server has set (autopilot); a limit not in it has its default.
+	SpeedLimit map[string]float64 `json:"speed_limit,omitempty"`
 }
 
 type storeFile struct {
