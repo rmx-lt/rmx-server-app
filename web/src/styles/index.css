@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import 'material-symbols/outlined.css';
 
 /*
  * Theme tokens, defined once. `@theme` makes each one a utility (bg-surface,

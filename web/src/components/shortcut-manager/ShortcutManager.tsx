@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { shortcutRegistry, shortcutBlockers } from "@/hooks/shortcut-manager/useShortcut";
 import { matchesShortcut } from "@/utils/parseShortcut";
-import { useMenuStore } from "@/components/menu-bar/menuStore";
 
 /**
  * Renderless component — mount once in the app shell.
@@ -16,8 +15,6 @@ export default function ShortcutManager() {
         if (!matchesShortcut(e, entry.parsed)) continue;
 
         e.preventDefault();
-
-        useMenuStore.getState().setActiveMenu(null);
 
         entry.handler();
         break;

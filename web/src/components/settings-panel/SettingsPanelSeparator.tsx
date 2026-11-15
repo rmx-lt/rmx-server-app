@@ -3,12 +3,5 @@ interface SettingsPanelSeparatorProps {
 }
 
 export default function SettingsPanelSeparator({ label }: SettingsPanelSeparatorProps) {
-    return (
-        <div className="flex items-center gap-2 px-3 py-1 mt-0.5">
-            <span className="text-[10px] font-semibold text-faint uppercase tracking-wider select-none whitespace-nowrap">
-                {label}
-            </span>
-            <div className="flex-1 h-px bg-hover" />
-        </div>
-    );
+    return <h3 className="mt-5 mb-1 border-b border-line pb-1.5 text-xs font-medium text-faint select-none first:mt-0">{label}</h3>;
 }

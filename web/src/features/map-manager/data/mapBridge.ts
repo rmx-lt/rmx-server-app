@@ -1,10 +1,12 @@
-import { createMap, listMaps, loadMap, type MapContent } from "@/data/planning/maps";
+import { createMap, deleteMap, listMaps, loadMap, renameMap, type MapContent } from "@/data/planning/maps";
 import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import type { MapInfo } from "@/data/planning/schemaTypes";
 import { useMapStore } from "@/model/mapStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
+import { useMapListStore } from "@/model/mapListStore";
+import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 import { currentMapContent, flushSave, resetSave } from "@/features/canvas-editing/data/canvasBridge";
 
 // Opening, starting and duplicating maps. The maps live on the server
@@ -36,6 +38,7 @@ function showMap(content: MapContent): void {
     useCanvasHistoryStore.getState().resetHistory();
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
     resetSave();
+    void useMapListStore.getState().refresh();
 }
 
 /** Creates a blank map on the server, placed at the user's default geo anchor. Returns its id. */
@@ -62,9 +65,38 @@ export async function newMap(): Promise<void> {
     showMap(await loadMap(await createBlankMap()));
 }
 
-/** Makes a copy of the open map on the server and opens it. */
-export async function duplicateMap(): Promise<void> {
+/** Makes a copy of a map ("name (copy)") on the server and opens it. */
+export async function duplicateMap(mapId: number): Promise<void> {
     await flushSave();
-    const content = currentMapContent();
+    const content = mapId === useMapStore.getState().map.id ? currentMapContent() : await loadMap(mapId);
     showMap(await loadMap(await createMap(content, `${content.map.name} (copy)`)));
+}
+
+/** Renames a map. The open one changes in the store and is saved by the autosave. */
+export async function renameMapById(mapId: number, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (mapId === useMapStore.getState().map.id) useMapStore.getState().setName(trimmed);
+    else {
+        await renameMap(mapId, trimmed);
+        await useMapListStore.getState().refresh();
+    }
+}
+
+/** Asks first, then deletes a map; deleting the open one opens the next (or makes a new one). */
+export function requestDeleteMap(mapId: number, name: string): void {
+    useConfirmationModalStore.getState().requestConfirmation({
+        title: "Delete map",
+        message: `Delete "${name}"? This cannot be undone.`,
+        tone: "danger",
+        confirmLabel: "Delete",
+        confirmAction: async () => {
+            const wasOpen = mapId === useMapStore.getState().map.id;
+            // Nothing of a map that is going away is saved.
+            if (wasOpen) resetSave();
+            await deleteMap(mapId);
+            if (wasOpen) await openLatestMap();
+            else await useMapListStore.getState().refresh();
+        },
+    });
 }
