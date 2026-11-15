@@ -6,6 +6,7 @@ import type { DeviceSummary } from "./DeviceSummary";
 import type { KeyStatus } from "./KeyStatus";
 import type { LatestValue } from "./LatestValue";
 import type { MetricPoint } from "./MetricPoint";
+import type { MonitorState } from "./MonitorState";
 
 /**
  * RpcData is the payload of a successful answer.
@@ -58,4 +59,22 @@ export type RpcData =
      * True when more points matched than the limit allows; the newest are returned.
      */
     truncated: boolean,
+  }
+  | {
+    "kind": "monitor_watching",
+    device: string,
+    board: Board,
+    session: string,
+    state: MonitorState,
+    metrics: Array<string>,
+    rate: number,
+    /**
+     * The board's budget for the sum of metrics x rate over all its streams,
+     * and how much of it is used, from its last monitor_start ack; null before the first.
+     */
+    budget: number | null,
+    used: number | null,
+  }
+  | {
+    "kind": "done",
   };

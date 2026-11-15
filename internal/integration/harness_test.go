@@ -149,6 +149,8 @@ type appOptions struct {
 	jobDir      string
 	// env sets more settings (the NTRIP_* variables).
 	env map[string]string
+	// sameDatabase: the pool already has the test user (a second server on it).
+	sameDatabase bool
 }
 
 func startAppWith(t *testing.T, pool *db.Pool, staticDir string) *testApp {
@@ -194,8 +196,10 @@ func startAppOptions(t *testing.T, pool *db.Pool, opts appOptions) *testApp {
 	t.Cleanup(func() { app.shutdown() })
 
 	app.waitHealthy()
-	if err := auth.CreateUser(context.Background(), pool, user, password); err != nil {
-		t.Fatal(err)
+	if !opts.sameDatabase {
+		if err := auth.CreateUser(context.Background(), pool, user, password); err != nil {
+			t.Fatal(err)
+		}
 	}
 	res := app.login(user, password)
 	if res.StatusCode != 200 {

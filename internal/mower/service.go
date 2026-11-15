@@ -15,6 +15,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/rmx-lt/rmx-server-app/internal/api"
@@ -37,28 +38,77 @@ type Pusher interface {
 	Push(api.ServerMessage)
 }
 
-// Service ingests what the mowers publish and answers questions about it.
+// Service ingests what the mowers publish, answers questions about it, and
+// sends the mowers their commands.
 type Service struct {
 	pool *db.Pool
 	push Pusher
 	// now is the clock; tests replace it.
 	now func() time.Time
+
+	// pub publishes commands and setpoints; set by Connect.
+	pub Publisher
+	// cmds holds the commands waiting for an ack, mon the monitor streams,
+	// drv the live-driving setpoints, ntrip the caster settings (all in memory;
+	// the commands themselves are in the database).
+	cmds  commander
+	mon   monitors
+	drv   driving
+	ntrip *ntripSync
+	// base is the context of Run, for work that outlives a request.
+	base atomic.Pointer[context.Context]
 }
 
 // New returns the service. pool may be nil in tests that never reach the
 // database; push may be nil (nothing is pushed).
 func New(pool *db.Pool, push Pusher) *Service {
-	return &Service{pool: pool, push: push, now: func() time.Time { return time.Now().UTC() }}
+	s := &Service{pool: pool, push: push, now: func() time.Time { return time.Now().UTC() }}
+	s.cmds.open = map[string]*pending{}
+	if pool != nil {
+		s.cmds.ledger = dbLedger{pool}
+	}
+	s.mon.init()
+	s.drv.init()
+	return s
 }
 
+// Connect gives the service the connection it publishes commands on. Call it
+// before Run.
+func (s *Service) Connect(pub Publisher) { s.pub = pub }
+
+// Run sends again the commands that get no ack, keeps the monitor streams
+// alive, and returns when ctx ends. Commands that were open when the server
+// last stopped are closed with an unknown outcome first.
+func (s *Service) Run(ctx context.Context) {
+	s.base.Store(&ctx)
+	s.recoverOpen(ctx)
+	tick := time.NewTicker(tickInterval)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			s.tick(ctx, s.now())
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// runCtx is the context of Run, or a background one when Run has not started.
+func (s *Service) runCtx() context.Context {
+	if c := s.base.Load(); c != nil {
+		return *c
+	}
+	return context.Background()
+}
+
+// send pushes a message to every open WebSocket.
 func (s *Service) send(msg any) {
 	if s.push == nil {
 		return
 	}
 	switch m := msg.(type) {
-	case api.MsgDeviceChanged:
-		s.push.Push(api.ServerMessage{V: m})
-	case api.MsgTelemetry:
+	case api.MsgDeviceChanged, api.MsgTelemetry, api.MsgCommand, api.MsgMonitor, api.MsgMonitorSamples:
 		s.push.Push(api.ServerMessage{V: m})
 	}
 }
@@ -76,7 +126,7 @@ func (s *Service) changed(device core.DeviceID, board *api.Board, change string)
 func (s *Service) HandleMessage(ctx context.Context, device core.DeviceID, suffix string, payload []byte) {
 	board, kind, part := parseSuffix(suffix)
 	if kind == topicOther {
-		return // commands, acks, monitor, chunk transfer: other features
+		return // commands, recording, chunk transfer: not handled here
 	}
 	if len(payload) == 0 {
 		return // an emptied retained topic
@@ -98,6 +148,10 @@ func (s *Service) HandleMessage(ctx context.Context, device core.DeviceID, suffi
 		err = s.ingestEvent(ctx, device, board, payload)
 	case topicMetrics:
 		err = s.ingestCatalogue(ctx, device, board, part, payload)
+	case topicAck:
+		err = s.ingestAck(ctx, device, board, payload)
+	case topicMonitor:
+		err = s.ingestSamples(device, board, payload)
 	}
 	var bad badMessage
 	switch {
@@ -155,9 +209,13 @@ func (s *Service) ingestState(ctx context.Context, device core.DeviceID, board a
 	})
 	if err == nil {
 		if restarted {
+			s.boardRestarted(ctx, device, board)
 			s.changed(device, &board, "boot")
 		}
 		s.changed(device, &board, "state")
+		if board == api.BoardGateway {
+			s.syncNTRIP(ctx, device, st)
+		}
 	}
 	return err
 }
@@ -188,6 +246,7 @@ func (s *Service) ingestTelemetry(ctx context.Context, device core.DeviceID, boa
 		return err
 	}
 	if restarted {
+		s.boardRestarted(ctx, device, board)
 		s.changed(device, &board, "boot")
 	}
 	values := make([]api.MetricValue, len(t.Readings))
@@ -220,6 +279,7 @@ func (s *Service) ingestEvent(ctx context.Context, device core.DeviceID, board a
 		return err
 	}
 	if restarted {
+		s.boardRestarted(ctx, device, board)
 		s.changed(device, &board, "boot")
 	}
 	if fresh {

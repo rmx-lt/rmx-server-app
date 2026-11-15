@@ -73,6 +73,8 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	mq := mqtt.New(cfg.MQTT)
 	transfer.RegisterMQTT(mq, files)
 	mower.Register(mq, mowerSvc)
+	mowerSvc.Connect(mq)
+	mowerSvc.SetNTRIP(cfg.NTRIP, cfg.MQTT.Password)
 	static, closeStatic := openStatic(cfg.StaticDir)
 	defer closeStatic()
 
@@ -80,10 +82,14 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	a := &app{cfg: cfg, pool: pool, auth: authSvc, planning: planning.New(pool), mower: mowerSvc, mqtt: mq, ws: sockets, static: static}
 
 	var background sync.WaitGroup
-	background.Add(1)
+	background.Add(2)
 	go func() {
 		defer background.Done()
 		authSvc.DeleteExpiredHourly(ctx)
+	}()
+	go func() {
+		defer background.Done()
+		mowerSvc.Run(ctx)
 	}()
 
 	srv := &http.Server{
