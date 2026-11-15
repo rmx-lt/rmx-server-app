@@ -1,3 +1,3 @@
 export default function MenuSeparator() {
-  return <div className="my-1 border-t border-gray-300 select-none"></div>;
+  return <div className="my-1 border-t border-line-strong select-none"></div>;
 }

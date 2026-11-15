@@ -28,7 +28,7 @@ export function App() {
     };
   }, []);
 
-  if (state === "checking") return <p className="min-h-full bg-zinc-950 p-4 text-sm text-zinc-400">Connecting to the server…</p>;
+  if (state === "checking") return <p className="min-h-full bg-page p-4 text-sm text-muted">Connecting to the server…</p>;
   if (state === "logged-out") return <LoginForm />;
   return <Workbench />;
 }

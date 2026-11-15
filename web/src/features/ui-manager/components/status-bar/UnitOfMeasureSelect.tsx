@@ -18,18 +18,18 @@ export default function UnitOfMeasureSelect() {
     return (
         <Listbox value={unitOfMeasure} onChange={(next) => { setUnitOfMeasure(next).catch(console.error); }}>
             <div className="relative">
-                <ListboxButton title="Unit of measure" className="group flex items-center h-5 w-full rounded px-1.5 text-xs text-gray-500 hover:bg-gray-200 transition-colors cursor-pointer select-none">
+                <ListboxButton title="Unit of measure" className="group flex items-center h-5 w-full rounded px-1.5 text-xs text-muted hover:bg-hover transition-colors cursor-pointer select-none">
                     <span className="flex items-center gap-0.5 justify-between">
                         <span>{selectedLabel}</span>
                     </span>
                 </ListboxButton>
 
-                <ListboxOptions className="absolute right-0 bottom-full mb-1 min-w-full border border-gray-300 rounded shadow-md bg-white outline-none z-50 overflow-hidden">
+                <ListboxOptions className="absolute right-0 bottom-full mb-1 min-w-full border border-line-strong rounded shadow-md bg-surface outline-none z-50 overflow-hidden">
                     {OPTIONS.map((option) => (
                         <ListboxOption
                             key={option.value}
                             value={option.value}
-                            className="px-3 py-1.5 text-sm cursor-pointer transition-colors border-b border-gray-100 last:border-b-0 text-gray-700 data-focus:bg-teal-600 data-focus:text-white data-selected:bg-teal-600 data-selected:text-white"
+                            className="px-3 py-1.5 text-sm cursor-pointer transition-colors border-b border-line last:border-b-0 text-fg data-focus:bg-accent data-focus:text-on-accent data-selected:bg-accent data-selected:text-on-accent"
                         >
                             {option.label}
                         </ListboxOption>

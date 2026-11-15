@@ -49,14 +49,14 @@ export default function MenuBarButton({
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onKeyDown={handleKeyDown}
-        className={`flex items-center h-7 px-3 text-base text-gray-700 rounded hover:bg-gray-200 active:bg-gray-300 cursor-pointer select-none ${isOpen ? "bg-gray-200" : ""}`}
+        className={`flex items-center h-7 px-3 text-base text-fg rounded hover:bg-hover active:bg-pressed cursor-pointer select-none ${isOpen ? "bg-hover" : ""}`}
       >
         {label}
       </button>
 
       {/* Submenu Dropdown */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-0 bg-white border border-gray-300 rounded shadow-lg z-20 min-w-max">
+        <div className="absolute left-0 top-full mt-0 bg-surface border border-line-strong rounded shadow-lg z-20 min-w-max">
           {submenu}
         </div>
       )}

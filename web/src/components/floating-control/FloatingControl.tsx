@@ -156,7 +156,7 @@ export default function FloatingControl({
     return (
         <div
             ref={windowRef}
-            className="absolute w-64 bg-gray-100 border border-gray-300 rounded shadow-md select-none"
+            className="absolute w-64 bg-raised border border-line-strong rounded shadow-md select-none"
             style={{ left: pos.x, top: pos.y, zIndex }}
             onMouseDown={(e) => { e.stopPropagation(); bringToFront(id); if (hideHeader) handleHeaderMouseDown(e); }}
             onKeyDown={(e) => e.stopPropagation()}
@@ -164,10 +164,10 @@ export default function FloatingControl({
             {/* Header */}
             {!hideHeader && (
                 <div
-                    className="flex items-center gap-1 px-3 h-8 border-b border-gray-300 rounded-t cursor-grab active:cursor-grabbing"
+                    className="flex items-center gap-1 px-3 h-8 border-b border-line-strong rounded-t cursor-grab active:cursor-grabbing"
                     onMouseDown={handleHeaderMouseDown}
                 >
-                    <span className="flex-1 text-xs font-semibold text-gray-700 truncate select-none">
+                    <span className="flex-1 text-xs font-semibold text-fg truncate select-none">
                         {title}
                     </span>
 
@@ -176,7 +176,7 @@ export default function FloatingControl({
                         type="button"
                         aria-label={minimized ? "Expand" : "Minimize"}
                         onClick={() => setMinimized((m) => !m)}
-                        className="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-200 active:bg-gray-300 transition-colors focus:outline-none cursor-pointer"
+                        className="flex items-center justify-center w-5 h-5 rounded text-faint hover:text-fg hover:bg-hover active:bg-pressed transition-colors focus:outline-none cursor-pointer"
                     >
                         <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>
                             {minimized ? "expand_more" : "expand_less"}
@@ -188,7 +188,7 @@ export default function FloatingControl({
                         type="button"
                         aria-label="Close"
                         onClick={onClose}
-                        className="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-red-600 hover:bg-red-100 active:bg-red-200 transition-colors focus:outline-none cursor-pointer"
+                        className="flex items-center justify-center w-5 h-5 rounded text-faint hover:text-danger hover:bg-danger-soft active:bg-danger-soft transition-colors focus:outline-none cursor-pointer"
                     >
                         <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>
                             close
@@ -199,7 +199,7 @@ export default function FloatingControl({
 
             {/* Body */}
             {(hideHeader || !minimized) && (
-                <div className={`flex flex-col bg-gray-50 py-2${hideHeader ? " rounded cursor-grab active:cursor-grabbing" : ""}`}>
+                <div className={`flex flex-col bg-page py-2${hideHeader ? " rounded cursor-grab active:cursor-grabbing" : ""}`}>
                     {children}
                 </div>
             )}

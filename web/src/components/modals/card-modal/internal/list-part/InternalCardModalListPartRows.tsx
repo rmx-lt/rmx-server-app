@@ -46,7 +46,7 @@ function InternalCardModalListPartCell({
     onStartEditing?: () => void;
     onStopEditing: () => void;
 }) {
-    const displayValue = cell?.value ?? cell?.emptyValue ?? <span className="text-gray-300">—</span>;
+    const displayValue = cell?.value ?? cell?.emptyValue ?? <span className="text-faint">—</span>;
     const toneClassName = getToneClassName(cell?.tone);
     const monoClassName = cell?.mono ? "font-mono" : "";
 
@@ -85,7 +85,7 @@ function InternalCardModalListPartCell({
                                 onStopEditing();
                             }
                         }}
-                        className="w-full px-2 py-1 text-sm border border-teal-600 rounded bg-white text-gray-800 focus:outline-none"
+                        className="w-full px-2 py-1 text-sm border border-accent rounded bg-surface text-fg focus:outline-none"
                     />
                 ) : (
                     <span className={`truncate ${toneClassName} ${monoClassName}`.trim()} title={cell?.title}>
@@ -111,23 +111,23 @@ export function InternalCardModalListPartGroupRow({
     dataColumns,
 }: InternalCardModalListPartGroupRowProps) {
     return (
-        <div className="grid w-full items-stretch bg-gray-50" style={{ gridTemplateColumns }}>
+        <div className="grid w-full items-stretch bg-page" style={{ gridTemplateColumns }}>
             <button
                 type="button"
                 onClick={row.onToggle}
-                className="flex items-center justify-center border-r border-gray-200 text-gray-400 hover:text-gray-600 cursor-pointer"
+                className="flex items-center justify-center border-r border-line text-faint hover:text-muted cursor-pointer"
                 title={row.expanded ? "Collapse group" : "Expand group"}
             >
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                     {row.expanded ? "expand_more" : "chevron_right"}
                 </span>
             </button>
-            <div className="flex min-w-0 items-center px-3 py-2 border-r border-gray-200 text-sm font-semibold text-gray-700">
+            <div className="flex min-w-0 items-center px-3 py-2 border-r border-line text-sm font-semibold text-fg">
                 <span className="truncate" style={{ paddingLeft: depth * ROW_INDENT_STEP }} title={typeof row.label === "string" ? row.label : undefined}>
                     {row.label}
                 </span>
             </div>
-            <div className="border-r border-gray-200" />
+            <div className="border-r border-line" />
             {dataColumns.map((column) => (
                 <InternalCardModalListPartCell
                     key={`${row.id}-${column.id}`}
@@ -135,7 +135,7 @@ export function InternalCardModalListPartGroupRow({
                     editable={false}
                     isEditing={false}
                     isCellEditable={false}
-                    wrapperClassName="flex min-w-0 items-center px-3 py-2 border-r last:border-r-0 border-gray-200 text-sm text-gray-500"
+                    wrapperClassName="flex min-w-0 items-center px-3 py-2 border-r last:border-r-0 border-line text-sm text-muted"
                     contentClassName="flex min-w-0 w-full items-center"
                     onStopEditing={() => undefined}
                 />
@@ -180,10 +180,10 @@ export function InternalCardModalListPartRecordRow({
     const isSelected = selectedRowIdSet.has(row.id);
     const selectedIndicatorIcon = selectedRowIds.length > 1 ? "check_circle" : "arrow_forward";
     const hoverIndicatorIcon = selectedRowIds.length > 1 ? "circle" : "arrow_forward";
-    const rowTextClassName = editable ? "text-gray-700" : "text-gray-500";
+    const rowTextClassName = editable ? "text-fg" : "text-muted";
     const rowBackgroundClassName = editable
-        ? "bg-white hover:bg-gray-50"
-        : "bg-gray-50 hover:bg-gray-100";
+        ? "bg-surface hover:bg-page"
+        : "bg-page hover:bg-raised";
     const mainColumnCell = row.cells[mainColumn.id];
     const isMainColumnEditing = editingCell?.rowId === row.id && editingCell.columnId === mainColumn.id;
     const isMainColumnEditable = isEditableCell(editable, mainColumn, mainColumnCell);
@@ -211,7 +211,7 @@ export function InternalCardModalListPartRecordRow({
 
                     onRowSelection(event, row.id);
                 }}
-                className={`flex items-center justify-center border-r border-gray-200 cursor-pointer ${isSelected ? "text-teal-600" : "text-gray-300"}`}
+                className={`flex items-center justify-center border-r border-line cursor-pointer ${isSelected ? "text-accent" : "text-faint"}`}
                 title={isSelected ? "Deselect row" : "Select row"}
             >
                 {isSelected ? (
@@ -229,18 +229,18 @@ export function InternalCardModalListPartRecordRow({
                 editable={editable}
                 isEditing={isMainColumnEditing}
                 isCellEditable={isMainColumnEditable}
-                wrapperClassName={`flex min-w-0 items-center px-3 py-2 border-r border-gray-200 text-sm ${rowTextClassName}`}
+                wrapperClassName={`flex min-w-0 items-center px-3 py-2 border-r border-line text-sm ${rowTextClassName}`}
                 contentClassName="flex min-w-0 w-full items-center"
                 indentPx={depth * ROW_INDENT_STEP}
                 onStartEditing={() => onSetEditingCell({ rowId: row.id, columnId: mainColumn.id })}
                 onStopEditing={onClearEditingCell}
             />
-            <div className="flex items-center justify-center border-r border-gray-200">
+            <div className="flex items-center justify-center border-r border-line">
                 {row.actions && row.actions.length > 0 ? (
                     <button
                         type="button"
                         onClick={(event) => onMoreClick(event, row.id)}
-                        className={`flex items-center justify-center w-7 h-7 rounded transition-opacity cursor-pointer ${isSelected ? "opacity-100 text-teal-600 hover:text-teal-700 hover:bg-gray-100" : openMenuRowId === row.id ? "opacity-100 text-gray-600 bg-gray-100" : "opacity-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100 group-hover:opacity-100"}`}
+                        className={`flex items-center justify-center w-7 h-7 rounded transition-opacity cursor-pointer ${isSelected ? "opacity-100 text-accent hover:text-accent hover:bg-raised" : openMenuRowId === row.id ? "opacity-100 text-muted bg-raised" : "opacity-0 text-faint hover:text-fg hover:bg-raised group-hover:opacity-100"}`}
                         title="Record actions"
                     >
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>more_vert</span>
@@ -259,7 +259,7 @@ export function InternalCardModalListPartRecordRow({
                         editable={editable}
                         isEditing={isEditing}
                         isCellEditable={isCellEditable}
-                        wrapperClassName={`flex min-w-0 items-center px-3 py-2 border-r last:border-r-0 border-gray-200 text-sm justify-start text-left ${rowTextClassName}`}
+                        wrapperClassName={`flex min-w-0 items-center px-3 py-2 border-r last:border-r-0 border-line text-sm justify-start text-left ${rowTextClassName}`}
                         contentClassName="flex min-w-0 w-full items-center"
                         onStartEditing={() => onSetEditingCell({ rowId: row.id, columnId: column.id })}
                         onStopEditing={onClearEditingCell}

@@ -6,6 +6,7 @@ import type { Zone } from "@/data/planning/schemaTypes";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import type { ZoneCategory } from "@/config/db-ops/enums";
 import { LAYER_STYLE } from "@/config/canvas-editing/canvasConfig";
+import { useCanvasColors } from "@/hooks/useTheme";
 
 interface CanvasPolygonObjectsLayerProps {
     category: ZoneCategory;
@@ -42,7 +43,8 @@ export function CanvasPolygonObjectsLayerInner({
     // Coordinates onDragStart/onDragEnd: only true when a left-button drag is active.
     const primaryDragRef = useRef(false);
 
-    const { stroke, fill, edgeWidth } = LAYER_STYLE[category];
+    const { stroke, fill } = useCanvasColors()[category];
+    const { edgeWidth } = LAYER_STYLE[category];
     const layerObjects = objects.filter((obj) => obj.category === category);
 
     return (

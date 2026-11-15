@@ -26,18 +26,12 @@ export const ZOOM_MAX = 8;
 export const ZOOM_STEP = 0.1;
 export const ZOOM_FACTOR = 1.15;
 
-export const COLOR_VERTEX_FILL = "#ffffff";
-export const COLOR_VERTEX_SELECTED_STROKE = "#2b7fff";
-
-export const COLOR_EDGE_MIDPOINT_FILL = "rgba(255,255,255,0.8)";
-export const COLOR_EDGE_MIDPOINT_STROKE = "#94a3b8";
-
 /**
- * Layer styles. Users cannot change them; the code sets what is visible.
+ * Layer widths. Users cannot change them; the code sets what is visible. The
+ * colours come from the theme (`readCanvasColors` in src/utils/theme.ts).
  * Layers are drawn in this order, grid first.
  */
 export const LAYER_STYLE = {
-    grid: { lineColor: "#e2e8f0" },
-    mowing: { stroke: "#22c55e", fill: "#22c55e2e", edgeWidth: 1.5 },
-    no_go: { stroke: "#ef4444", fill: "#ef44443b", edgeWidth: 1.5 },
+    mowing: { edgeWidth: 1.5 },
+    no_go: { edgeWidth: 1.5 },
 } as const;

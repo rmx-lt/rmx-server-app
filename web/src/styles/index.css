@@ -1,6 +1,88 @@
+@import "tailwindcss";
 @import 'material-symbols/outlined.css';
 
+/*
+ * Theme tokens, defined once. `@theme` makes each one a utility (bg-surface,
+ * text-fg, border-line, ...) and a CSS variable. The values below are the light
+ * set; the dark set overrides them under data-theme="dark". The attribute is set
+ * before first paint by the script in public/index.html and by src/utils/theme.ts.
+ * Warm neutrals and one accent, after the Claude desktop app. `static` keeps the
+ * canvas tokens, which only JS reads, in the output.
+ */
+@theme static {
+    --color-page: #f0eee6; /* app background, behind panels; canvas */
+    --color-surface: #faf9f5; /* panels, bars, menus, modals, inputs */
+    --color-raised: #f0eee6; /* resting buttons, tabs, fields on a surface */
+    --color-hover: #e8e6dc;
+    --color-pressed: #ddd9cc;
+    --color-line: #e5e2d8;
+    --color-line-strong: #cdc9bb;
+    --color-fg: #1f1e1d;
+    --color-muted: #5e5d59;
+    --color-faint: #87867f; /* placeholders, disabled, quiet icons */
+    --color-accent: #b4532f;
+    --color-accent-hover: #9e4725;
+    --color-on-accent: #ffffff;
+    --color-danger: #b3261e;
+    --color-danger-soft: #fbeae8;
+    --color-ok: #2f7d46;
+    --color-warn: #a86a0c;
+    --color-overlay: #1f1e1d66;
+
+    /* Canvas (read by Konva through src/utils/theme.ts, so hex only) */
+    --color-canvas-grid: #e0ddd0;
+    --color-canvas-mowing: #1f8a4c;
+    --color-canvas-mowing-fill: #1f8a4c33;
+    --color-canvas-no-go: #cf3425;
+    --color-canvas-no-go-fill: #cf34253d;
+    --color-canvas-handle: #ffffff;
+    --color-canvas-midpoint: #ffffffcc;
+    --color-canvas-midpoint-edge: #8f8c80;
+}
+
+:root[data-theme="dark"] {
+    --color-page: #1f1e1d;
+    --color-surface: #262624;
+    --color-raised: #30302e;
+    --color-hover: #3a3936;
+    --color-pressed: #46443f;
+    --color-line: #3a3935;
+    --color-line-strong: #55534d;
+    --color-fg: #f0eee6;
+    --color-muted: #b0aea5;
+    --color-faint: #86847c;
+    --color-accent: #d97757;
+    --color-accent-hover: #e58b6d;
+    --color-on-accent: #1f1e1d;
+    --color-danger: #f0867c;
+    --color-danger-soft: #3d2523;
+    --color-ok: #6cc384;
+    --color-warn: #e3b251;
+    --color-overlay: #00000099;
+
+    --color-canvas-grid: #34332f;
+    --color-canvas-mowing: #4fd184;
+    --color-canvas-mowing-fill: #4fd18438;
+    --color-canvas-no-go: #ff6b5e;
+    --color-canvas-no-go-fill: #ff6b5e45;
+    --color-canvas-handle: #f0eee6;
+    --color-canvas-midpoint: #f0eee6cc;
+    --color-canvas-midpoint-edge: #8a877e;
+}
+
+:root {
+    color-scheme: light;
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+body {
+    background-color: var(--color-page);
+    color: var(--color-fg);
+}
+
 ::selection {
-    background-color: #0d9488; /* teal-600 */
-    color: #ffffff;
+    background-color: var(--color-accent);
+    color: var(--color-on-accent);
 }

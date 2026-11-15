@@ -49,11 +49,11 @@ export default function ToolBarMoreButton({ groups }: Props) {
             />
 
             {isOpen && (
-                <div className="absolute top-full left-0 mt-1 z-50 min-w-max rounded border border-gray-300 bg-white shadow-lg py-1">
+                <div className="absolute top-full left-0 mt-1 z-50 min-w-max rounded border border-line-strong bg-surface shadow-lg py-1">
                     {groups.map((group, groupIdx) => (
                         <div key={group.id}>
                             {groupIdx > 0 && (
-                                <hr className="my-1 border-gray-200" />
+                                <hr className="my-1 border-line" />
                             )}
                             {group.overflowItems.map((item) => (
                                 <button
@@ -64,10 +64,10 @@ export default function ToolBarMoreButton({ groups }: Props) {
                                         item.onClick();
                                         setIsOpen(false);
                                     }}
-                                    className="flex items-center gap-2 w-full px-3 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+                                    className="flex items-center gap-2 w-full px-3 py-1 text-xs text-fg hover:bg-raised disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
                                 >
                                     <span
-                                        className={`material-symbols-outlined text-base leading-none${item.isActive ? " text-teal-700" : ""}`}
+                                        className={`material-symbols-outlined text-base leading-none${item.isActive ? " text-accent" : ""}`}
                                     >
                                         {item.icon}
                                     </span>

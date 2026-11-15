@@ -11,10 +11,10 @@ export function toTitleCase(value: string) {
 export function getToneClassName(tone: CardModalListPartCell["tone"] = "default") {
     switch (tone) {
         case "muted":
-            return "text-gray-400";
+            return "text-faint";
         case "subtle":
-            return "text-gray-300";
+            return "text-faint";
         default:
-            return "text-gray-800";
+            return "text-fg";
     }
 }

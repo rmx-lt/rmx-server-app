@@ -247,7 +247,7 @@ export default function CanvasEditor() {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full bg-white overflow-hidden outline-none relative"
+      className="w-full h-full bg-page overflow-hidden outline-none relative"
       style={{ cursor: resolveCursor() }}
       tabIndex={0}
       onKeyDown={handleKeyDown}

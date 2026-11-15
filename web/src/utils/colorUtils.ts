@@ -1,6 +1,6 @@
 /** Returns an active/selected fill shade — darker for light fills, lighter for dark fills. */
 export function deriveActiveFill(hex: string): string {
-    if (hex.length !== 7) return "#cbd5e1";
+    if (hex.length !== 7) return hex;
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);

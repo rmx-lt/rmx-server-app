@@ -7,7 +7,7 @@ export default function InspectorPanelSectionTitle({
 }: InspectorPanelSectionTitleProps) {
   return (
     <div className="w-full flex items-center px-4 pt-3">
-      <span className="text-sm font-medium text-gray-700">{title}</span>
+      <span className="text-sm font-medium text-fg">{title}</span>
     </div>
   );
 }

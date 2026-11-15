@@ -4,12 +4,8 @@ import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canv
 import type { Zone } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import {
-    COLOR_VERTEX_FILL,
-    COLOR_EDGE_MIDPOINT_FILL,
-    COLOR_EDGE_MIDPOINT_STROKE,
-    LAYER_STYLE,
-} from "@/config/canvas-editing/canvasConfig";
+import { LAYER_STYLE } from "@/config/canvas-editing/canvasConfig";
+import { useCanvasColors } from "@/hooks/useTheme";
 import { deriveActiveFill } from "@/utils/colorUtils";
 import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
 
@@ -43,7 +39,9 @@ export function CanvasVertexHandlesLayerInner({
     onHandleHoverChange,
 }: CanvasVertexHandlesLayerProps) {
     const category = (selectedObject?.category ?? ZONE_CATEGORY.MOWING) as ZoneCategory;
-    const { stroke: accentColor, edgeWidth } = LAYER_STYLE[category];
+    const colors = useCanvasColors();
+    const accentColor = colors[category].stroke;
+    const { edgeWidth } = LAYER_STYLE[category];
     const isLayerListening = activeTool === "select" && selectedObject !== null;
     const edgeMidpoints = selectedObject ? computeEdgeMidpoints(selectedObjectVertices) : [];
     if (!selectedObject) return <Layer />;
@@ -52,7 +50,7 @@ export function CanvasVertexHandlesLayerInner({
     const vertexStrokeActive = Math.max(3, edgeWidth * 0.6) / scale;
     const midpointRadius = Math.max(4, edgeWidth) / scale;
     const midpointStroke = Math.max(1.5, edgeWidth * 0.3) / scale;
-    const activeFill = deriveActiveFill(COLOR_VERTEX_FILL);
+    const activeFill = deriveActiveFill(colors.handle);
 
     return (
         <Layer listening={isLayerListening}>
@@ -71,7 +69,7 @@ export function CanvasVertexHandlesLayerInner({
                         x={v.x}
                         y={v.y}
                         radius={vertexRadius}
-                        fill={isActiveVertex ? activeFill : COLOR_VERTEX_FILL}
+                        fill={isActiveVertex ? activeFill : colors.handle}
                         stroke={accentColor}
                         strokeWidth={isActiveVertex ? vertexStrokeActive : vertexStrokeNormal}
                         draggable
@@ -90,8 +88,8 @@ export function CanvasVertexHandlesLayerInner({
                         x={mid.x}
                         y={mid.y}
                         radius={midpointRadius}
-                        fill={COLOR_EDGE_MIDPOINT_FILL}
-                        stroke={COLOR_EDGE_MIDPOINT_STROKE}
+                        fill={colors.midpoint}
+                        stroke={colors.midpointEdge}
                         strokeWidth={midpointStroke}
                         onMouseDown={(e) => {
                             e.cancelBubble = true;

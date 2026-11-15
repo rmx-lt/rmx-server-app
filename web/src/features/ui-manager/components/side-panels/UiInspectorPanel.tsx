@@ -161,7 +161,7 @@ export default function UiInspectorPanel({ children }: UiInspectorPanelProps) {
     <div
       ref={panelRef}
       style={{ width: hidden ? 0 : `${width}px` }}
-      className="relative flex flex-col h-full shrink-0 bg-gray-100 overflow-hidden select-none pointer-events-auto"
+      className="relative flex flex-col h-full shrink-0 bg-raised overflow-hidden select-none pointer-events-auto"
     >
       {!hidden && (
         <>
@@ -173,8 +173,8 @@ export default function UiInspectorPanel({ children }: UiInspectorPanelProps) {
           >
             <div
               className={`absolute left-0 top-0 bottom-0 pointer-events-none transition-[width,background-color] delay-0 ${isResizing
-                ? "w-1 bg-teal-600"
-                : "w-px bg-gray-300 group-hover:w-1 group-hover:bg-teal-600 group-hover:delay-300"
+                ? "w-1 bg-accent"
+                : "w-px bg-pressed group-hover:w-1 group-hover:bg-accent group-hover:delay-300"
                 }`}
             />
           </div>

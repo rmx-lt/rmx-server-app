@@ -39,20 +39,20 @@ export default function InternalListModalRepeater({
     return (
         <div className="flex flex-col mx-4">
             {isLoading ? (
-                <div className="border border-gray-300 bg-white h-52 rounded flex items-center justify-center text-sm text-gray-400 italic">
+                <div className="border border-line-strong bg-surface h-52 rounded flex items-center justify-center text-sm text-faint italic">
                     {loadingMessage}
                 </div>
             ) : (
                 <>
-                    <ul className="border border-gray-300 bg-white h-52 overflow-y-auto rounded">
-                        <li className="sticky top-0 flex items-center px-3 py-1 bg-gray-200 text-sm font-bold text-gray-700 tracking-wider border-b border-gray-300 z-10 cursor-default">
+                    <ul className="border border-line-strong bg-surface h-52 overflow-y-auto rounded">
+                        <li className="sticky top-0 flex items-center px-3 py-1 bg-hover text-sm font-bold text-fg tracking-wider border-b border-line-strong z-10 cursor-default">
                             <span className="flex-1">Name</span>
                             {hasActions && <span className="w-6" />}
                             <span className="w-10 text-right">ID</span>
                         </li>
 
                         {items.length === 0 ? (
-                            <li className="px-3 py-2 text-sm text-gray-400 italic">{emptyMessage}</li>
+                            <li className="px-3 py-2 text-sm text-faint italic">{emptyMessage}</li>
                         ) : (
                             items.map((item) => {
                                 const isSelected = item.id === selectedId;
@@ -60,10 +60,10 @@ export default function InternalListModalRepeater({
                                 const isMenuOpen = openMenuId === item.id;
 
                                 return (
-                                    <li key={item.id} className={`group flex items-stretch ${isSelected ? "bg-teal-600" : "hover:bg-gray-100"}`}>
+                                    <li key={item.id} className={`group flex items-stretch ${isSelected ? "bg-accent" : "hover:bg-raised"}`}>
                                         <button
                                             type="button"
-                                            className={`flex-1 flex items-center pl-3 py-1.5 text-sm text-left cursor-pointer ${isSelected ? "text-white" : "text-gray-700"} ${isActive ? "font-medium" : ""}`}
+                                            className={`flex-1 flex items-center pl-3 py-1.5 text-sm text-left cursor-pointer ${isSelected ? "text-on-accent" : "text-fg"} ${isActive ? "font-medium" : ""}`}
                                             onClick={(e) => { e.stopPropagation(); onSelect?.(item.id); }}
                                             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(item.id); }}
                                             onMouseDown={(e) => e.stopPropagation()}
@@ -74,14 +74,14 @@ export default function InternalListModalRepeater({
                                                     title={onDoubleClick ? doubleClickLabel : onSelect ? "Select" : undefined}
                                                     onClick={onDoubleClick ? (e) => { e.stopPropagation(); onDoubleClick(item.id); } : undefined}
                                                 >
-                                                    {item.name || <span className="italic text-gray-400">Unnamed</span>}
+                                                    {item.name || <span className="italic text-faint">Unnamed</span>}
                                                 </span>
                                             </span>
                                         </button>
                                         {hasActions && (
                                             <button
                                                 type="button"
-                                                className={`w-6 flex items-center justify-center rounded transition-opacity cursor-pointer ${isSelected ? "text-white bg-teal-700" : "text-gray-600 bg-gray-200"} ${isMenuOpen ? "opacity-100" : isSelected ? "text-teal-100 bg-transparent hover:text-white hover:bg-teal-700" : "text-gray-400 bg-transparent hover:text-gray-600 hover:bg-gray-200"} ${isSelected || isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                                                className={`w-6 flex items-center justify-center rounded transition-opacity cursor-pointer ${isSelected ? "text-on-accent bg-accent-hover" : "text-muted bg-hover"} ${isMenuOpen ? "opacity-100" : isSelected ? "text-on-accent bg-transparent hover:text-on-accent hover:bg-accent-hover" : "text-faint bg-transparent hover:text-muted hover:bg-hover"} ${isSelected || isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                                                 onClick={(e) => onMoreClick(e, item.id)}
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 title="Actions"
@@ -89,7 +89,7 @@ export default function InternalListModalRepeater({
                                                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>more_vert</span>
                                             </button>
                                         )}
-                                        <span className={`w-10 pr-3 flex items-center justify-end text-sm tabular-nums shrink-0 ${isSelected ? "text-white" : "text-gray-700"}`}>
+                                        <span className={`w-10 pr-3 flex items-center justify-end text-sm tabular-nums shrink-0 ${isSelected ? "text-on-accent" : "text-fg"}`}>
                                             {item.id}
                                         </span>
                                     </li>
@@ -106,13 +106,13 @@ export default function InternalListModalRepeater({
                             />
                             <div
                                 style={{ top: menuPos.top, left: menuPos.left }}
-                                className="fixed z-58 bg-white border border-gray-200 rounded shadow-lg py-1 min-w-36"
+                                className="fixed z-58 bg-surface border border-line rounded shadow-lg py-1 min-w-36"
                                 onMouseDown={(e) => e.stopPropagation()}
                             >
                                 {onDoubleClick && (
                                     <button
                                         type="button"
-                                        className="flex items-center gap-2 w-full px-3 py-1 text-sm text-left text-gray-700 cursor-pointer transition-colors hover:bg-gray-100"
+                                        className="flex items-center gap-2 w-full px-3 py-1 text-sm text-left text-fg cursor-pointer transition-colors hover:bg-raised"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onDoubleClick(openMenuId);
@@ -127,7 +127,7 @@ export default function InternalListModalRepeater({
                                     <button
                                         key={action.title}
                                         type="button"
-                                        className={`flex items-center gap-2 w-full px-3 py-1 text-sm text-left cursor-pointer transition-colors hover:bg-gray-100 ${action.variant === "danger" ? "text-red-600" : "text-gray-700"}`}
+                                        className={`flex items-center gap-2 w-full px-3 py-1 text-sm text-left cursor-pointer transition-colors hover:bg-raised ${action.variant === "danger" ? "text-danger" : "text-fg"}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             action.onClick(openMenuId);

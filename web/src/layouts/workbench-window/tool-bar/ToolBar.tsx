@@ -196,7 +196,7 @@ export default function ToolBar() {
     useToolBarOverflow(groups.length);
 
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-1 bg-gray-100 border-b border-gray-300">
+    <div className="flex items-center justify-between gap-3 px-3 py-1 bg-raised border-b border-line-strong">
       {/* Left cluster — ref'd for available-width measurement */}
       <div ref={containerRef} className="relative flex-1 min-w-0">
         {/* Ghost row: invisible, renders all groups to measure their natural widths */}

@@ -20,8 +20,8 @@ function InternalCardModalListPartTableActionButton({
     variant?: "default" | "danger";
 }) {
     const colorClassName = variant === "danger"
-        ? "border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
-        : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400";
+        ? "border-danger text-danger hover:bg-danger-soft hover:border-danger"
+        : "border-line-strong text-fg hover:bg-page hover:border-line-strong";
 
     return (
         <button
@@ -64,7 +64,7 @@ export function InternalCardModalListPartToolbar({
     }
 
     return (
-        <div data-list-part-keep-selection="true" className={`flex items-center gap-2 flex-wrap px-3 py-2 border-b ${editable ? "border-gray-200 bg-gray-50" : "border-gray-200 bg-gray-100"}`}>
+        <div data-list-part-keep-selection="true" className={`flex items-center gap-2 flex-wrap px-3 py-2 border-b ${editable ? "border-line bg-page" : "border-line bg-raised"}`}>
             {tableActions?.onNew ? (
                 <InternalCardModalListPartTableActionButton
                     icon="add"
@@ -125,7 +125,7 @@ export function InternalCardModalListPartRecordActionsMenu({
             <div
                 data-list-part-keep-selection="true"
                 style={{ top: menuPos.top, left: menuPos.left }}
-                className="fixed z-58 bg-white border border-gray-200 rounded shadow-lg py-1 min-w-36"
+                className="fixed z-58 bg-surface border border-line rounded shadow-lg py-1 min-w-36"
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 {recordActions.map((action) => (
@@ -133,7 +133,7 @@ export function InternalCardModalListPartRecordActionsMenu({
                         key={action.id}
                         type="button"
                         disabled={action.disabled}
-                        className={`flex items-center gap-2 w-full px-3 py-1 text-sm text-left cursor-pointer transition-colors hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed ${action.variant === "danger" ? "text-red-600" : "text-gray-700"}`}
+                        className={`flex items-center gap-2 w-full px-3 py-1 text-sm text-left cursor-pointer transition-colors hover:bg-raised disabled:opacity-40 disabled:cursor-not-allowed ${action.variant === "danger" ? "text-danger" : "text-fg"}`}
                         onClick={() => {
                             void action.onClick(openMenuRowId);
                             closeMenu();

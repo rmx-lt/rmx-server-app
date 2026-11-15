@@ -27,10 +27,10 @@ export default function SettingsPanelToggle({
                     className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${disabled
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer"
-                        } ${value ? "bg-teal-600" : "bg-gray-300"}`}
+                        } ${value ? "bg-accent" : "bg-pressed"}`}
                 >
                     <span
-                        className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${value ? "translate-x-3.5" : "translate-x-0.5"
+                        className={`inline-block h-3 w-3 rounded-full bg-surface shadow transition-transform ${value ? "translate-x-3.5" : "translate-x-0.5"
                             }`}
                     />
                 </button>

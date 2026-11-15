@@ -16,8 +16,8 @@ export default function CanvasPointerPosition() {
         : "";
 
     return (
-        <div className="flex items-center gap-1 h-5 px-1.5 text-xs text-gray-500 select-none tabular-nums min-w-28">
-            <span className="material-symbols-outlined text-gray-400 shrink-0" style={{ fontSize: 14 }}>
+        <div className="flex items-center gap-1 h-5 px-1.5 text-xs text-muted select-none tabular-nums min-w-28">
+            <span className="material-symbols-outlined text-faint shrink-0" style={{ fontSize: 14 }}>
                 near_me
             </span>
             <span>{display}</span>
