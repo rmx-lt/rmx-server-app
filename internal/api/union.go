@@ -36,6 +36,9 @@ func variant[T any](tag string) Variant { return Variant{Tag: tag, Type: reflect
 var (
 	requestUnion = &Union{Name: "Request", Tag: "op", Variants: []Variant{
 		variant[RequestPing]("ping"),
+		variant[RequestDevices]("devices"),
+		variant[RequestDevice]("device"),
+		variant[RequestMetricHistory]("metric_history"),
 	}}
 	rpcResultUnion = &Union{Name: "RpcResult", Tag: "status", Variants: []Variant{
 		variant[RpcOk]("ok"),
@@ -43,9 +46,14 @@ var (
 	}}
 	rpcDataUnion = &Union{Name: "RpcData", Tag: "kind", Variants: []Variant{
 		variant[RpcPong]("pong"),
+		variant[DeviceList]("devices"),
+		variant[DeviceDetail]("device"),
+		variant[MetricHistory]("metric_history"),
 	}}
 	serverMessageUnion = &Union{Name: "ServerMessage", Tag: "type", Variants: []Variant{
 		variant[MsgResponse]("response"),
+		variant[MsgDeviceChanged]("device_changed"),
+		variant[MsgTelemetry]("telemetry"),
 	}}
 )
 
@@ -65,6 +73,8 @@ var Enums = []Enum{
 		"bad_request", "not_found", "internal", "unauthorized", "forbidden", "too_many_requests", "conflict",
 	}},
 	{"ZoneCategory", reflect.TypeFor[ZoneCategory](), []string{"mowing", "no_go", "navigation"}},
+	{"Board", reflect.TypeFor[Board](), []string{"gateway", "autopilot"}},
+	{"KeyState", reflect.TypeFor[KeyState](), []string{"linked", "missing", "duplicate", "wrong_type"}},
 	{"RoutePointType", reflect.TypeFor[RoutePointType](), []string{"start", "end", "start_end"}},
 }
 
@@ -90,6 +100,20 @@ var Structs = []reflect.Type{
 	reflect.TypeFor[Setting](),
 	reflect.TypeFor[SettingList](),
 	reflect.TypeFor[SettingValue](),
+	reflect.TypeFor[DeviceSummary](),
+	reflect.TypeFor[DeviceList](),
+	reflect.TypeFor[BoardState](),
+	reflect.TypeFor[CatalogueMetric](),
+	reflect.TypeFor[CataloguePart](),
+	reflect.TypeFor[BoardCatalogue](),
+	reflect.TypeFor[KeyStatus](),
+	reflect.TypeFor[LatestValue](),
+	reflect.TypeFor[DeviceDetail](),
+	reflect.TypeFor[MetricPoint](),
+	reflect.TypeFor[MetricHistory](),
+	reflect.TypeFor[DeviceEvent](),
+	reflect.TypeFor[DeviceEventList](),
+	reflect.TypeFor[MetricValue](),
 }
 
 func (u *Union) marshal(v any) ([]byte, error) {

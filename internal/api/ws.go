@@ -4,8 +4,8 @@ package api
 
 // ---- Requests (client to server) --------------------------------------------
 
-// RequestPing asks the server to answer with an RpcPong. It is the only
-// request today: a client can use it to check that the connection works.
+// RequestPing asks the server to answer with an RpcPong: a client can use it
+// to check that the connection works.
 type RequestPing struct{}
 
 // Request is an operation, sent by the client over the WebSocket.
