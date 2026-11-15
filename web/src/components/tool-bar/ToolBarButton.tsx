@@ -24,10 +24,10 @@ export default function ToolBarButton({
       disabled={isDisabled}
       className={
         isActive
-          ? "w-8 h-8 flex items-center justify-center rounded border-2 text-teal-700 hover:bg-gray-200 active:bg-gray-300 cursor-pointer select-none"
+          ? "w-8 h-8 flex items-center justify-center rounded border-2 text-accent hover:bg-hover active:bg-pressed cursor-pointer select-none"
           : isDisabled
-            ? "w-8 h-8 flex items-center justify-center rounded text-gray-400 opacity-40 cursor-not-allowed select-none"
-            : "w-8 h-8 flex items-center justify-center rounded text-gray-600 hover:text-gray-900 active:text-gray-800 hover:bg-gray-200 active:bg-gray-300 cursor-pointer select-none"
+            ? "w-8 h-8 flex items-center justify-center rounded text-faint opacity-40 cursor-not-allowed select-none"
+            : "w-8 h-8 flex items-center justify-center rounded text-muted hover:text-fg active:text-fg hover:bg-hover active:bg-pressed cursor-pointer select-none"
       }
     >
       <span className="material-symbols-outlined">{icon}</span>

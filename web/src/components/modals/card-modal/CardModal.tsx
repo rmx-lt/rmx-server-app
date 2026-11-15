@@ -108,10 +108,10 @@ export default function CardModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 select-none"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-overlay select-none"
             onMouseDown={handleBackdropMouseDown}
         >
-            <div className={`flex flex-col ${widthClassName} max-h-[90vh] min-h-0 bg-gray-100 rounded-lg shadow-xl overflow-hidden`}>
+            <div className={`flex flex-col ${widthClassName} max-h-[90vh] min-h-0 bg-raised rounded-lg shadow-xl overflow-hidden`}>
                 <ModalTitle title={title} onClose={onClose} />
                 {header ? <InternalCardModalHeader {...header} /> : null}
                 <ModalActionBar actions={actionBarActions} />

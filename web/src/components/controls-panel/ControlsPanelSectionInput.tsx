@@ -28,8 +28,8 @@ export default function ControlsPanelSectionInput({
     >
       <span
         className={`absolute pointer-events-none select-none transition-all duration-150 leading-none ${isFloated
-          ? `top-1 left-3 text-xs ${isFocused ? "text-teal-700" : "text-gray-500"}`
-          : "top-1/2 -translate-y-1/2 left-3 text-sm text-gray-400"
+          ? `top-1 left-3 text-xs ${isFocused ? "text-accent" : "text-muted"}`
+          : "top-1/2 -translate-y-1/2 left-3 text-sm text-faint"
           }`}
       >
         {label}
@@ -60,10 +60,10 @@ export default function ControlsPanelSectionInput({
           onBlur?.();
         }}
         disabled={disabled}
-        className={`w-full border rounded bg-white text-sm px-3 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isFloated ? "pt-5 pb-1" : "py-1.5"
+        className={`w-full border rounded bg-surface text-sm px-3 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isFloated ? "pt-5 pb-1" : "py-1.5"
           } ${type === "number" ? "pr-5" : ""
-          } ${isFocused ? "border-teal-700" : "border-gray-300"
-          } ${disabled ? "text-gray-400 cursor-not-allowed" : "text-gray-900"
+          } ${isFocused ? "border-accent-hover" : "border-line-strong"
+          } ${disabled ? "text-faint cursor-not-allowed" : "text-fg"
           }`}
       />
       {showSpinners && (
@@ -78,7 +78,7 @@ export default function ControlsPanelSectionInput({
               const constrained = max !== undefined && nextVal > max ? max : nextVal;
               onChange(String(constrained));
             }}
-            className="flex-1 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-t cursor-pointer active:text-teal-700"
+            className="flex-1 flex items-center justify-center text-faint hover:bg-raised hover:text-fg disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-t cursor-pointer active:text-accent"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>expand_less</span>
           </button>
@@ -93,7 +93,7 @@ export default function ControlsPanelSectionInput({
               const constrained = max !== undefined && nextVal > max ? max : nextVal;
               onChange(String(constrained));
             }}
-            className="flex-1 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-b cursor-pointer active:text-teal-700"
+            className="flex-1 flex items-center justify-center text-faint hover:bg-raised hover:text-fg disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-b cursor-pointer active:text-accent"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>expand_more</span>
           </button>

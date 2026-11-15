@@ -5,5 +5,5 @@ interface Props {
 }
 
 export default function MenuBarSubmenu({ children }: Props) {
-    return <div className="w-max py-1 bg-gray-100">{children}</div>;
+    return <div className="w-max py-1 bg-raised">{children}</div>;
 }

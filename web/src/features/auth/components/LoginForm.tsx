@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { login } from "@/features/auth/data/session";
+import logo from "@/assets/rmx-logo.png";
 
 /**
  * The page's own login. There is no sign-up: users are created on the server
@@ -29,16 +30,17 @@ export function LoginForm() {
   }
 
   const input =
-    "w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-teal-500 disabled:opacity-60";
+    "w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm outline-none focus:border-accent-hover disabled:opacity-60";
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-zinc-950 p-4 text-zinc-100">
-      <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3 rounded-md border border-zinc-800 p-5">
+    <div className="flex min-h-full items-center justify-center bg-page p-4 text-fg">
+      <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3 rounded-md border border-line p-5">
         <div>
-          <h1 className="text-lg font-semibold">Blade of Grass</h1>
-          <p className="text-sm text-zinc-400">Blade of Grass · log in to continue</p>
+          <img src={logo} alt="" className="mb-3 h-12 w-12 rounded-lg ring-1 ring-line" />
+          <h1 className="text-lg font-semibold">RMX</h1>
+          <p className="text-sm text-muted">Log in to continue</p>
         </div>
-        {notice && !error && <p className="text-sm text-zinc-300">{notice}</p>}
+        {notice && !error && <p className="text-sm text-muted">{notice}</p>}
         <input
           className={input}
           value={username}
@@ -65,14 +67,14 @@ export function LoginForm() {
           disabled={busy}
         />
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
         <button
           type="submit"
           disabled={busy || !username || !password}
-          className="rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-500 disabled:opacity-50"
+          className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover disabled:opacity-50"
         >
           {busy ? "Logging in…" : "Log in"}
         </button>

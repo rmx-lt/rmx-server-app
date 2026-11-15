@@ -36,8 +36,8 @@ function CoordInput({
         <div className="relative flex-1 min-w-0">
             <span
                 className={`absolute pointer-events-none select-none transition-all duration-150 leading-none ${isFloated
-                    ? `top-1 left-2 text-xs ${isFocused ? "text-teal-700" : "text-gray-500"}`
-                    : "top-1/2 -translate-y-1/2 left-2 text-sm text-gray-400"
+                    ? `top-1 left-2 text-xs ${isFocused ? "text-accent" : "text-muted"}`
+                    : "top-1/2 -translate-y-1/2 left-2 text-sm text-faint"
                     }`}
             >
                 {label}
@@ -54,7 +54,7 @@ function CoordInput({
                 onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                 }}
-                className={`w-full rounded border bg-white text-sm px-2 pt-4 pb-1 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-gray-900 ${isFocused ? "border-teal-700" : "border-gray-300"
+                className={`w-full rounded border bg-surface text-sm px-2 pt-4 pb-1 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-fg ${isFocused ? "border-accent-hover" : "border-line-strong"
                     }`}
             />
         </div>
@@ -95,7 +95,7 @@ export default function VertexPositionField() {
 
     return (
         <div className="flex items-center gap-2 px-5 py-1">
-            <span className="w-[30%] shrink-0 truncate text-sm text-gray-800">Position</span>
+            <span className="w-[30%] shrink-0 truncate text-sm text-fg">Position</span>
             <div className="flex-1 min-w-0 flex gap-1.5">
                 <CoordInput label={xLabel} baseValue={x} unit={selectedUnit} onCommit={commitX} />
                 <CoordInput label={yLabel} baseValue={y} unit={selectedUnit} onCommit={commitY} />

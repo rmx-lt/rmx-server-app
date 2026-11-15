@@ -13,8 +13,8 @@ export default function InspectorPanelSectionButton({
 }: InspectorPanelSectionButtonProps) {
     const variantStyles =
         variant === "primary"
-            ? "text-teal-700 bg-white border-gray-300 hover:bg-gray-200 active:bg-gray-300 disabled:text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed"
-            : "text-gray-600 bg-white border-gray-300 hover:text-gray-900 active:text-gray-800 hover:bg-gray-200 active:bg-gray-300 disabled:text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed";
+            ? "text-accent bg-surface border-line-strong hover:bg-hover active:bg-pressed disabled:text-faint disabled:opacity-40 disabled:cursor-not-allowed"
+            : "text-muted bg-surface border-line-strong hover:text-fg active:text-fg hover:bg-hover active:bg-pressed disabled:text-faint disabled:opacity-40 disabled:cursor-not-allowed";
 
     return (
         <div className="px-5 py-1">

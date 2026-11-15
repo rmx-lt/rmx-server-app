@@ -14,7 +14,7 @@ export default function FloatingControlMainButton({
             type="button"
             onClick={onClick}
             disabled={disabled}
-            className="mx-3 my-0.5 px-2 py-0.5 border border-teal-600 rounded text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 hover:border-teal-700 active:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer select-none focus:outline-none"
+            className="mx-3 my-0.5 px-2 py-0.5 border border-accent rounded text-xs font-medium text-on-accent bg-accent hover:bg-accent-hover hover:border-accent-hover active:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer select-none focus:outline-none"
         >
             {label}
         </button>

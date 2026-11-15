@@ -93,7 +93,7 @@ export default function ModalPopUp({
                         </>
                     )}
 
-                    <div className={`max-h-52 flex flex-col rounded border border-gray-300 bg-white shadow-lg text-xs text-gray-700 overflow-hidden ${panelClassName}`}>
+                    <div className={`max-h-52 flex flex-col rounded border border-line-strong bg-surface shadow-lg text-xs text-fg overflow-hidden ${panelClassName}`}>
                         {children}
                     </div>
                 </div>

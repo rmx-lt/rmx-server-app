@@ -22,15 +22,15 @@ function InternalCardModalListPartHeaderCell({
     onResizeStart: (event: MouseEvent, columnId: string) => void;
 }) {
     return (
-        <div className={`relative px-3 py-2 border-r border-gray-200 ${isLast ? "last:border-r-0" : ""}`.trim()}>
-            <div className="flex items-center justify-start min-w-0 text-[11px] font-semibold tracking-wide text-gray-500 text-left">
+        <div className={`relative px-3 py-2 border-r border-line ${isLast ? "last:border-r-0" : ""}`.trim()}>
+            <div className="flex items-center justify-start min-w-0 text-[11px] font-semibold tracking-wide text-muted text-left">
                 <span className="truncate">{typeof column.title === "string" ? toTitleCase(column.title) : column.title}</span>
             </div>
             <button
                 type="button"
                 aria-label={`Resize ${typeof column.title === "string" ? column.title : column.id} column`}
                 onMouseDown={(event) => onResizeStart(event, column.id)}
-                className={`absolute right-0 top-0 bottom-0 w-1 translate-x-1/2 cursor-col-resize transition-colors ${resizingColumnId === column.id ? "bg-teal-600" : "bg-transparent hover:bg-teal-500"}`}
+                className={`absolute right-0 top-0 bottom-0 w-1 translate-x-1/2 cursor-col-resize transition-colors ${resizingColumnId === column.id ? "bg-accent" : "bg-transparent hover:bg-accent-hover"}`}
             />
         </div>
     );
@@ -44,15 +44,15 @@ export default function InternalCardModalListPartHeader({
     onResizeStart,
 }: InternalCardModalListPartHeaderProps) {
     return (
-        <div className="sticky top-0 z-10 overflow-hidden border-b border-gray-200 bg-gray-100">
+        <div className="sticky top-0 z-10 overflow-hidden border-b border-line bg-raised">
             <div className="grid w-full items-stretch" style={{ gridTemplateColumns }}>
-                <div className="px-2 py-2 border-r border-gray-200" />
+                <div className="px-2 py-2 border-r border-line" />
                 <InternalCardModalListPartHeaderCell
                     column={mainColumn}
                     resizingColumnId={resizingColumnId}
                     onResizeStart={onResizeStart}
                 />
-                <div className="px-2 py-2 border-r border-gray-200" />
+                <div className="px-2 py-2 border-r border-line" />
                 {dataColumns.map((column) => (
                     <InternalCardModalListPartHeaderCell
                         key={column.id}

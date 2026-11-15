@@ -85,11 +85,11 @@ export default function FloatingControlRangeField({
     return (
         <div className="flex items-center gap-2 px-3 h-8">
             <div className="w-29/50 shrink-0 flex items-center gap-1 min-w-0">
-                <span className="text-xs text-gray-500 shrink-0 truncate select-none">{label}</span>
+                <span className="text-xs text-muted shrink-0 truncate select-none">{label}</span>
                 <span className="flex-1 min-w-0 h-1 bg-[radial-gradient(circle,#d1d5db_1.5px,transparent_1.5px)] bg-size-[10px_10px] bg-repeat-x bg-center" />
                 {error && (
                     <span
-                        className="shrink-0 flex items-center cursor-default transition-colors text-red-500 hover:text-red-600"
+                        className="shrink-0 flex items-center cursor-default transition-colors text-danger hover:text-danger"
                         title={error}
                     >
                         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>error</span>
@@ -109,11 +109,11 @@ export default function FloatingControlRangeField({
                         onFocus?.();
                     }}
                     onBlur={handleBlur}
-                    className={`w-full border rounded bg-white text-xs px-2 h-6 focus:outline-none transition-colors placeholder:text-gray-400 placeholder:italic ${isFocused ? "border-teal-700" : "border-gray-300"
-                        } ${disabled ? "text-gray-400 cursor-not-allowed opacity-50" : "text-gray-900"}`}
+                    className={`w-full border rounded bg-surface text-xs px-2 h-6 focus:outline-none transition-colors placeholder:text-faint placeholder:italic ${isFocused ? "border-accent-hover" : "border-line-strong"
+                        } ${disabled ? "text-faint cursor-not-allowed opacity-50" : "text-fg"}`}
                 />
                 {pickedValue !== null && pickedValue !== undefined && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 italic pointer-events-none whitespace-nowrap">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-faint italic pointer-events-none whitespace-nowrap">
                         (→ {pickedValue})
                     </span>
                 )}

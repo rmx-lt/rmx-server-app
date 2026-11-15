@@ -160,12 +160,12 @@ export default function InternalCardModalListPart({
         <div ref={rootRef} className="flex shrink-0 flex-col gap-2 min-h-0">
             {hasHeader ? (
                 <div className="flex items-center gap-2 px-1">
-                    {title ? <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</span> : null}
+                    {title ? <span className="text-xs font-semibold text-muted uppercase tracking-wide">{title}</span> : null}
                     {badge}
                 </div>
             ) : null}
             {hasListContent ? (
-                <div className={`border rounded overflow-hidden ${editable ? "border-gray-200 bg-white" : "border-gray-200 bg-gray-50"}`}>
+                <div className={`border rounded overflow-hidden ${editable ? "border-line bg-surface" : "border-line bg-page"}`}>
                     <InternalCardModalListPartToolbar
                         editable={editable}
                         selectedRowIds={selectedRowIds}
@@ -175,7 +175,7 @@ export default function InternalCardModalListPart({
                     />
                     {!hasRows ? (
                         emptyMessage ? (
-                            <p className="text-sm text-gray-400 italic text-center py-6 px-4">{emptyMessage}</p>
+                            <p className="text-sm text-faint italic text-center py-6 px-4">{emptyMessage}</p>
                         ) : null
                     ) : (
                         <div className={scrollClassName}>
@@ -187,7 +187,7 @@ export default function InternalCardModalListPart({
                                     resizingColumnId={resizingColumnId}
                                     onResizeStart={handleResizeStart}
                                 />
-                                <div className={editable ? "divide-y divide-gray-100" : undefined}>
+                                <div className={editable ? "divide-y divide-line" : undefined}>
                                     {flattenedRows.map(({ row, depth }) => {
                                         if (row.kind === "group") {
                                             return (

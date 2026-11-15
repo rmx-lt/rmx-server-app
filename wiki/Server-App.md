@@ -809,9 +809,10 @@ whether the session still exists and shows the login form if not.
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
   read once per login.
-- **Layers.** Users can't change styles. The colours and widths of the grid and
-  the zone layers are constants (`LAYER_STYLE` in
-  `web/src/config/canvas-editing/canvasConfig.ts`) and the code decides what is
+- **Layers.** Users can't change styles. The widths of the zone layers are
+  constants (`LAYER_STYLE` in
+  `web/src/config/canvas-editing/canvasConfig.ts`), the colours come from the
+  theme (see "Name, logo and theme"), and the code decides what is
   visible: the grid always, the satellite map when the map has a geo anchor.
   The map has no format, type, coordinate system, headland, route points or
   zone type, and there is no map generator, vertex modifier or XML import and
@@ -820,6 +821,29 @@ whether the session still exists and shows the login form if not.
   ([rmx-server-app#100](https://github.com/rmx-lt/rmx-server-app/issues/100));
   `web/src/features/canvas-editing/utils/headlandGeometry.ts` is kept for that,
   unused for now.
+- **Name, logo and theme.** The client is called **RMX** (page title, header,
+  login form); the repository, Go module and wiki keep their names. The logo is
+  the RMX mark (`web/src/assets/rmx-logo.png`, shown with rounded corners like
+  the organization avatar; `rmx-favicon.png` is the rounded favicon). Colours
+  are named tokens defined once in `web/src/styles/index.css` with Tailwind's
+  `@theme` (utilities `bg-surface`, `text-fg`, `border-line`, `bg-accent` and so
+  on; the light set is the `@theme` block, the dark set overrides it under
+  `data-theme="dark"`). Components use the token names, never fixed greys or
+  hex values. Tokens: `page` (app background, canvas), `surface` (panels, bars,
+  menus, modals), `raised`, `hover`, `pressed`, `line`, `line-strong`, `fg`,
+  `muted`, `faint` (placeholders and disabled only; below 4.5:1), `accent`,
+  `accent-hover`, `on-accent`, `danger`, `danger-soft`, `ok`, `warn`, `overlay`,
+  and `canvas-*` (grid, mowing and no-go stroke and fill, handles). Konva needs
+  concrete colours, so the canvas layers read the `canvas-*` variables through
+  `useCanvasColors` (`web/src/hooks/useTheme.ts`) and redraw when the theme
+  changes, with no reload. The default follows the system
+  (`prefers-color-scheme`); the user's choice (system, dark, light) is kept in
+  the browser (`localStorage` key `rmx:theme`, no server involved), and a small
+  script in `public/index.html` applies it before first paint, so there is no
+  flash. For now the choice sits in three buttons in the header
+  (`components/theme-switch/`); the settings modal
+  ([rmx-server-app#104](https://github.com/rmx-lt/rmx-server-app/issues/104))
+  takes it over.
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
   monitor feature, and the only `fetch` calls go to the app's own

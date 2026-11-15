@@ -25,12 +25,12 @@ function ActionButton({
 }) {
     const base = "flex items-center justify-center w-8 h-8 rounded transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
     const style = disabled
-        ? "text-gray-300"
+        ? "text-faint"
         : active
-            ? "border-2 text-teal-700 hover:bg-gray-200 active:bg-gray-300"
+            ? "border-2 text-accent hover:bg-hover active:bg-pressed"
             : danger
-                ? "text-gray-400 hover:bg-red-50 hover:text-red-600"
-                : "text-gray-400 hover:bg-gray-200 hover:text-gray-700";
+                ? "text-faint hover:bg-danger-soft hover:text-danger"
+                : "text-faint hover:bg-hover hover:text-fg";
 
     return (
         <button

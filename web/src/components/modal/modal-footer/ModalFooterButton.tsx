@@ -13,10 +13,10 @@ export default function ModalFooterButton({
 }: ModalFooterButtonProps) {
     const styles =
         variant === "primary"
-            ? "border border-teal-600 bg-teal-600 text-white hover:bg-teal-700 hover:border-teal-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            ? "border border-accent bg-accent text-on-accent hover:bg-accent-hover hover:border-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
             : variant === "danger"
-                ? "border border-gray-300 text-red-600 hover:bg-red-700 hover:text-white hover:border-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                : "border border-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed";
+                ? "border border-line-strong text-danger hover:bg-danger hover:text-on-accent hover:border-danger disabled:opacity-40 disabled:cursor-not-allowed"
+                : "border border-line-strong text-fg hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed";
 
     return (
         <button

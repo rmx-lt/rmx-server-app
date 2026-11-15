@@ -20,7 +20,7 @@ export default function ModalActionBar({ actions }: ModalActionBarProps) {
     if (actions.length === 0) return null;
 
     return (
-        <div className="flex items-center gap-2 py-2 mx-4 bg-gray-100 border-t-2 border-b-2 border-gray-200 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 py-2 mx-4 bg-raised border-t-2 border-b-2 border-line shrink-0 flex-wrap">
             {actions.map((action) => (
                 <ModalActionBarAction key={action.id} {...action} />
             ))}

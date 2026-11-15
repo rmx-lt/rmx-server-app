@@ -45,9 +45,9 @@ export default function SettingsPanelInput({
                         }
                     }}
                     disabled={disabled}
-                    className={`w-full border rounded bg-white text-xs px-2 h-6 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${type === "number" ? "pr-5" : ""
-                        } ${isFocused ? "border-teal-700" : "border-gray-300"
-                        } ${disabled ? "text-gray-400 cursor-not-allowed opacity-50" : "text-gray-900"
+                    className={`w-full border rounded bg-surface text-xs px-2 h-6 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${type === "number" ? "pr-5" : ""
+                        } ${isFocused ? "border-accent-hover" : "border-line-strong"
+                        } ${disabled ? "text-faint cursor-not-allowed opacity-50" : "text-fg"
                         }`}
                 />
                 {showSpinners && (
@@ -60,7 +60,7 @@ export default function SettingsPanelInput({
                                 e.preventDefault();
                                 onChange(String(Number(value) + 1));
                             }}
-                            className="flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-pointer active:text-teal-700"
+                            className="flex items-center justify-center text-faint hover:text-fg cursor-pointer active:text-accent"
                             style={{ height: 10 }}
                         >
                             <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>expand_less</span>
@@ -73,7 +73,7 @@ export default function SettingsPanelInput({
                                 e.preventDefault();
                                 onChange(String(Math.max(min ?? -Infinity, Number(value) - 1)));
                             }}
-                            className="flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-pointer active:text-teal-700"
+                            className="flex items-center justify-center text-faint hover:text-fg cursor-pointer active:text-accent"
                             style={{ height: 10 }}
                         >
                             <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>expand_more</span>

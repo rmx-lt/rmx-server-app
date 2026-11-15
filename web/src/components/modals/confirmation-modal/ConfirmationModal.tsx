@@ -32,17 +32,17 @@ export default function ConfirmationModal() {
 
     return (
         <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 select-none"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-overlay select-none"
             onMouseDown={handleBackdropMouseDown}
         >
-            <div className="flex flex-col w-100 bg-gray-100 rounded-lg shadow-xl overflow-hidden">
+            <div className="flex flex-col w-100 bg-raised rounded-lg shadow-xl overflow-hidden">
                 <ModalTitle title={title} onClose={cancel} />
 
-                <p className="px-5 pt-3 pb-5 text-sm text-gray-500 whitespace-pre-wrap">
+                <p className="px-5 pt-3 pb-5 text-sm text-muted whitespace-pre-wrap">
                     {message}
                 </p>
 
-                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200">
+                <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-line">
                     <ModalFooterButton variant={confirmVariant} disabled={confirmDisabled} onClick={() => confirm().catch(console.error)}>
                         {confirmLabel}
                     </ModalFooterButton>

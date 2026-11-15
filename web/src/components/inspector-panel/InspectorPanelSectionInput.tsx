@@ -42,7 +42,7 @@ export default function InspectorPanelSectionInput({
 
     return (
         <div className="flex items-center gap-2 px-5 py-1">
-            <span className="min-w-0 flex-1 truncate text-sm text-gray-800" title={label}>
+            <span className="min-w-0 flex-1 truncate text-sm text-fg" title={label}>
                 {label}
             </span>
             <input
@@ -58,7 +58,7 @@ export default function InspectorPanelSectionInput({
                 onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                 }}
-                className={`w-20 shrink-0 rounded border bg-white text-sm px-2 py-0.5 text-right text-gray-900 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isFocused ? "border-teal-700" : "border-gray-300"}`}
+                className={`w-20 shrink-0 rounded border bg-surface text-sm px-2 py-0.5 text-right text-fg focus:outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${isFocused ? "border-accent-hover" : "border-line-strong"}`}
             />
         </div>
     );

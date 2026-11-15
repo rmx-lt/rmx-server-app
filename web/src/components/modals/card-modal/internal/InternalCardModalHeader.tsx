@@ -25,16 +25,16 @@ export default function InternalCardModalHeader({
     canDelete = true,
 }: InternalCardModalHeaderProps) {
     return (
-        <div className="flex items-center px-5 pb-1 bg-gray-100 select-none shrink-0">
+        <div className="flex items-center px-5 pb-1 bg-raised select-none shrink-0">
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                 {recordId !== null && (
                     <>
-                        <span className="text-lg text-gray-700 shrink-0">{recordId}</span>
-                        <span className="text-lg font-bold text-gray-400">·</span>
+                        <span className="text-lg text-fg shrink-0">{recordId}</span>
+                        <span className="text-lg font-bold text-faint">·</span>
                     </>
                 )}
-                <span className="text-lg text-gray-700 truncate" title={recordName || undefined}>
-                    {recordName || <span className="text-gray-400 italic">New record</span>}
+                <span className="text-lg text-fg truncate" title={recordName || undefined}>
+                    {recordName || <span className="text-faint italic">New record</span>}
                 </span>
             </div>
 

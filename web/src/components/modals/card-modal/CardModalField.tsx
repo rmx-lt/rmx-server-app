@@ -4,9 +4,9 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headless
 export type CardModalTextFieldHintState = "info" | "warning" | "error";
 
 const HINT_STYLE: Record<CardModalTextFieldHintState, { icon: string; color: string }> = {
-    info: { icon: "info", color: "text-gray-400 hover:text-teal-600" },
-    warning: { icon: "warning", color: "text-amber-500 hover:text-amber-600" },
-    error: { icon: "error", color: "text-red-500 hover:text-red-600" },
+    info: { icon: "info", color: "text-faint hover:text-accent" },
+    warning: { icon: "warning", color: "text-warn hover:text-warn" },
+    error: { icon: "error", color: "text-danger hover:text-danger" },
 };
 
 interface CardModalFieldBase {
@@ -93,13 +93,13 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
             {/* Label */}
             <div className="w-1/3 shrink-0 h-8 flex items-center gap-1 min-w-0">
                 <label
-                    className="text-sm text-gray-500 tracking-wide truncate min-w-0 cursor-default"
+                    className="text-sm text-muted tracking-wide truncate min-w-0 cursor-default"
                     title={displayLabel}
                 >
                     {displayLabel}
                 </label>
                 {showRequiredMarker && (
-                    <span className="text-red-500 text-sm leading-none shrink-0 cursor-default" title="Required field" aria-hidden="true">
+                    <span className="text-danger text-sm leading-none shrink-0 cursor-default" title="Required field" aria-hidden="true">
                         *
                     </span>
                 )}
@@ -118,12 +118,12 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
             {props.type === "select" ? (
                 <div className="flex-1 min-w-0 flex items-center h-8">
                     <Listbox value={props.value} onChange={(v) => props.onChange?.(v)} disabled={disabled}>
-                        <ListboxButton className="group w-full flex items-center gap-1 border border-gray-300 rounded bg-white text-left select-none focus:outline-none px-2 h-7 cursor-pointer data-open:border-teal-600 data-disabled:cursor-default data-disabled:bg-gray-100 data-disabled:text-gray-500 transition-colors">
-                            <span className="text-sm flex-1 truncate text-gray-800 group-data-disabled:text-gray-500">
+                        <ListboxButton className="group w-full flex items-center gap-1 border border-line-strong rounded bg-surface text-left select-none focus:outline-none px-2 h-7 cursor-pointer data-open:border-accent data-disabled:cursor-default data-disabled:bg-raised data-disabled:text-muted transition-colors">
+                            <span className="text-sm flex-1 truncate text-fg group-data-disabled:text-muted">
                                 {props.options.find((o) => o.value === props.value)?.label ?? "\u00A0"}
                             </span>
                             <span
-                                className="material-symbols-outlined shrink-0 transition-transform duration-150 text-gray-400 group-data-open:rotate-180 group-data-open:text-teal-600 group-data-disabled:text-gray-300"
+                                className="material-symbols-outlined shrink-0 transition-transform duration-150 text-faint group-data-open:rotate-180 group-data-open:text-accent group-data-disabled:text-faint"
                                 style={{ fontSize: 16 }}
                             >
                                 expand_more
@@ -131,13 +131,13 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                         </ListboxButton>
                         <ListboxOptions
                             anchor={{ to: "bottom start", gap: 4 }}
-                            className="w-(--button-width) border border-gray-300 rounded shadow-md bg-white max-h-48 overflow-y-auto outline-none z-200 select-none cursor-default"
+                            className="w-(--button-width) border border-line-strong rounded shadow-md bg-surface max-h-48 overflow-y-auto outline-none z-200 select-none cursor-default"
                         >
                             {props.options.map((opt) => (
                                 <ListboxOption
                                     key={opt.value}
                                     value={opt.value}
-                                    className="px-3 py-1 text-sm cursor-pointer transition-colors text-gray-700 border-b border-white last:border-b-0 data-focus:bg-teal-600 data-focus:text-white data-selected:bg-teal-600 data-selected:text-white data-selected:font-medium"
+                                    className="px-3 py-1 text-sm cursor-pointer transition-colors text-fg border-b border-surface last:border-b-0 data-focus:bg-accent data-focus:text-on-accent data-selected:bg-accent data-selected:text-on-accent data-selected:font-medium"
                                 >
                                     {opt.label || "\u00A0"}
                                 </ListboxOption>
@@ -154,10 +154,10 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                         disabled={disabled}
                         onClick={() => !disabled && props.onChange?.(!props.checked)}
                         className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${disabled ? "opacity-50 cursor-default" : "cursor-pointer"
-                            } ${props.checked ? "bg-teal-600" : "bg-gray-300"}`}
+                            } ${props.checked ? "bg-accent" : "bg-pressed"}`}
                     >
                         <span
-                            className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${props.checked ? "translate-x-3.5" : "translate-x-0.5"
+                            className={`inline-block h-3 w-3 rounded-full bg-surface shadow transition-transform ${props.checked ? "translate-x-3.5" : "translate-x-0.5"
                                 }`}
                         />
                     </button>
@@ -201,8 +201,8 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter") props.onConfirm?.();
                                         }}
-                                        className={`w-full px-2 text-sm border rounded text-gray-800 placeholder:text-gray-400 placeholder:italic h-7 focus:outline-none transition-colors disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-default truncate ${isNumericType && showCopyBtn ? "pr-10" : isNumericType ? "pr-5" : showCopyBtn ? "pr-6" : ""
-                                            } ${isFocused ? "border-teal-600" : "border-gray-300"}`}
+                                        className={`w-full px-2 text-sm border rounded text-fg placeholder:text-faint placeholder:italic h-7 focus:outline-none transition-colors disabled:bg-raised disabled:text-muted disabled:cursor-default truncate ${isNumericType && showCopyBtn ? "pr-10" : isNumericType ? "pr-5" : showCopyBtn ? "pr-6" : ""
+                                            } ${isFocused ? "border-accent" : "border-line-strong"}`}
                                     />
                                     {showCopyBtn && (
                                         <button
@@ -210,7 +210,7 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                                             tabIndex={-1}
                                             onClick={handleCopy}
                                             title={copied ? "Copied" : "Copy to clipboard"}
-                                            className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center transition-colors cursor-pointer ${copied ? "text-green-500" : "text-gray-400 hover:text-gray-600"}`}
+                                            className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center transition-colors cursor-pointer ${copied ? "text-ok" : "text-faint hover:text-muted"}`}
                                         >
                                             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
                                                 {copied ? "check" : "content_copy"}
@@ -227,7 +227,7 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                                                     const next = Number(props.value) + 1;
                                                     props.onChange?.(String(props.max !== undefined && next > props.max ? props.max : next));
                                                 }}
-                                                className="flex items-center justify-center text-gray-400 hover:text-gray-700 active:text-teal-600 cursor-pointer"
+                                                className="flex items-center justify-center text-faint hover:text-fg active:text-accent cursor-pointer"
                                                 style={{ height: 12 }}
                                             >
                                                 <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>expand_less</span>
@@ -240,7 +240,7 @@ const CardModalField = forwardRef<HTMLInputElement, CardModalFieldConfig>((props
                                                     const next = Number(props.value) - 1;
                                                     props.onChange?.(String(props.min !== undefined && next < props.min ? props.min : next));
                                                 }}
-                                                className="flex items-center justify-center text-gray-400 hover:text-gray-700 active:text-teal-600 cursor-pointer"
+                                                className="flex items-center justify-center text-faint hover:text-fg active:text-accent cursor-pointer"
                                                 style={{ height: 12 }}
                                             >
                                                 <span className="material-symbols-outlined leading-none" style={{ fontSize: 14 }}>expand_more</span>

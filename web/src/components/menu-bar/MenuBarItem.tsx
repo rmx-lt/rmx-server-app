@@ -54,7 +54,7 @@ export default function MenuBarItem({
         type="button"
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        className="flex items-center gap-2 px-3 w-full max-w-72 text-left text-base text-gray-700 hover:bg-gray-200 rounded cursor-pointer select-none"
+        className="flex items-center gap-2 px-3 w-full max-w-72 text-left text-base text-fg hover:bg-hover rounded cursor-pointer select-none"
       >
         {/* Left: Checkmark space */}
         <div className="w-5 shrink-0">
@@ -70,7 +70,7 @@ export default function MenuBarItem({
 
         {/* Right: Shortcut or Arrow */}
         {(shortcutText || hasSubmenu) && (
-          <div className="flex items-center text-gray-500 shrink-0">
+          <div className="flex items-center text-muted shrink-0">
             {hasSubmenu ? (
               <span className="material-symbols-outlined block leading-none" style={{ fontSize: 18 }}>chevron_right</span>
             ) : <span className="text-base">{shortcutText}</span>}
@@ -80,7 +80,7 @@ export default function MenuBarItem({
 
       {/* Submenu */}
       {hasSubmenu && isHovered && (
-        <div className="absolute left-full -top-1.25 min-w-max bg-white border border-gray-300 rounded shadow-lg z-10">
+        <div className="absolute left-full -top-1.25 min-w-max bg-surface border border-line-strong rounded shadow-lg z-10">
           {submenu}
         </div>
       )}

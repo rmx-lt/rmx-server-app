@@ -97,11 +97,11 @@ export default function ListModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 select-none"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-overlay select-none"
             onMouseDown={handleBackdropMouseDown}
         >
             <div
-                className={`flex flex-col ${widthClassName} bg-gray-100 rounded-lg shadow-xl overflow-hidden`}
+                className={`flex flex-col ${widthClassName} bg-raised rounded-lg shadow-xl overflow-hidden`}
                 onMouseDown={handlePanelMouseDown}
             >
                 <ModalTitle title={title} onClose={onClose} />
