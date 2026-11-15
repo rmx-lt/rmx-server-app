@@ -2,7 +2,7 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
-for the browser, firmware images and job files to the mower's boards over MQTT
+for the browser, firmware images and path files to the mower's boards over MQTT
 (see [Firmware over MQTT](#firmware-over-mqtt)), what the mower reports (state,
 metric catalogues, telemetry, events; see [Mower ingest](#mower-ingest)), the
 commands, live driving and monitor streams it sends the mower (see
@@ -58,7 +58,7 @@ over HTTPS and its WebSocket, with their session.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
   `mower/status/server`, is the only publisher of commands and live-driving
   setpoints (see [Mower commands](#mower-commands)), serves firmware images and
-  job files as binary chunks (see [Firmware over MQTT](#firmware-over-mqtt)),
+  path files as binary chunks (see [Firmware over MQTT](#firmware-over-mqtt)),
   and stores what the gateway and the autopilot publish under
   `mower/<name>/gateway/…` and `mower/<name>/autopilot/…` (see [Mower ingest](#mower-ingest)).
 - **Login**: the app's own login page and server-side sessions in a cookie
@@ -140,7 +140,7 @@ The contract between the mower and the server is wiki [Mower-Protocol](Mower-Pro
 commands, chunk transfer. The server implements the state, catalogue, telemetry
 and event topics of it (see [Mower ingest](#mower-ingest)), the commands, live
 driving and monitor (see [Mower commands](#mower-commands)) and chunk transfer
-(see [Firmware over MQTT](#firmware-over-mqtt)); job planning, border recording
+(see [Firmware over MQTT](#firmware-over-mqtt)); path planning, border recording
 and the autopilot's side of them follow
 ([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)).
 
@@ -154,7 +154,7 @@ MQTT topics (`<prefix>` is `mower`; the full table is wiki
 | `<prefix>/<name>/<board>/cmd/ack` | device → server | the ack of a command |
 | `<prefix>/<name>/autopilot/drive` | server → device | a live-driving setpoint, QoS 0 |
 | `<prefix>/<name>/<board>/monitor` | device → server | monitor samples, QoS 0 |
-| `<prefix>/<name>/gateway/fw/…`, `autopilot/fw/…`, `autopilot/job/…` | both | chunk transfer: `req` (device → server), `chunk` and `res` (server → device) |
+| `<prefix>/<name>/gateway/fw/…`, `autopilot/fw/…`, `autopilot/path/…` | both | chunk transfer: `req` (device → server), `chunk` and `res` (server → device) |
 | `<prefix>/<name>/gateway/#`, `<prefix>/<name>/autopilot/#` | device → server | subscribed as a whole; the topics handled are in [Mower ingest](#mower-ingest) |
 
 The byte layout of a chunk, and the request, are in
@@ -167,7 +167,7 @@ The server answers only on the topics of the name it got the request on.
 
 ## Firmware over MQTT
 
-A board downloads a firmware image or a job file as binary chunks on the same
+A board downloads a firmware image or a path file as binary chunks on the same
 MQTT connection it already uses: **chunk transfer**, wiki
 [Mower-Protocol](Mower-Protocol) §12 (the contract; this section says how the
 server does it). The files stay signed or checked by the board; the transport
@@ -181,16 +181,16 @@ reach that set's files:
 |---|---|---|---|
 | `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | `$FIRMWARE_DIR/gateway/` |
 | `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | `$FIRMWARE_DIR/autopilot/` |
-| `autopilot/job/req`, `chunk`, `res` | autopilot | `<job>.json` | `$JOB_DIR/` |
+| `autopilot/path/req`, `chunk`, `res` | autopilot | `<path>.json` | `$PATH_FILE_DIR/` |
 
 A set whose directory is not there serves no files: every request gets
 `not_found`. Names are looked up inside the directory only (`os.Root`), so a name
-cannot escape it. A firmware image is at most 32 MiB, a job file 1 MiB. The
+cannot escape it. A firmware image is at most 32 MiB, a path file 1 MiB. The
 SHA-256 is cached in memory and recomputed when the file's size or modification
 time changes.
 
 **One request open per topic set.** A board has one request open per set, and the
-server answers requests on different sets side by side: a job file and a firmware
+server answers requests on different sets side by side: a path file and a firmware
 image download at the same time. A second request on the same set that arrives
 before the answer to the first is published is ignored (the board asks again
 after its 10 s). QoS is 1. Chunks and errors are not retained. A topic that does
@@ -278,8 +278,8 @@ An error is JSON on `<set>/res` (never on `chunk`):
 
 `FIRMWARE_DIR` is the directory of firmware images (read-only) with the
 subdirectories `gateway/` and `autopilot/`; a missing subdirectory leaves that
-set empty (logged at start). `JOB_DIR` is the directory of job files
-(`<job>.json`, read-only for this domain: job planning writes them). Unset, the
+set empty (logged at start). `PATH_FILE_DIR` is the directory of path files
+(`<path>.json`, read-only for this domain: path planning writes them). Unset, the
 set is not served. There is no chunk-size setting any more.
 
 **esp-mqtt buffer.** The gateway is an ESP32. esp-mqtt's receive buffer
@@ -303,10 +303,10 @@ mounts them. That change is not in this repo. In `services/app/compose.yaml`, on
 ```yaml
 environment:
   FIRMWARE_DIR: /firmware
-  JOB_DIR: /jobs
+  PATH_FILE_DIR: /paths
 volumes:
   - <host directory of the images>:/firmware:ro
-  - <host directory of the job files>:/jobs:ro
+  - <host directory of the path files>:/paths:ro
 ```
 
 The images move into `gateway/` and `autopilot/` below the host directory: the
@@ -464,9 +464,9 @@ streams and the correction caster's settings. The contract is wiki
 [Mower-Protocol](Mower-Protocol) §5, §6.4, §8, §9, §13 and §15; this section
 says what the server does with it. Code: `internal/mower/` (`command.go`, `drive.go`,
 `monitor.go`, `ntrip.go`, the SQL in `store.go`), wire types in
-`internal/api/command.go`. The server is the only publisher of commands. Job
+`internal/api/command.go`. The server is the only publisher of commands. Path
 planning and border recording logic are not here yet: the server sends
-`job_start`, `record_start` and `record_stop` when a user asks, and does nothing
+`path_start`, `record_start` and `record_stop` when a user asks, and does nothing
 else with them.
 
 ### The command sender
@@ -523,7 +523,7 @@ Commands a user may send: gateway `ping`, `restart`, `ota` (`version`, optional
 `file`, `size`), `autopilot_reset`; autopilot `stop`, `manual_start`,
 `manual_stop`, `blade` (`on`), `follow` (`points` 1 to 100 of `[lat, lon]`,
 optional `reverse`, `blade`, `speed`), `record_start` (`session`, optional
-`spacing`), `record_stop`, `job_start` (`job`, `size`, `sha256`, optional
+`spacing`), `record_stop`, `path_start` (`path`, `size`, `sha256`, optional
 `from_point`), `pause`, `resume`, `clear_fault`, `ota`, `restart`.
 
 WebSocket requests (`op`):
@@ -935,7 +935,7 @@ from `.env` (default `dev` / `dev-password-123`). The script:
   `.env` it rebuilds and restarts the server and the mower; a build error
   waits for the next save. Ctrl+C stops all three;
 - sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it) and
-  `JOB_DIR=dev/jobs` (both gitignored) when `.env` sets none: drop any
+  `PATH_FILE_DIR=dev/paths` (both gitignored) when `.env` sets none: drop any
   `<version>.bin` into the board's subdirectory.
 
 
@@ -971,9 +971,9 @@ still counts and relays the autopilot's topics as it would.
   catalogue (at least 10 s in `idle`) with every key of §16.4 linked, events
   with `boot` and `seq`, live driving on `autopilot/drive` (the setpoint rules
   and the 0.5 s timeout of §9), border recording in batches (§10), `follow`
-  (`reverse`, `blade`, `speed`), and jobs: `job_start` downloads `<job>.json`
-  over `autopilot/job/…`, checks size and SHA-256, drives to the start with the
-  blade off and follows the segments; `job.point` counts the points reached and
+  (`reverse`, `blade`, `speed`), and paths: `path_start` downloads `<path>.json`
+  over `autopilot/path/…`, checks size and SHA-256, drives to the start with the
+  blade off and follows the segments; `path.point` counts the points reached, `path.points` is the length of the file, and
   `from_point` continues. Pauses for command, link or fix (§7.1), faults, `ota`,
   and monitor streams with the budget of 400 values per second.
 - **Motion model.** A differential drive following the live setpoints or the
@@ -1024,8 +1024,8 @@ sends commands and live-driving setpoints and serves chunk transfer
 ([Mower commands](#mower-commands)): `POST /api/devices/<name>/commands` with
 `{"board":"gateway","cmd":"ping"}` reaches the simulated mower and its ack comes
 back in the command's state. A gateway `ota` needs `<version>.bin` in
-`dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a job
-its file in `dev/jobs/`. `devsim send` and the tests
+`dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a path
+its file in `dev/paths/`. `devsim send` and the tests
 ([Tests and checks](#tests-and-checks)) play the server's part without it.
 
 The real board connects only to the VPS broker (port 8884, client
@@ -1116,10 +1116,10 @@ The integration tests (`internal/integration/`: `harness_test.go`, then
 `app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
-ping, chunk transfer (a job file and firmware images side by side, every chunk
+ping, chunk transfer (a path file and firmware images side by side, every chunk
 checked against the file's SHA-256, the three sets kept apart), the commands
 (an ack, the resend of a lost ack after 5 s with the same id, open commands
-failed by a new boot, a gateway restart and ota refused while the autopilot is in a job, allowed with the board link down or the autopilot idle),
+failed by a new boot, a gateway restart and ota refused while the autopilot is in a path, allowed with the board link down or the autopilot idle),
 live driving, a monitor stream that runs only while watched, the caster settings
 sent once and on change (the password only on the wire), health, that the records routes and
 tables are gone, the retained server status and graceful shutdown, and the
@@ -1140,11 +1140,11 @@ The simulated mower has its own tests in `cmd/devsim`. The unit tests run both
 boards on a fake clock and play the server over the same topics: the state
 machine of [Mower-Protocol](Mower-Protocol) §8 (every command in every mode),
 the command id memory and lost acks, live driving and its 0.5 s timeout,
-recording, jobs with chunk download and retry, pauses and faults, monitor
+recording, paths with chunk download and retry, pauses and faults, monitor
 streams and their budget, and the catalogues checked against §16.4 and §16.5.
 `e2e_integration_test.go` (in the integration run) starts devsim against the
 compose Mosquitto on a private topic prefix and plays the server: retained
-`mower/status/server`, commands and repeated ids, driving, recording, a job
+`mower/status/server`, commands and repeated ids, driving, recording, a path
 and a gateway update served over chunk transfer, and the switches.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
@@ -1185,7 +1185,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 - Listens on **`0.0.0.0:8080`** (HTTP; TLS is Caddy's job). Publish no port;
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
-  unless `FIRMWARE_DIR` or `JOB_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
+  unless `FIRMWARE_DIR` or `PATH_FILE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
 - `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
@@ -1211,7 +1211,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
 | `FIRMWARE_DIR` | no | `/firmware` | firmware images in the subdirectories `gateway/` and `autopilot/` (`<version>.bin`). Unset: no firmware is served. See [Firmware over MQTT](#firmware-over-mqtt) |
-| `JOB_DIR` | no | `/jobs` | job files (`<job>.json`) served to the autopilot. Unset: none are served |
+| `PATH_FILE_DIR` | no | `/paths` | path files (`<path>.json`) served to the autopilot. Unset: none are served |
 | `NTRIP_HOST`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` | no | (secret, server-side `.env`) | the caster the server tells the gateways to use; all four or none. The password is never logged or returned. `NTRIP_PORT` defaults to `2101`. See [Mower commands](#mower-commands) |
 
 **Database:** TimescaleDB on Postgres 17 (`timescale/timescaledb:2.30.2-pg17`

@@ -147,9 +147,9 @@ func TestMowerIngestEndToEnd(t *testing.T) {
 		metricJSON("usage.total.up", "", "number", "counter", "B"),
 		metricJSON("usage.mqtt.up.*", "", "number", "counter", "B")))
 
-	// Autopilot: state and a catalogue that leaves two keys unlinked (position.heading, job.point).
+	// Autopilot: state and a catalogue that leaves three keys unlinked (position.heading, path.point, path.points).
 	m.pub("autopilot/state", `{"protocol": "0.1", "boot": 57, "firmware": "0.1.0", "previous": null, "partition": "ota_0",
-	  "mode": "idle", "paused": null, "job": null, "recording": null, "fault": null, "time": 1794650000.00}`)
+	  "mode": "idle", "paused": null, "path": null, "recording": null, "fault": null, "time": 1794650000.00}`)
 	m.pub("autopilot/metrics/index", indexJSON(12, "position", "battery"))
 	m.pub("autopilot/metrics/position", partJSON(12, "Position",
 		metricJSON("position.lat", "position.lat", "number", "gauge", "degrees"),
@@ -204,7 +204,7 @@ func TestMowerIngestEndToEnd(t *testing.T) {
 		}
 	}
 	slices.Sort(missing)
-	if !slices.Equal(missing, []string{"job.point", "position.heading"}) {
+	if !slices.Equal(missing, []string{"path.point", "path.points", "position.heading"}) {
 		t.Fatalf("missing keys: %v", missing)
 	}
 
@@ -439,7 +439,7 @@ func TestMowerCatalogueIsUsedOnlyWhenComplete(t *testing.T) {
 	if k := keyOf(d, "blade.on"); k.State != api.KeyLinked {
 		t.Fatalf("%+v", k)
 	}
-	if k := keyOf(d, "job.point"); k.State != api.KeyMissing {
+	if k := keyOf(d, "path.point"); k.State != api.KeyMissing {
 		t.Fatalf("%+v", k)
 	}
 }
@@ -484,7 +484,7 @@ func TestMowerAutopilotStateIsOutOfDateWhileTheGatewayIsNot(t *testing.T) {
 
 	m.pub("gateway/status", "online")
 	m.pub("gateway/state", `{"protocol": "0.1", "boot": 1, "autopilot_link": "up"}`)
-	m.pub("autopilot/state", `{"protocol": "0.2", "boot": 1, "mode": "job"}`)
+	m.pub("autopilot/state", `{"protocol": "0.2", "boot": 1, "mode": "path"}`)
 	d := app.waitDevice(name, "states", func(d api.DeviceDetail) bool { return hasState(d.Autopilot.State) && hasState(d.Gateway.State) })
 	eq(t, d.AutopilotStale, false)
 	// A protocol version the server does not support is shown.

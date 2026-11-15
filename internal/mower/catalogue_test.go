@@ -199,7 +199,7 @@ func TestResolveKeysAcrossBothBoards(t *testing.T) {
 		t.Fatalf("%+v", k)
 	}
 	// Not linked by any metric: reported as missing.
-	for _, key := range []string{"position.heading", "job.point"} {
+	for _, key := range []string{"position.heading", "path.point", "path.points"} {
 		if k := keyState(keys, key); k.State != api.KeyMissing || k.Metric != nil || k.Board != nil || len(k.Candidates) != 0 {
 			t.Fatalf("%s: %+v", key, k)
 		}
@@ -247,7 +247,7 @@ func TestResolveKeysChecksTheKeysType(t *testing.T) {
 	cat := catalogue(t, api.BoardAutopilot,
 		metric("blade.on", "blade.on", "number"), // a bool key
 		metric("gnss.fix", "gnss.fix", "number"), // an enum key
-		metric("job.point", "job.point", "number"),
+		metric("path.point", "path.point", "number"),
 	)
 	keys := ResolveKeys(cat)
 	for _, key := range []string{"blade.on", "gnss.fix"} {
@@ -255,7 +255,7 @@ func TestResolveKeysChecksTheKeysType(t *testing.T) {
 			t.Fatalf("%s: %+v", key, k)
 		}
 	}
-	if k := keyState(keys, "job.point"); k.State != api.KeyLinked {
+	if k := keyState(keys, "path.point"); k.State != api.KeyLinked {
 		t.Fatalf("%+v", k)
 	}
 	// An enum key needs the key's values in the key's order.

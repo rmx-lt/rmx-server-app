@@ -121,7 +121,7 @@ func TestCatalogueKeysLinkedExactlyOnce(t *testing.T) {
 	// §16.4.
 	keys := map[string]struct{ typ, unit string }{
 		"position.lat": {"number", "degrees"}, "position.lon": {"number", "degrees"},
-		"position.heading": {"number", "degrees"}, "gnss.fix": {"enum", ""}, "job.point": {"number", ""},
+		"position.heading": {"number", "degrees"}, "gnss.fix": {"enum", ""}, "path.point": {"number", ""}, "path.points": {"number", ""},
 		"battery.level": {"number", "%"}, "blade.on": {"bool", ""}, "signal.strength": {"number", "dBm"},
 	}
 	linked := map[string][]string{}
@@ -186,7 +186,8 @@ func TestCatalogueMatchesSection165(t *testing.T) {
 		{"autopilot", "gnss.sats", "", "number", "", "gauge", 1, none, true},
 		{"autopilot", "gnss.accuracy", "", "number", "m", "gauge", 1, []int{10}, true},
 		{"autopilot", "gnss.correction_age", "", "number", "s", "gauge", 1, none, true},
-		{"autopilot", "job.point", "job.point", "number", "", "gauge", 1, none, false},
+		{"autopilot", "path.point", "path.point", "number", "", "gauge", 1, none, false},
+		{"autopilot", "path.points", "path.points", "number", "", "gauge", 1, none, false},
 		{"autopilot", "battery.v", "", "number", "V", "gauge", 1, fast, true},
 		{"autopilot", "battery.a", "", "number", "A", "gauge", 1, fast, true},
 		{"autopilot", "battery.power", "", "number", "W", "gauge", 1, fast, true},
@@ -332,8 +333,8 @@ func TestAutopilotTelemetry(t *testing.T) {
 	if v, ok := m["position.heading"]; !ok || v != nil {
 		t.Fatalf("heading standing still: %v %v", v, ok)
 	}
-	if v, ok := m["job.point"]; !ok || v != nil {
-		t.Fatalf("job.point outside a job: %v %v", v, ok)
+	if v, ok := m["path.point"]; !ok || v != nil {
+		t.Fatalf("path.point outside a path: %v %v", v, ok)
 	}
 	if m["gnss.fix"].(float64) != 4 || m["position.lat"].(float64) < 54 || m["blade.on"] != false {
 		t.Fatalf("metrics: %v", m)
@@ -423,7 +424,7 @@ func TestStateMessages(t *testing.T) {
 	if gw["autopilot_link"] != "up" || gw["ntrip"] != "off" || gw["operator"] == nil {
 		t.Errorf("gateway state: %v", gw)
 	}
-	for _, k := range []string{"mode", "paused", "job", "recording", "fault"} {
+	for _, k := range []string{"mode", "paused", "path", "recording", "fault"} {
 		if _, ok := ap[k]; !ok {
 			t.Errorf("autopilot state has no %s", k)
 		}

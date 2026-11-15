@@ -69,7 +69,7 @@ type catPart struct {
 }
 
 var groupLabels = map[string]string{
-	"position": "Position", "gnss": "GNSS", "job": "Job", "battery": "Battery", "drive": "Drive",
+	"position": "Position", "gnss": "GNSS", "path": "Path", "battery": "Battery", "drive": "Drive",
 	"blade": "Blade", "system": "System", "link": "Board link", "signal": "Signal", "usage": "Data usage",
 }
 
@@ -163,7 +163,8 @@ func autopilotDefs() []metricDef {
 		def("gnss.sats", "Satellites", "Satellites used in the solution.", "", 1, noRates, true).rng(0, 40).dec(0),
 		def("gnss.accuracy", "Position accuracy", "Estimated horizontal accuracy.", "m", 1, posRates, true).dec(3),
 		def("gnss.correction_age", "Correction age", "Age of the last correction.", "s", 1, noRates, true).dec(1),
-		def("job.point", "Job point", "Number of the last job point reached.", "", 1, noRates, false).key("job.point").dec(0),
+		def("path.point", "Path point", "Number of the last path point reached.", "", 1, noRates, false).key("path.point").dec(0),
+		def("path.points", "Path points", "Number of points in the path file.", "", 1, noRates, false).key("path.points").dec(0),
 		def("battery.v", "Battery voltage", "Voltage at the battery terminals.", "V", 1, monRates, true).rng(18, 29.4).warnLow(21).dec(2),
 		def("battery.a", "Battery current", "Current drawn from the battery.", "A", 1, monRates, true).rng(0, 20).dec(2),
 		def("battery.power", "Battery power", "Power drawn from the battery.", "W", 1, monRates, true).rng(0, 400).dec(1),
