@@ -115,6 +115,10 @@ The WebSocket carries one envelope:
 An unknown or malformed request gets a `bad_request` error with its
 `request_id` (empty if the message was not JSON); the socket stays open.
 
+The contract between the mower and the server is wiki [Mower-Protocol](Mower-Protocol): topics, payloads,
+commands, chunk transfer. The server does not implement it yet
+([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)); the topics below are what it serves today.
+
 MQTT topics (`<prefix>` is `mower`):
 
 | Topic | Direction | Payload |
@@ -146,7 +150,11 @@ ignored. QoS is 1. Chunks, info and errors are not retained.
 
 The gateway side is
 [rmx-mower-gateway#44](https://github.com/rmx-lt/rmx-mower-gateway/issues/44).
-This section is the contract that firmware is written against.
+This section describes what the server does today. The contract that firmware is
+written against is wiki [Mower-Protocol](Mower-Protocol) §12, which differs from it:
+the topics name their source (`gateway/fw/…`, `autopilot/fw/…`, `autopilot/job/…`),
+job files are served as well as firmware, one request is open per topic set and
+not per device, and the chunk size is fixed at 4096 bytes.
 
 ### Request
 
