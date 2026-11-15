@@ -86,6 +86,7 @@ stays, so nothing runs twice.
 | `metric_latest` | plain table | the newest value per `device` + `board` + `metric`: `time`, `boot`, `value` (null: not known) |
 | `commands` | plain table | the commands the server sent: `id` (primary key), `device`, `board`, `cmd`, `params` (JSONB, **never a secret**), `state` (`sent`, `accepted`, `done`, `failed`, `unknown`), `error`, `message`, `result` (JSONB), `attempts` (1 to 4), `requested_by`, `created_at`, `updated_at`, `finished_at`. The monitor keep-alives are not stored |
 | `ntrip_sent` | plain table | per `device`: a keyed fingerprint of the caster settings its gateway acknowledged (not the password, and it cannot be turned back into it), `sent_at` |
+| `paths` | plain table | the path files the mower downloads: `id` (primary key; the path id of [Mower-Protocol](Mower-Protocol) §11), `doc` (bytea, the file's bytes exactly as the mower gets them, at most 1 MiB), `size` and `sha256` (both generated from `doc`, so they cannot disagree with it), `created_at` |
 | `telemetry` | hypertable | `time`, `device`, `board`, `metric`, `boot`, `value` (double): one row per known value; daily chunks, compressed after a day, no retention policy yet |
 
 The first migrations still create the old `records` and `record_events`
@@ -174,20 +175,26 @@ server does it). The files stay signed or checked by the board; the transport
 adds the SHA-256 of the whole file to every chunk, so a download can start or
 continue at any chunk. Code: `internal/transfer/`.
 
-Three topic sets, each with its own directory, so a request on one set can only
+Three topic sets, each with its own source, so a request on one set can only
 reach that set's files:
 
-| Topics (below `<prefix>/<name>/`) | Who asks | Files | Directory |
+| Topics (below `<prefix>/<name>/`) | Who asks | Files | Source |
 |---|---|---|---|
-| `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | `$FIRMWARE_DIR/gateway/` |
-| `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | `$FIRMWARE_DIR/autopilot/` |
-| `autopilot/path/req`, `chunk`, `res` | autopilot | `<path>.json` | `$PATH_FILE_DIR/` |
+| `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | directory `$FIRMWARE_DIR/gateway/` |
+| `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | directory `$FIRMWARE_DIR/autopilot/` |
+| `autopilot/path/req`, `chunk`, `res` | autopilot | `<path>.json` | table `paths`, row `id = <path>` |
 
-A set whose directory is not there serves no files: every request gets
+A firmware set whose directory is not there serves no files: every request gets
 `not_found`. Names are looked up inside the directory only (`os.Root`), so a name
-cannot escape it. A firmware image is at most 32 MiB, a path file 1 MiB. The
-SHA-256 is cached in memory and recomputed when the file's size or modification
-time changes.
+cannot escape it. A firmware image is at most 32 MiB. The SHA-256 is cached in
+memory and recomputed when the file's size or modification time changes. A path
+file is the `doc` of its row (at most 1 MiB) and its hash is the row's `sha256`;
+a name that is not `<id>.json` of a stored path gets `not_found`.
+
+A path gets into the table through `transfer.StorePath(ctx, q, id, doc)`, an
+internal function (no HTTP route): the tests and, until jobs exist, nothing else
+call it. It keeps the bytes as given, so the `size` and `sha256` of a
+`path_start` command are the row's.
 
 **One request open per topic set.** A board has one request open per set, and the
 server answers requests on different sets side by side: a path file and a firmware
@@ -268,7 +275,7 @@ An error is JSON on `<set>/res` (never on `chunk`):
 | `code` | When |
 |---|---|
 | `bad_request` | The JSON is not a request, the file name is not allowed, or the chunk number is past the end |
-| `not_found` | No such regular file in that set |
+| `not_found` | No such regular file in that set, or no such path in the table |
 | `internal` | The server could not read the file, or it is too large |
 
 `request_id` is empty when the id itself was missing or not valid. Branch on
@@ -278,9 +285,8 @@ An error is JSON on `<set>/res` (never on `chunk`):
 
 `FIRMWARE_DIR` is the directory of firmware images (read-only) with the
 subdirectories `gateway/` and `autopilot/`; a missing subdirectory leaves that
-set empty (logged at start). `PATH_FILE_DIR` is the directory of path files
-(`<path>.json`, read-only for this domain: path planning writes them). Unset, the
-set is not served. There is no chunk-size setting any more.
+set empty (logged at start). Unset, the firmware sets are not served. Paths have
+no setting: they are in the database. There is no chunk-size setting.
 
 **esp-mqtt buffer.** The gateway is an ESP32. esp-mqtt's receive buffer
 (`esp_mqtt_client_config_t.buffer.size`) defaults to
@@ -296,18 +302,20 @@ default: the board's request is a small JSON publish.
 
 ### Mount on the VPS
 
-The app container does not have these directories until `rmx-server-infra`
-mounts them. That change is not in this repo. In `services/app/compose.yaml`, on
+The app container does not have the firmware directory until `rmx-server-infra`
+mounts it. That change is not in this repo. In `services/app/compose.yaml`, on
 `app`:
 
 ```yaml
 environment:
   FIRMWARE_DIR: /firmware
-  PATH_FILE_DIR: /paths
 volumes:
   - <host directory of the images>:/firmware:ro
-  - <host directory of the path files>:/paths:ro
 ```
+
+Paths need no mount: they are in the database
+([rmx-server-infra#109](https://github.com/rmx-lt/rmx-server-infra/issues/109)
+removes the old path directory from the stack).
 
 The images move into `gateway/` and `autopilot/` below the host directory: the
 single flat directory the server served before this layout is not read any more.
@@ -937,9 +945,9 @@ from `.env` (default `dev` / `dev-password-123`). The script:
   one terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
   `.env` it rebuilds and restarts the server and the mower; a build error
   waits for the next save. Ctrl+C stops all three;
-- sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it) and
-  `PATH_FILE_DIR=dev/paths` (both gitignored) when `.env` sets none: drop any
-  `<version>.bin` into the board's subdirectory.
+- sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it,
+  gitignored) when `.env` sets none: drop any `<version>.bin` into the board's
+  subdirectory.
 
 
 **Simulated mower** (`cmd/devsim`). Both boards of a mower on the local
@@ -1028,7 +1036,7 @@ sends commands and live-driving setpoints and serves chunk transfer
 `{"board":"gateway","cmd":"ping"}` reaches the simulated mower and its ack comes
 back in the command's state. A gateway `ota` needs `<version>.bin` in
 `dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a path
-its file in `dev/paths/`. `devsim send` and the tests
+a row in the `paths` table (`transfer.StorePath`). `devsim send` and the tests
 ([Tests and checks](#tests-and-checks)) play the server's part without it.
 
 The real board connects only to the VPS broker (port 8884, client
@@ -1116,10 +1124,10 @@ Then open <http://localhost:8080/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`) start the real
+`app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`, `devsim_path_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
-ping, chunk transfer (a path file and firmware images side by side, every chunk
+ping, chunk transfer (a path file from the `paths` table and firmware images side by side, a path id that is not in the table, every chunk
 checked against the file's SHA-256, the three sets kept apart), the commands
 (an ack, the resend of a lost ack after 5 s with the same id, open commands
 failed by a new boot, a gateway restart and ota refused while the autopilot is in a path, allowed with the board link down or the autopilot idle),
@@ -1148,7 +1156,9 @@ streams and their budget, and the catalogues checked against §16.4 and §16.5.
 `e2e_integration_test.go` (in the integration run) starts devsim against the
 compose Mosquitto on a private topic prefix and plays the server: retained
 `mower/status/server`, commands and repeated ids, driving, recording, a path
-and a gateway update served over chunk transfer, and the switches.
+and a gateway update served over chunk transfer, and the switches. The integration run also builds devsim and runs it against the
+real server: a path stored in the table is downloaded in chunks and followed
+(`devsim_path_test.go`).
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
@@ -1188,7 +1198,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 - Listens on **`0.0.0.0:8080`** (HTTP; TLS is Caddy's job). Publish no port;
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
-  unless `FIRMWARE_DIR` or `PATH_FILE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
+  unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
 - `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
@@ -1214,7 +1224,6 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
 | `FIRMWARE_DIR` | no | `/firmware` | firmware images in the subdirectories `gateway/` and `autopilot/` (`<version>.bin`). Unset: no firmware is served. See [Firmware over MQTT](#firmware-over-mqtt) |
-| `PATH_FILE_DIR` | no | `/paths` | path files (`<path>.json`) served to the autopilot. Unset: none are served |
 | `NTRIP_HOST`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` | no | (secret, server-side `.env`) | the caster the server tells the gateways to use; all four or none. The password is never logged or returned. `NTRIP_PORT` defaults to `2101`. See [Mower commands](#mower-commands) |
 
 **Database:** TimescaleDB on Postgres 17 (`timescale/timescaledb:2.30.2-pg17`
