@@ -33,7 +33,7 @@ func TestParseSuffix(t *testing.T) {
 		{"gateway/cmd", api.BoardGateway, topicOther, ""},
 		{"gateway/fw/req", api.BoardGateway, topicOther, ""},
 		{"autopilot/drive", api.BoardAutopilot, topicOther, ""},
-		{"autopilot/job/chunk", api.BoardAutopilot, topicOther, ""},
+		{"autopilot/path/chunk", api.BoardAutopilot, topicOther, ""},
 		// Wrong board for the topic, bad part names, other roots.
 		{"autopilot/status", api.BoardAutopilot, topicOther, ""},
 		{"gateway/event", api.BoardGateway, topicOther, ""},
@@ -54,7 +54,7 @@ func TestParseSuffix(t *testing.T) {
 func TestParseTelemetry(t *testing.T) {
 	tel, err := ParseTelemetry([]byte(`{
 	  "time": 1794650000.25, "boot": 57,
-	  "metrics": { "position.lat": 54.68712345, "gnss.fix": 4, "blade.on": true, "job.point": null,
+	  "metrics": { "position.lat": 54.68712345, "gnss.fix": 4, "blade.on": true, "path.point": null,
 	               "drive.left.rpm": 52, "usage.mqtt.up.autopilot/telemetry": 1480000, "bad": "text", "worse": [1] }
 	}`))
 	if err != nil {
@@ -75,7 +75,7 @@ func TestParseTelemetry(t *testing.T) {
 	if *got["position.lat"] != 54.68712345 || *got["gnss.fix"] != 4 || *got["blade.on"] != 1 || *got["usage.mqtt.up.autopilot/telemetry"] != 1480000 {
 		t.Fatalf("%v", got)
 	}
-	if v, ok := got["job.point"]; !ok || v != nil {
+	if v, ok := got["path.point"]; !ok || v != nil {
 		t.Fatal("a null value must stay null, not disappear")
 	}
 }
@@ -187,8 +187,8 @@ func TestCounterRates(t *testing.T) {
 }
 
 func TestParseState(t *testing.T) {
-	st, err := ParseState([]byte(`{"protocol": "0.1", "boot": 57, "firmware": "0.1.0", "mode": "job", "paused": null, "time": 1794650000.00}`))
-	if err != nil || st.Boot == nil || *st.Boot != 57 || st.Protocol != "0.1" || st.Mode != "job" {
+	st, err := ParseState([]byte(`{"protocol": "0.1", "boot": 57, "firmware": "0.1.0", "mode": "path", "paused": null, "time": 1794650000.00}`))
+	if err != nil || st.Boot == nil || *st.Boot != 57 || st.Protocol != "0.1" || st.Mode != "path" {
 		t.Fatalf("%+v %v", st, err)
 	}
 	st, err = ParseState([]byte(`{"protocol": "0.1", "boot": 212, "autopilot_link": "up", "future_field": {"a": 1}}`))

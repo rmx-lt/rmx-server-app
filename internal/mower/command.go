@@ -535,8 +535,8 @@ var commandSpecs = map[api.Board]map[string][]param{
 		},
 		"record_start": {{"session", pID, true}, {"spacing", pPositive, false}},
 		"record_stop":  nil,
-		"job_start": {
-			{"job", pID, true}, {"size", pCount, true}, {"sha256", pSHA256, true}, {"from_point", pCount, false},
+		"path_start": {
+			{"path", pID, true}, {"size", pCount, true}, {"sha256", pSHA256, true}, {"from_point", pCount, false},
 		},
 		"pause":       nil,
 		"resume":      nil,
@@ -676,7 +676,7 @@ func numberLiteral(v json.RawMessage) bool {
 // to a device in its current state (§2, §7.1, §6.4):
 //   - a board whose protocol the server does not support gets nothing but ota;
 //   - the gateway is told to restart or update only while the autopilot is idle,
-//     because both take the mower offline and pause a running job.
+//     because both take the mower offline and pause a running path.
 func checkAllowed(row deviceRow, board api.Board, cmd string) error {
 	br := row.gateway
 	if board == api.BoardAutopilot {

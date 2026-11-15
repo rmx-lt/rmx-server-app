@@ -1,11 +1,11 @@
 // Package transfer serves files to the mower's boards as MQTT chunks (wiki
 // Mower-Protocol §12): signed firmware images for the gateway and for the
-// autopilot, and the autopilot's job files.
+// autopilot, and the autopilot's path files.
 //
-// The board checks the image signature and the job file itself. This domain
+// The board checks the image signature and the path file itself. This domain
 // only reads a file out of a directory, splits it into 4096-byte chunks and
 // builds the binary frame. Each topic set (gateway/fw, autopilot/fw,
-// autopilot/job) has its own directory, so a request on one set can only
+// autopilot/path) has its own directory, so a request on one set can only
 // reach that set's files. The topic layout and the byte layout are the
 // contract; the server's side is in wiki Server-App, "Chunk transfer".
 //
@@ -31,8 +31,8 @@ const (
 	HeaderMaxChunk = math.MaxUint16
 	// MaxFirmwareBytes is the largest firmware image this server sends (32 MiB).
 	MaxFirmwareBytes int64 = 32 << 20
-	// MaxJobBytes is the largest job file (1 MiB, §11).
-	MaxJobBytes int64 = 1 << 20
+	// MaxPathBytes is the largest path file (1 MiB, §11).
+	MaxPathBytes int64 = 1 << 20
 	// MaxFileNameLen bounds a file name (§12).
 	MaxFileNameLen = 128
 )

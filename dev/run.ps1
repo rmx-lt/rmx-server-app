@@ -38,10 +38,10 @@ foreach ($line in Get-Content .env) {
 $devUser = if ($dotenv.DEV_USER) { $dotenv.DEV_USER } else { 'dev' }
 $devPassword = if ($dotenv.DEV_PASSWORD) { $dotenv.DEV_PASSWORD } else { 'dev-password-123' }
 if (-not $SimName) { $SimName = if ($dotenv.DEVSIM_NAME) { $dotenv.DEVSIM_NAME } else { 'mower-sim' } }
-# Firmware (gateway/ and autopilot/ below) and job files the server serves to the simulated mower.
+# Firmware (gateway/ and autopilot/ below) and path files the server serves to the simulated mower.
 if (-not $dotenv.FIRMWARE_DIR -and -not $env:FIRMWARE_DIR) { $env:FIRMWARE_DIR = 'dev/firmware' }
-if (-not $dotenv.JOB_DIR -and -not $env:JOB_DIR) { $env:JOB_DIR = 'dev/jobs' }
-New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, dev/jobs, .dev | Out-Null
+if (-not $dotenv.PATH_FILE_DIR -and -not $env:PATH_FILE_DIR) { $env:PATH_FILE_DIR = 'dev/paths' }
+New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, dev/paths, .dev | Out-Null
 
 # --- ports --------------------------------------------------------------------
 # A leftover server or web dev server on these ports would answer instead of
