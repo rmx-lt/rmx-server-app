@@ -19,6 +19,7 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/config"
 	"github.com/rmx-lt/rmx-server-app/internal/db"
 	"github.com/rmx-lt/rmx-server-app/internal/firmware"
+	"github.com/rmx-lt/rmx-server-app/internal/mower"
 	"github.com/rmx-lt/rmx-server-app/internal/mqtt"
 	"github.com/rmx-lt/rmx-server-app/internal/planning"
 	"github.com/rmx-lt/rmx-server-app/internal/ws"
@@ -31,8 +32,10 @@ type app struct {
 	auth *auth.Service
 	// planning holds the users' maps and settings.
 	planning *planning.Service
-	mqtt     *mqtt.Client
-	ws       *ws.Server
+	// mower holds the devices, their state, catalogues and telemetry.
+	mower *mower.Service
+	mqtt  *mqtt.Client
+	ws    *ws.Server
 	// static serves the built web app; nil when STATIC_DIR is not set.
 	static http.Handler
 }
@@ -66,15 +69,19 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	}
 
 	authSvc := auth.New(pool)
+	sockets := ws.New(ctx, authSvc.SessionValid)
+	mowerSvc := mower.New(pool, sockets)
+	mower.RegisterWS(sockets, mowerSvc)
 	mq := mqtt.New(cfg.MQTT)
 	if fw != nil {
 		firmware.RegisterMQTT(mq, fw)
 	}
+	mower.Register(mq, mowerSvc)
 	static, closeStatic := openStatic(cfg.StaticDir)
 	defer closeStatic()
 
 	mq.Start()
-	a := &app{cfg: cfg, pool: pool, auth: authSvc, planning: planning.New(pool), mqtt: mq, ws: ws.New(ctx, authSvc.SessionValid), static: static}
+	a := &app{cfg: cfg, pool: pool, auth: authSvc, planning: planning.New(pool), mower: mowerSvc, mqtt: mq, ws: sockets, static: static}
 
 	var background sync.WaitGroup
 	background.Add(1)
