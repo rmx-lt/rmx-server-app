@@ -36,7 +36,7 @@ export function LoginForm() {
     <div className="flex min-h-full items-center justify-center bg-page p-4 text-fg">
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3 rounded-md border border-line p-5">
         <div>
-          <img src={logo} alt="" className="mb-3 h-12 w-12 rounded-lg" />
+          <img src={logo} alt="" className="mb-3 h-12 w-12 rounded-lg ring-1 ring-line" />
           <h1 className="text-lg font-semibold">RMX</h1>
           <p className="text-sm text-muted">Log in to continue</p>
         </div>
