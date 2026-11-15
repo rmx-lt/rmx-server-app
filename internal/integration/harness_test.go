@@ -146,6 +146,9 @@ func startApp(t *testing.T, pool *db.Pool) *testApp { return startAppWith(t, poo
 type appOptions struct {
 	staticDir   string
 	firmwareDir string
+	jobDir      string
+	// env sets more settings (the NTRIP_* variables).
+	env map[string]string
 }
 
 func startAppWith(t *testing.T, pool *db.Pool, staticDir string) *testApp {
@@ -156,6 +159,9 @@ func startAppOptions(t *testing.T, pool *db.Pool, opts appOptions) *testApp {
 	t.Helper()
 	prefix := "mower/it-" + randomHex(8)
 	cfg, err := config.FromLookup(func(key string) (string, bool) {
+		if v, ok := opts.env[key]; ok {
+			return v, true
+		}
 		switch key {
 		case "MQTT_TOPIC_PREFIX":
 			return prefix, true
@@ -165,6 +171,8 @@ func startAppOptions(t *testing.T, pool *db.Pool, opts appOptions) *testApp {
 			return opts.staticDir, opts.staticDir != ""
 		case "FIRMWARE_DIR":
 			return opts.firmwareDir, opts.firmwareDir != ""
+		case "JOB_DIR":
+			return opts.jobDir, opts.jobDir != ""
 		case "ALLOWED_ORIGINS":
 			return origin + ",http://other.allowed.test", true
 		}

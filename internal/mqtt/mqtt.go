@@ -9,6 +9,9 @@
 //   - HandleTree routes a whole subtree of a device's topics
 //     (<prefix>/+/<root>/#) to one handler, which gets messages one at a time,
 //     in the order they arrived: state, catalogues and telemetry depend on it.
+//     A suffix registered with Handle inside such a subtree (the chunk
+//     transfer topics under gateway/ and autopilot/) is served by its own
+//     handler instead, concurrently with the subtree's.
 //   - It keeps a retained "online" on <prefix>/status/server, replaced by
 //     "offline" on clean shutdown or, via the last will, when the connection dies.
 //
@@ -172,6 +175,9 @@ func (c *Client) ready(cm *autopaho.ConnectionManager) {
 	if len(c.handlers)+len(c.trees) > 0 {
 		subs := make([]paho.SubscribeOptions, 0, len(c.handlers)+len(c.trees))
 		for suffix := range c.handlers {
+			if _, covered := c.trees[firstLevel(suffix)]; covered {
+				continue // the tree's subscription delivers it; a second one would deliver it twice
+			}
 			subs = append(subs, paho.SubscribeOptions{Topic: DeviceFilter(c.cfg.TopicPrefix, suffix), QoS: 1})
 		}
 		for root := range c.trees {
@@ -195,12 +201,21 @@ func (c *Client) ready(cm *autopaho.ConnectionManager) {
 	c.connected.Store(true)
 }
 
-// receive routes one incoming message. A message under a tree root is queued
-// for the ordered worker; any other runs in its own goroutine.
+// receive routes one incoming message. A suffix with its own handler runs in
+// its own goroutine; any other message under a tree root is queued for the
+// ordered worker.
 func (c *Client) receive(topic string, payload []byte) {
 	device, suffix, ok := ParseDeviceTopic(c.cfg.TopicPrefix, topic)
 	if !ok {
 		slog.Debug("ignoring message on unexpected topic", "topic", topic)
+		return
+	}
+	if h, ok := c.handlers[suffix]; ok {
+		c.workers.Add(1)
+		go func() {
+			defer c.workers.Done()
+			h(c.workersCtx, device, payload)
+		}()
 		return
 	}
 	if th, ok := c.trees[firstLevel(suffix)]; ok {
@@ -212,16 +227,7 @@ func (c *Client) receive(topic string, payload []byte) {
 		}
 		return
 	}
-	h, ok := c.handlers[suffix]
-	if !ok {
-		slog.Debug("ignoring message on unexpected topic", "topic", topic)
-		return
-	}
-	c.workers.Add(1)
-	go func() {
-		defer c.workers.Done()
-		h(c.workersCtx, device, payload)
-	}()
+	slog.Debug("ignoring message on unexpected topic", "topic", topic)
 }
 
 // runOrdered runs the tree messages one after another until the client stops.
@@ -247,6 +253,15 @@ func (c *Client) Publish(ctx context.Context, device core.DeviceID, suffix strin
 	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
 	defer cancel()
 	_, err := c.cm.Publish(ctx, &paho.Publish{Topic: DeviceTopic(c.cfg.TopicPrefix, device, suffix), QoS: 1, Payload: payload})
+	return err
+}
+
+// PublishFast sends payload with QoS 0 (no acknowledgement, not retained): for
+// messages that are worthless when late, like live-driving setpoints.
+func (c *Client) PublishFast(ctx context.Context, device core.DeviceID, suffix string, payload []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
+	defer cancel()
+	_, err := c.cm.Publish(ctx, &paho.Publish{Topic: DeviceTopic(c.cfg.TopicPrefix, device, suffix), QoS: 0, Payload: payload})
 	return err
 }
 

@@ -73,3 +73,40 @@ func TestTreeAndSuffixHandlersSideBySide(t *testing.T) {
 		}
 	}
 }
+
+// A suffix with its own handler inside a tree (the chunk topics under gateway/)
+// goes to that handler only, not to the tree's.
+func TestSuffixInsideTreeGoesToItsOwnHandler(t *testing.T) {
+	c := New(config.MQTT{TopicPrefix: "mower"})
+	exact := make(chan string, 4)
+	tree := make(chan string, 4)
+	c.Handle("gateway/fw/req", func(_ context.Context, _ core.DeviceID, p []byte) { exact <- string(p) })
+	c.HandleTree("gateway", func(_ context.Context, _ core.DeviceID, s string, _ []byte) { tree <- s })
+	c.workers.Add(1)
+	go c.runOrdered()
+	defer func() { c.stopWorkers(); c.workers.Wait() }()
+
+	c.receive("mower/m1/gateway/fw/req", []byte("a"))
+	c.receive("mower/m1/gateway/state", nil)
+	select {
+	case got := <-exact:
+		if got != "a" {
+			t.Fatalf("exact handler got %q", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the exact handler was not called")
+	}
+	select {
+	case got := <-tree:
+		if got != "gateway/state" {
+			t.Fatalf("tree handler got %q, want only gateway/state", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the tree handler was not called")
+	}
+	select {
+	case got := <-tree:
+		t.Fatalf("tree handler also got %q", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+}

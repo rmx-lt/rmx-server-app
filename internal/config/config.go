@@ -7,18 +7,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/netip"
 	"os"
 	"strconv"
 	"strings"
-)
-
-// FIRMWARE_CHUNK_BYTES: the default and the bounds. The firmware domain
-// uses the same constants; the maximum fits the uint16 length of its chunk header.
-const (
-	DefaultFirmwareChunkBytes = 4096
-	MinFirmwareChunkBytes     = 256
-	MaxFirmwareChunkBytes     = 16384
 )
 
 // Config holds every setting of the server.
@@ -38,13 +31,50 @@ type Config struct {
 	// StaticDir is STATIC_DIR: built client files to serve at /. Empty
 	// in local development, where the Bun dev server serves the client instead.
 	StaticDir string
-	// FirmwareDir is FIRMWARE_DIR: a directory of *.bin images served to
-	// devices over MQTT. Empty means firmware requests are not served.
+	// FirmwareDir is FIRMWARE_DIR: the firmware images served to the boards
+	// over MQTT, in the subdirectories "gateway" and "autopilot". Empty means
+	// no firmware is served.
 	FirmwareDir string
-	// FirmwareChunkBytes is FIRMWARE_CHUNK_BYTES, default 4096. Each chunk
-	// except the last is this long.
-	FirmwareChunkBytes int
+	// JobDir is JOB_DIR: the job files (<job>.json) served to the autopilot
+	// over MQTT. Empty means no job files are served.
+	JobDir string
+	// NTRIP is the correction caster the gateways use (NTRIP_* variables).
+	// The zero value means none is configured.
+	NTRIP NTRIP
 }
+
+// NTRIP holds the caster settings the server sends to every gateway with
+// ntrip_set (wiki Mower-Protocol §13). The password is a secret: it is read
+// only from the environment, never logged, never returned by the API.
+type NTRIP struct {
+	// Host is NTRIP_HOST; empty means no caster is configured.
+	Host string
+	// Port is NTRIP_PORT, default 2101.
+	Port uint16
+	// Mountpoint is NTRIP_MOUNTPOINT.
+	Mountpoint string
+	// User is NTRIP_USER.
+	User string
+	// Password is NTRIP_PASSWORD. Never logged.
+	Password string
+}
+
+// Configured reports whether a caster is set.
+func (n NTRIP) Configured() bool { return n.Host != "" }
+
+// String hides the password, so a stray %v or %+v does not print it.
+func (n NTRIP) String() string {
+	if !n.Configured() {
+		return "ntrip: none"
+	}
+	return fmt.Sprintf("ntrip: %s:%d/%s as %s", n.Host, n.Port, n.Mountpoint, n.User)
+}
+
+// GoString is String for %#v.
+func (n NTRIP) GoString() string { return n.String() }
+
+// LogValue keeps the password out of structured logs.
+func (n NTRIP) LogValue() slog.Value { return slog.StringValue(n.String()) }
 
 // MQTT holds the broker settings.
 type MQTT struct {
@@ -110,9 +140,9 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 			ClientID:    "rmx-server",
 			TopicPrefix: "mower",
 		},
-		StaticDir:          get("STATIC_DIR"),
-		FirmwareDir:        strings.TrimSpace(get("FIRMWARE_DIR")),
-		FirmwareChunkBytes: DefaultFirmwareChunkBytes,
+		StaticDir:   get("STATIC_DIR"),
+		FirmwareDir: strings.TrimSpace(get("FIRMWARE_DIR")),
+		JobDir:      strings.TrimSpace(get("JOB_DIR")),
 	}
 	if v := get("BIND_ADDR"); v != "" {
 		if _, err := netip.ParseAddrPort(strings.TrimSpace(v)); err != nil {
@@ -130,13 +160,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		}
 		c.MQTT.TopicPrefix = v
 	}
-	if v := get("FIRMWARE_CHUNK_BYTES"); v != "" {
-		n := number("FIRMWARE_CHUNK_BYTES", uint64(DefaultFirmwareChunkBytes), 16)
-		if n < uint64(MinFirmwareChunkBytes) || n > uint64(MaxFirmwareChunkBytes) {
-			errs = append(errs, fmt.Errorf("FIRMWARE_CHUNK_BYTES must be %d to %d", MinFirmwareChunkBytes, MaxFirmwareChunkBytes))
-		}
-		c.FirmwareChunkBytes = int(n)
-	}
+	c.NTRIP = ntrip(get, number, &errs)
 	if v := required("ALLOWED_ORIGINS"); v != "" {
 		origins, err := ParseOrigins(v)
 		if err != nil {
@@ -148,6 +172,33 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// ntrip reads the NTRIP_* variables: none, or all of host, mountpoint, user and
+// password (the port defaults to 2101).
+func ntrip(get func(string) string, number func(string, uint64, int) uint64, errs *[]error) NTRIP {
+	n := NTRIP{
+		Host:       strings.TrimSpace(get("NTRIP_HOST")),
+		Mountpoint: strings.TrimSpace(get("NTRIP_MOUNTPOINT")),
+		User:       strings.TrimSpace(get("NTRIP_USER")),
+		Password:   get("NTRIP_PASSWORD"),
+	}
+	if n.Host == "" && n.Mountpoint == "" && n.User == "" && n.Password == "" && get("NTRIP_PORT") == "" {
+		return NTRIP{}
+	}
+	port := number("NTRIP_PORT", 2101, 16)
+	if port == 0 {
+		*errs = append(*errs, errors.New("NTRIP_PORT must be 1 to 65535"))
+	}
+	n.Port = uint16(port)
+	for _, f := range []struct{ key, value string }{
+		{"NTRIP_HOST", n.Host}, {"NTRIP_MOUNTPOINT", n.Mountpoint}, {"NTRIP_USER", n.User}, {"NTRIP_PASSWORD", n.Password},
+	} {
+		if f.value == "" {
+			*errs = append(*errs, fmt.Errorf("%s is not set (the NTRIP settings go together)", f.key))
+		}
+	}
+	return n
 }
 
 // ParseOrigins reads origins as browsers send them: lower-case

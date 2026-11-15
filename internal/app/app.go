@@ -18,10 +18,10 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/auth"
 	"github.com/rmx-lt/rmx-server-app/internal/config"
 	"github.com/rmx-lt/rmx-server-app/internal/db"
-	"github.com/rmx-lt/rmx-server-app/internal/firmware"
 	"github.com/rmx-lt/rmx-server-app/internal/mower"
 	"github.com/rmx-lt/rmx-server-app/internal/mqtt"
 	"github.com/rmx-lt/rmx-server-app/internal/planning"
+	"github.com/rmx-lt/rmx-server-app/internal/transfer"
 	"github.com/rmx-lt/rmx-server-app/internal/ws"
 )
 
@@ -60,22 +60,18 @@ func Run(ctx context.Context, cfg *config.Config, ln net.Listener) error {
 // when it stops.
 func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listener) error {
 	defer pool.Close()
-	fw, err := openFirmware(cfg)
+	files, err := transfer.Open(transfer.Config{FirmwareDir: cfg.FirmwareDir, JobDir: cfg.JobDir})
 	if err != nil {
 		return err
 	}
-	if fw != nil {
-		defer fw.Close()
-	}
+	defer files.Close()
 
 	authSvc := auth.New(pool)
 	sockets := ws.New(ctx, authSvc.SessionValid)
 	mowerSvc := mower.New(pool, sockets)
 	mower.RegisterWS(sockets, mowerSvc)
 	mq := mqtt.New(cfg.MQTT)
-	if fw != nil {
-		firmware.RegisterMQTT(mq, fw)
-	}
+	transfer.RegisterMQTT(mq, files)
 	mower.Register(mq, mowerSvc)
 	static, closeStatic := openStatic(cfg.StaticDir)
 	defer closeStatic()
@@ -121,18 +117,4 @@ func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listen
 	background.Wait()
 	slog.Info("stopped")
 	return nil
-}
-
-// openFirmware opens FIRMWARE_DIR. An empty path means firmware is off.
-func openFirmware(cfg *config.Config) (*firmware.Service, error) {
-	if cfg.FirmwareDir == "" {
-		slog.Info("firmware directory is not set; firmware requests are not served")
-		return nil, nil
-	}
-	svc, err := firmware.Open(cfg.FirmwareDir, cfg.FirmwareChunkBytes)
-	if err != nil {
-		return nil, err
-	}
-	slog.Info("firmware directory ready", "dir", cfg.FirmwareDir, "chunk_bytes", cfg.FirmwareChunkBytes)
-	return svc, nil
 }
