@@ -772,8 +772,8 @@ at most 16 KiB of JSON, at most 100 settings per user.
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
 `65d23b7` (rmx-server-app#51): draw a map (mowing zones and no-go zones) on a canvas, inspect it, and save it. It opens on the login form
-when there is no session; after login the workbench loads, with the user menu
-(log out, log out everywhere) at the right of its header. While logged in the
+when there is no session; after login the shell loads (see "The shell" below).
+While logged in the
 app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
 whether the session still exists and shows the login form if not.
 
@@ -791,10 +791,11 @@ whether the session still exists and shows the login form if not.
   and writes them back unchanged on every save (renumbered if a drawn zone took
   their id).
 - **Saving.** Everything is saved by itself; there is no save status, Save
-  button, autosave switch or leave-page warning. A new map (File → New, Ctrl+Alt+N)
-  is created on the server at once, and a page load opens the map changed last
-  (or creates one when the user has none). File → Open (Ctrl+O) opens another;
-  File → Duplicate makes a copy ("name (copy)") and opens it. A change is saved
+  button, autosave switch or leave-page warning. A new map (New map in the
+  side panel, Ctrl+Alt+N) is created on the server at once, and a page load
+  opens the map changed last (or creates one when the user has none). A click
+  in the map list opens another; Duplicate in its menu makes a copy ("name
+  (copy)") and opens it. A change is saved
   one second after the last one (a burst is one save): the whole map with the
   `revision` it was loaded or saved at (`web/src/data/planning/autosave.ts`,
   wired up in `features/canvas-editing/data/canvasBridge.ts`). A failed save is
@@ -805,7 +806,7 @@ whether the session still exists and shows the login form if not.
   between (409 `conflict`), the client reads the stored revision and saves its
   own document over it: the user's change is never dropped, the other window's
   change to the same map is. The only state shown is the connection: "Live"
-  while the WebSocket is open, "Offline" otherwise (status bar, left).
+  while the WebSocket is open, "Offline" otherwise (top bar, right).
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
   read once per login.
@@ -840,10 +841,55 @@ whether the session still exists and shows the login form if not.
   (`prefers-color-scheme`); the user's choice (system, dark, light) is kept in
   the browser (`localStorage` key `rmx:theme`, no server involved), and a small
   script in `public/index.html` applies it before first paint, so there is no
-  flash. For now the choice sits in three buttons in the header
-  (`components/theme-switch/`); the settings modal
-  ([rmx-server-app#104](https://github.com/rmx-lt/rmx-server-app/issues/104))
-  takes it over.
+  flash. The choice is made in the settings modal, page
+  Appearance.
+- **The shell.** The structure of the Claude desktop app, with the canvas in
+  place of the chat (`web/src/layouts/workbench-window/`):
+  - **Side panel** (left, collapsible; Ctrl+Alt+C): logo and name, New map, the
+    mode switch, the map list, a device spot (placeholder until
+    [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
+    and at the bottom the account menu and the settings button. The list shows
+    the newest change first and marks the open map; its menu per map has
+    Rename, Duplicate and Delete (a confirmation first). Deleting the open map
+    opens the next one, or makes a new one when it was the last.
+  - **Top bar:** the open map's name in the middle (click to rename; the same
+    rename as the list menu), the connection state and the right panel toggle.
+  - **Canvas** in the middle, with the tool strip floating at the bottom
+    middle (a rounded strip) and the view controls (zoom in, zoom out, fit all
+    zones, home) at the bottom right in every mode.
+  - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (the map's
+    zone counts, area to mow and perimeter; for a selected zone its category
+    and gross and net area; no vertex data) and Monitor (a placeholder).
+  - **Settings modal**: a page list on the left. Account (user name, log out,
+    log out everywhere), Appearance (theme, unit of measure) and Map defaults
+    (the default geo anchor of new maps, and the open map's own). Later pages
+    (users, NTRIP, devices, shortcuts) come with their own issues.
+  - Under 768 px the side panel, and under 1024 px the right panel, float over
+    the canvas instead of sitting beside it (a tap outside closes them);
+    opening one closes the other on a narrow screen, and both start closed
+    there.
+  - Modals, menus, tabs and selects are Headless UI (focus trap, Escape,
+    arrow keys); icons are `lucide-react`. The panel and tool state lives in
+    `features/ui-manager/stores/uiShellStore.ts`.
+- **Modes.** Plan, Drive and Mow, switched in the side panel; one store
+  (`model/modeStore.ts`) holds the mode, and `config/modes/modes.ts` says what
+  each shows. The mode decides the tool strip, the visible canvas layers and the
+  right panel's content (Details while planning, Monitor in the other two);
+  there is no separate view switch, and users can't switch layers.
+
+  | Mode | Tool strip | Layers |
+  |---|---|---|
+  | Plan | select (S), mowing zone (Z), no-go zone (O), delete (D), undo (Ctrl+Z), redo (Ctrl+Y) | zones |
+  | Drive | driving control, mower mode, blade, stop, record border, rewind, save as zone | zones, mower, draft border |
+  | Mow | plan job, start, pause, resume, go to point, follow path | zones, job path, progress, mower |
+
+  Plan works fully; the tools and their shortcuts work in Plan mode only, and
+  leaving Plan puts the active tool away. Drive and Mow are the shell only:
+  their tools are inert (they stay in the Tab order and say in a tooltip what
+  they will do) and their layers have nothing to draw yet. The behaviour comes
+  with [rmx-server-app#94](https://github.com/rmx-lt/rmx-server-app/issues/94),
+  [#105](https://github.com/rmx-lt/rmx-server-app/issues/105) and
+  [#106](https://github.com/rmx-lt/rmx-server-app/issues/106).
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
   monitor feature, and the only `fetch` calls go to the app's own
@@ -919,13 +965,13 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
   scripts/build.ts      production build → dist/
   src/
     app/                main, App, login gate, WebSocket keep-alive
-    layouts/            shell regions; compose features
+    layouts/            the shell (workbench-window/: side-panel, top-bar, canvas, right-panel, settings); composes features
     features/<name>/    {components,hooks,stores,data,utils,types}; auth + the blade-terminal features
     model/              state several features share
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
       planning/         maps (load, save, conversion to the wire format), settings
-    components/         generic widgets only
+    components/         generic widgets only (ui/ Button and Modal, tool-strip/, settings-panel/ rows, inspector-panel/ rows and tabs, confirmation modal)
     hooks/ utils/ config/ styles/ assets/ testing/
 ```
 
