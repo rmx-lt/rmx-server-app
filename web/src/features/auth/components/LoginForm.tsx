@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { login } from "@/features/auth/data/session";
+import logo from "@/assets/rmx-logo.png";
 
 /**
  * The page's own login. There is no sign-up: users are created on the server
@@ -35,8 +36,9 @@ export function LoginForm() {
     <div className="flex min-h-full items-center justify-center bg-zinc-950 p-4 text-zinc-100">
       <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-3 rounded-md border border-zinc-800 p-5">
         <div>
-          <h1 className="text-lg font-semibold">Blade of Grass</h1>
-          <p className="text-sm text-zinc-400">Blade of Grass · log in to continue</p>
+          <img src={logo} alt="" className="mb-3 h-12 w-12 rounded-lg" />
+          <h1 className="text-lg font-semibold">RMX</h1>
+          <p className="text-sm text-zinc-400">Log in to continue</p>
         </div>
         {notice && !error && <p className="text-sm text-zinc-300">{notice}</p>}
         <input

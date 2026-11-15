@@ -24,11 +24,11 @@ interface Window {
   showOpenFilePicker(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;
 }
 
-declare module "*.svg" {
+declare module "*.png" {
   /**
-   * A path to the SVG file
+   * A path to the PNG file
    */
-  const path: `${string}.svg`;
+  const path: `${string}.png`;
   export = path;
 }
 
