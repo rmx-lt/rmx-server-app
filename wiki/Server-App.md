@@ -2,9 +2,11 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
-for the browser, firmware images to the mower's devices over MQTT, what the
-mower reports (state, metric catalogues, telemetry, events; see
-[Mower ingest](#mower-ingest)), and the web app: the planning workbench ported
+for the browser, firmware images and job files to the mower's boards over MQTT
+(see [Firmware over MQTT](#firmware-over-mqtt)), what the mower reports (state,
+metric catalogues, telemetry, events; see [Mower ingest](#mower-ingest)), the
+commands, live driving and monitor streams it sends the mower (see
+[Mower commands](#mower-commands)), and the web app: the planning workbench ported
 from blade-terminal (see [Web app](#web-app)); the other mower features build on that.
 
 The stack: a Go server (`net/http`, pgx, goose, paho.golang,
@@ -18,6 +20,7 @@ and ported to Go in November 2026, when the backend language was decided
 - [How it works](#how-it-works)
 - [Firmware over MQTT](#firmware-over-mqtt)
 - [Mower ingest](#mower-ingest)
+- [Mower commands](#mower-commands)
 - [Login and sessions](#login-and-sessions)
 - [Planning API](#planning-api)
 - [Web app](#web-app)
@@ -44,15 +47,18 @@ over HTTPS and its WebSocket, with their session.
 
 - **HTTPS**: login and logout under `/api/auth`, the user's maps
   and settings under `/api/maps` and `/api/settings` (see [Planning API](#planning-api)), the
-  devices under `/api/devices` (see [Mower ingest](#mower-ingest)), `/health`,
+  devices under `/api/devices` (see [Mower ingest](#mower-ingest)), their commands
+  and monitor streams (see [Mower commands](#mower-commands)), `/health`,
   and the built client at `/`.
 - **WSS**: `/ws`, JSON request/response with a `request_id`, plus messages the
-  server pushes. Requests: `ping` and the device requests of
-  [Mower ingest](#mower-ingest); the connection (session check, keep-alive, close
-  codes) is what later features build on.
+  server pushes. Requests: `ping`, the device requests of
+  [Mower ingest](#mower-ingest), and live driving and monitor streams of
+  [Mower commands](#mower-commands); the connection (session check, keep-alive,
+  close codes) is what later features build on.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
-  `mower/status/server`, sends firmware images as binary chunks on
-  `mower/<client-id>/fw/chunk` (see [Firmware over MQTT](#firmware-over-mqtt)),
+  `mower/status/server`, is the only publisher of commands and live-driving
+  setpoints (see [Mower commands](#mower-commands)), serves firmware images and
+  job files as binary chunks (see [Firmware over MQTT](#firmware-over-mqtt)),
   and stores what the gateway and the autopilot publish under
   `mower/<name>/gateway/…` and `mower/<name>/autopilot/…` (see [Mower ingest](#mower-ingest)).
 - **Login**: the app's own login page and server-side sessions in a cookie
@@ -78,6 +84,8 @@ stays, so nothing runs twice.
 | `catalogues` | plain table | the catalogue in use per `device` + `board`: `revision`, `doc` (JSONB), `updated_at` |
 | `device_events` | plain table | autopilot events: `device`, `board`, `boot`, `seq`, `time`, `event`, `data` (JSONB: the other fields), `received_at`; primary key `device` + `board` + `boot` + `seq` |
 | `metric_latest` | plain table | the newest value per `device` + `board` + `metric`: `time`, `boot`, `value` (null: not known) |
+| `commands` | plain table | the commands the server sent: `id` (primary key), `device`, `board`, `cmd`, `params` (JSONB, **never a secret**), `state` (`sent`, `accepted`, `done`, `failed`, `unknown`), `error`, `message`, `result` (JSONB), `attempts` (1 to 4), `requested_by`, `created_at`, `updated_at`, `finished_at`. The monitor keep-alives are not stored |
+| `ntrip_sent` | plain table | per `device`: a keyed fingerprint of the caster settings its gateway acknowledged (not the password, and it cannot be turned back into it), `sent_at` |
 | `telemetry` | hypertable | `time`, `device`, `board`, `metric`, `boot`, `value` (double): one row per known value; daily chunks, compressed after a day, no retention policy yet |
 
 The first migrations still create the old `records` and `record_events`
@@ -130,157 +138,149 @@ An unknown or malformed request gets a `bad_request` error with its
 
 The contract between the mower and the server is wiki [Mower-Protocol](Mower-Protocol): topics, payloads,
 commands, chunk transfer. The server implements the state, catalogue, telemetry
-and event topics of it (see [Mower ingest](#mower-ingest)); commands, chunk
-transfer, jobs, recording and the monitor follow
-([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)). The firmware topics below are the older
-subset it still serves.
+and event topics of it (see [Mower ingest](#mower-ingest)), the commands, live
+driving and monitor (see [Mower commands](#mower-commands)) and chunk transfer
+(see [Firmware over MQTT](#firmware-over-mqtt)); job planning, border recording
+and the autopilot's side of them follow
+([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)).
 
-MQTT topics (`<prefix>` is `mower`):
+MQTT topics (`<prefix>` is `mower`; the full table is wiki
+[Mower-Protocol](Mower-Protocol) §3):
 
 | Topic | Direction | Payload |
 |---|---|---|
 | `<prefix>/status/server` | server → all, **retained** | `online` / `offline` (last will) |
-| `<prefix>/<client-id>/fw/req` | client → server | firmware request (JSON) |
-| `<prefix>/<client-id>/fw/chunk` | server → client | one firmware chunk (binary) |
-| `<prefix>/<client-id>/fw/res` | server → client | firmware info, or a JSON error |
+| `<prefix>/<name>/<board>/cmd` | server → device | a command (JSON), QoS 1; `<board>` is `gateway` or `autopilot` |
+| `<prefix>/<name>/<board>/cmd/ack` | device → server | the ack of a command |
+| `<prefix>/<name>/autopilot/drive` | server → device | a live-driving setpoint, QoS 0 |
+| `<prefix>/<name>/<board>/monitor` | device → server | monitor samples, QoS 0 |
+| `<prefix>/<name>/gateway/fw/…`, `autopilot/fw/…`, `autopilot/job/…` | both | chunk transfer: `req` (device → server), `chunk` and `res` (server → device) |
 | `<prefix>/<name>/gateway/#`, `<prefix>/<name>/autopilot/#` | device → server | subscribed as a whole; the topics handled are in [Mower ingest](#mower-ingest) |
 
-The byte layout of a chunk, and the firmware request, are in
-[Firmware over MQTT](#firmware-over-mqtt). Nothing on the `fw` topics is retained.
+The byte layout of a chunk, and the request, are in
+[Firmware over MQTT](#firmware-over-mqtt). Nothing on these topics is retained.
 
-The client id travels in the topic (like `mower/<id>/cmd`; `status` is reserved and cannot be a client id), not in
-MQTT 5 properties, so the scheme works on MQTT 3.1.1 and on small device
-clients, and a broker ACL can scope each login to its own topics. The server
-answers only on the topics of the id it got the request on.
+The device name travels in the topic (`status` is reserved and cannot be a
+device name), not in MQTT 5 properties, so the scheme works on MQTT 3.1.1 and on
+small device clients, and a broker ACL can scope each login to its own topics.
+The server answers only on the topics of the name it got the request on.
 
 ## Firmware over MQTT
 
-A device downloads a firmware image as binary chunks on the same MQTT
-connection it already uses. The image file is a signed `<version>.bin` in the
-server's firmware folder (Caddy's HTTPS `/fw/` download was removed on
-2026-11-13). The file stays signed; the device checks the signature. This transport adds a SHA-256 of the
-whole file, and the device can resume from any chunk index.
+A board downloads a firmware image or a job file as binary chunks on the same
+MQTT connection it already uses: **chunk transfer**, wiki
+[Mower-Protocol](Mower-Protocol) §12 (the contract; this section says how the
+server does it). The files stay signed or checked by the board; the transport
+adds the SHA-256 of the whole file to every chunk, so a download can start or
+continue at any chunk. Code: `internal/transfer/`.
 
-One firmware request is in flight per device. A second request that arrives
-before the answer is published is ignored. A topic that does not parse is
-ignored. QoS is 1. Chunks, info and errors are not retained.
+Three topic sets, each with its own directory, so a request on one set can only
+reach that set's files:
 
-The gateway side is
-[rmx-mower-gateway#44](https://github.com/rmx-lt/rmx-mower-gateway/issues/44).
-This section describes what the server does today. The contract that firmware is
-written against is wiki [Mower-Protocol](Mower-Protocol) §12, which differs from it:
-the topics name their source (`gateway/fw/…`, `autopilot/fw/…`, `autopilot/job/…`),
-job files are served as well as firmware, one request is open per topic set and
-not per device, and the chunk size is fixed at 4096 bytes.
+| Topics (below `<prefix>/<name>/`) | Who asks | Files | Directory |
+|---|---|---|---|
+| `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | `$FIRMWARE_DIR/gateway/` |
+| `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | `$FIRMWARE_DIR/autopilot/` |
+| `autopilot/job/req`, `chunk`, `res` | autopilot | `<job>.json` | `$JOB_DIR/` |
+
+A set whose directory is not there serves no files: every request gets
+`not_found`. Names are looked up inside the directory only (`os.Root`), so a name
+cannot escape it. A firmware image is at most 32 MiB, a job file 1 MiB. The
+SHA-256 is cached in memory and recomputed when the file's size or modification
+time changes.
+
+**One request open per topic set.** A board has one request open per set, and the
+server answers requests on different sets side by side: a job file and a firmware
+image download at the same time. A second request on the same set that arrives
+before the answer to the first is published is ignored (the board asks again
+after its 10 s). QoS is 1. Chunks and errors are not retained. A topic that does
+not parse is ignored.
 
 ### Request
 
-The device publishes a JSON object on `<prefix>/<name>/fw/req`. `<name>` is
-the device id, the same rules as any other client id (1–64 of
-`[A-Za-z0-9_-]`; `status` is not an id).
+The board publishes a JSON object on `<set>/req`:
 
 ```json
 { "request_id": "c0", "file": "1.2.3.bin", "chunk": 0 }
-{ "request_id": "i0", "op": "info", "file": "1.2.3.bin" }
 ```
 
 | Field | Rule |
 |---|---|
-| `request_id` | Required. 1–64 of `[A-Za-z0-9_-]`. |
-| `op` | `chunk` or `info`. Omitted means `chunk`. Unknown fields are ignored. |
-| `file` | Required. The file name only, not a path: `[A-Za-z0-9._-]+\.bin`, at most 128 characters. The version is that name (`1.2.3.bin`), the same last segment as the old HTTPS URL. |
-| `chunk` | Required for `chunk`: an integer from 0. Ignored for `info`. |
+| `request_id` | Required. 1–64 of `[A-Za-z0-9_-]`, new for every request. |
+| `file` | Required. 1–128 of `[A-Za-z0-9._-]`, never a path (`.` and `..` are refused). |
+| `chunk` | Required. An integer from 0. Unknown fields are ignored. |
 
-The body is at most 1024 bytes. `info` is optional. Chunk 0, and every other
-chunk, already carries the size, the chunk count and the SHA-256.
+The body is at most 4096 bytes. There is no `info` request: every chunk carries
+the size, the chunk count and the SHA-256.
 
 ### Chunk frame
 
-The answer to `chunk` is one binary MQTT payload on
-`<prefix>/<name>/fw/chunk`: a 64-byte little-endian header, then the raw
-bytes. No base64. Integers are little-endian. The ESP32 is little-endian, and
-every field below is naturally aligned, so a packed C struct of this layout
-matches the bytes.
+The answer is one binary MQTT payload on `<set>/chunk`: a 64-byte little-endian
+header, then the chunk's bytes. Every field is naturally aligned, so a packed C
+struct of this layout matches the bytes.
 
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `RMFW` (bytes `52 4D 46 57`) |
 | 4 | 1 | Header version, `1` |
-| 5 | 1 | Flags. Bit 0 is set: bytes 32–63 are the whole-image SHA-256. Other bits are 0 |
-| 6 | 2 | Header length, `64`. The payload starts at this offset |
-| 8 | 4 | Chunk index |
-| 12 | 4 | Chunk count |
-| 16 | 4 | Image size, in bytes |
-| 20 | 2 | Chunk length: how many payload bytes follow the header |
+| 5 | 1 | Flags, `1`: bytes 32–63 are the whole-file SHA-256 |
+| 6 | 2 | Header length, `64`. The chunk starts at this offset |
+| 8 | 4 | Chunk number |
+| 12 | 4 | Number of chunks in the file |
+| 16 | 4 | File size, in bytes |
+| 20 | 2 | Chunk length: how many bytes follow the header |
 | 22 | 2 | Reserved, `0` |
 | 24 | 8 | Request-id hash: the first 8 bytes of SHA-256 over the raw UTF-8 `request_id` |
-| 32 | 32 | SHA-256 of the whole image, raw bytes (not hex) |
+| 32 | 32 | SHA-256 of the whole file, raw bytes (not hex) |
 | 64 | chunk length | The chunk |
 
-Reject a frame whose magic, version, flags, header length or reserved field
-differ, or whose MQTT payload length is not `64 + chunk length`. The SHA-256
-in every chunk is the same, so a resume from the middle does not need a
-separate info call. An empty file is one chunk of length 0 (the SHA-256 of
-empty input). The last chunk of a longer file is shorter than the chunk size.
-A chunk index at or past the chunk count is an error, not an empty frame.
+A chunk is **4096 bytes**, fixed; only the last one of a file is shorter. An
+empty file is one chunk of length 0 (with the SHA-256 of empty input). A board
+drops a chunk whose magic, version, flags, header length or reserved field
+differ, whose MQTT payload is not `64 + chunk length`, or whose request-id hash
+is not that of its open request. A chunk number at or past the chunk count is an
+error, not an empty frame.
 
 ```c
 typedef struct __attribute__((packed)) {
     char magic[4];             /* 'R','M','F','W' */
     uint8_t version;           /* 1 */
-    uint8_t flags;             /* bit 0 set */
+    uint8_t flags;             /* 1 */
     uint16_t header_len;       /* 64 */
     uint32_t chunk_index;
     uint32_t chunk_count;
-    uint32_t image_size;
+    uint32_t file_size;
     uint16_t chunk_len;
     uint16_t reserved;         /* 0 */
     uint8_t request_id_hash[8];
     uint8_t sha256[32];
-} rmx_fw_header_t;
+} rmx_chunk_header_t;
 ```
 
-### Info and errors
+### Errors
 
-`info`, and every error, is JSON on `<prefix>/<name>/fw/res` (not on
-`fw/chunk`).
-
-```json
-{
-  "request_id": "i0",
-  "op": "info",
-  "file": "1.2.3.bin",
-  "size": 9000,
-  "sha256": "0123abcd…",
-  "chunk_size": 4096,
-  "chunks": 3
-}
-```
-
-`sha256` here is 64 lower-case hex characters. `chunk_size` is the server's
-configured size; only the last chunk is shorter.
+An error is JSON on `<set>/res` (never on `chunk`):
 
 ```json
-{ "request_id": "c3", "error": { "code": "bad_request", "message": "chunk is past the end of the file" } }
+{ "request_id": "c3", "error": { "code": "not_found", "message": "no such file" } }
 ```
 
 | `code` | When |
 |---|---|
-| `bad_request` | The JSON is not a request, the file name is not allowed, or the chunk index is past the end |
-| `not_found` | No such regular file in the firmware directory |
-| `internal` | The file is larger than 32 MiB, or the server could not read it |
+| `bad_request` | The JSON is not a request, the file name is not allowed, or the chunk number is past the end |
+| `not_found` | No such regular file in that set |
+| `internal` | The server could not read the file, or it is too large |
 
-`request_id` is empty when the id itself was missing or not valid. The
-message strings are stable enough to log; branch on `code`.
+`request_id` is empty when the id itself was missing or not valid. Branch on
+`code`; the message is for logs.
 
-### Files, chunk size, and the device buffer
+### Files and settings
 
-`FIRMWARE_DIR` is the directory of images (read-only). Unset, the server does
-not subscribe to `fw/req` and firmware is off. `FIRMWARE_CHUNK_BYTES` is the
-chunk size, default **4096**, allowed **256–16384**. A file over **32 MiB**
-is refused. The SHA-256 is cached in memory and recomputed when the file's
-size or modification time changes. Names are looked up inside that directory
-only (`os.Root`), so a name cannot escape it.
+`FIRMWARE_DIR` is the directory of firmware images (read-only) with the
+subdirectories `gateway/` and `autopilot/`; a missing subdirectory leaves that
+set empty (logged at start). `JOB_DIR` is the directory of job files
+(`<job>.json`, read-only for this domain: job planning writes them). Unset, the
+set is not served. There is no chunk-size setting any more.
 
 **esp-mqtt buffer.** The gateway is an ESP32. esp-mqtt's receive buffer
 (`esp_mqtt_client_config_t.buffer.size`) defaults to
@@ -290,33 +290,34 @@ buffer is still delivered, as several `MQTT_EVENT_DATA` callbacks with
 `current_data_offset` and `total_data_len` (ESP-IDF v5.4.1 MQTT docs). A 4096-byte
 chunk plus the 64-byte header and the MQTT framing (topic, packet id) is
 about 4.2 KB, so the default 1024-byte buffer works only if the firmware
-reassembles those callbacks. Set `buffer.size` to at least
-`96 + FIRMWARE_CHUNK_BYTES` (5120 for the default 4096-byte chunk; 8192
-leaves room to raise the chunk size later) so one event is the whole frame.
-`buffer.out_size` can stay at the default: the device's request is a small
-JSON publish, and esp-mqtt already fragments a publish that is larger than
-the output buffer. One request in flight matches a small LTE uplink.
+reassembles those callbacks. Set `buffer.size` to at least 5120 (8192 leaves
+room) so one event is the whole frame. `buffer.out_size` can stay at the
+default: the board's request is a small JSON publish.
 
 ### Mount on the VPS
 
-The app container does not have the firmware directory until
-`rmx-server-infra` mounts it. That change is not in this repo. In
-`services/app/compose.yaml`, on `app`:
+The app container does not have these directories until `rmx-server-infra`
+mounts them. That change is not in this repo. In `services/app/compose.yaml`, on
+`app`:
 
 ```yaml
 environment:
   FIRMWARE_DIR: /firmware
+  JOB_DIR: /jobs
 volumes:
   - <host directory of the images>:/firmware:ro
+  - <host directory of the job files>:/jobs:ro
 ```
 
-The host directory of the images is in `rmx-server-infra` (Caddy no longer
-serves it; its name follows the stack's rename in
-[rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)). The container runs as uid
-65532, so that directory needs to be readable by it (directories `0755` and
-files `0644` are enough). No Mosquitto ACL change: `app` already has
-readwrite `mower/#`, and each device already has `mower/<its username>/#`,
-which covers `fw/req`, `fw/chunk` and `fw/res`.
+The images move into `gateway/` and `autopilot/` below the host directory: the
+single flat directory the server served before this layout is not read any more.
+The host directory is in `rmx-server-infra` (Caddy no longer serves it; its name
+follows the stack's rename in
+[rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)). The
+container runs as uid 65532, so the directories need to be readable by it
+(directories `0755` and files `0644` are enough). No Mosquitto ACL change: `app`
+already has readwrite `mower/#`, and each device already has
+`mower/<its username>/#`, which covers every topic above.
 
 ## Mower ingest
 
@@ -324,7 +325,8 @@ What the mower tells the server, and what the server shows of it. The contract
 is wiki [Mower-Protocol](Mower-Protocol) §3, §4, §6, §7 and §16; this section
 says what the server does with it. Code: `internal/mower/` (`mqtt.go` payloads,
 `catalogue.go`, `store.go`, `service.go`, `http.go`, `ws.go`), wire types in
-`internal/api/mower.go`.
+`internal/api/mower.go`. The command acks and monitor samples that arrive on the
+same subscription are handled by [Mower commands](#mower-commands).
 
 **The server holds no formulas or hardware constants.** It stores and shows
 what the mower sends. The one thing it knows about a mower is the list of keys
@@ -454,6 +456,148 @@ Pushed to every open socket (no request):
 |---|---|---|
 | `device_changed` | `device`, `board` (null for the gateway status), `change` | `status`, `state`, `boot`, `catalogue` (the catalogue in use changed, so the keys may have), or `event`; the client loads the device again |
 | `telemetry` | `device`, `board`, `time`, `boot`, `values` (`metric`, `value`) | every telemetry message stored, so a live view needs no polling |
+
+## Mower commands
+
+What the server sends the mower: commands, live-driving setpoints, monitor
+streams and the correction caster's settings. The contract is wiki
+[Mower-Protocol](Mower-Protocol) §5, §6.4, §8, §9, §13 and §15; this section
+says what the server does with it. Code: `internal/mower/` (`command.go`, `drive.go`,
+`monitor.go`, `ntrip.go`, the SQL in `store.go`), wire types in
+`internal/api/command.go`. The server is the only publisher of commands. Job
+planning and border recording logic are not here yet: the server sends
+`job_start`, `record_start` and `record_stop` when a user asks, and does nothing
+else with them.
+
+### The command sender
+
+A command gets an id (`c-` and 12 hex characters), is written to the `commands`
+table in state `sent`, and is published on `<prefix>/<name>/<board>/cmd` with
+QoS 1. The API answers at once; the outcome follows.
+
+- **Acks.** The board's ack on `<board>/cmd/ack` moves the command: `accepted`
+  (a long-running command is running; the resends stop), then `done` or `failed`
+  (the final ack; `error`, `message` and `result` are kept). A final ack is final;
+  an ack for another device or board, or for an id the server does not know, is
+  ignored.
+- **Resend.** No ack within 5 s: the same bytes go out again, with the same id,
+  up to 3 times (4 sends in all, `attempts` says how many). Five seconds after the
+  last resend the command is `unknown` with the error `no_ack`: the outcome is read
+  from the board's state. An ack that arrives later still settles it.
+- **New boot.** When a board's `boot` value changes, every open command of that
+  board is `failed` with the error `board_restarted` (§5). The final ack of an
+  update arrives after the restart, with the command id kept across it (§6.5), so
+  a command failed this way still takes its own final ack.
+- **Server restart.** Commands that were open when the server stopped are
+  `unknown` with the error `server_restarted` when it starts.
+- **Refused before sending.** The device must exist (404). The mower must not be
+  offline (the gateway's retained status `offline`: 409). A board that reports a
+  protocol this server does not support gets nothing but `ota` (409). The
+  gateway's `restart` and `ota` are refused (409) unless the autopilot is known to
+  be idle: its state must be current (the gateway online and its `autopilot_link`
+  `up`, §7.1) and say `mode: idle`; the reason names the mode. The autopilot's own
+  restart and update are the board's to refuse (`wrong_mode`).
+- **Parameters** are checked against §6.4 and §8 and refused (400) when missing,
+  of the wrong type or not defined for the command; a command message is at most
+  4096 bytes. `monitor_start` and `monitor_stop` are sent by the monitor, `ntrip_set`
+  and `ntrip_clear` by the server itself: asking for them is a 400.
+
+Every change of a command is pushed to the open sockets (`command`).
+
+### API
+
+All routes need a session (and an allowed `Origin` for the POST).
+
+| Route | Answer |
+|---|---|
+| `POST /api/devices/{name}/commands` | body `CommandRequest`: `board` (`gateway` or `autopilot`), `cmd`, `params` (an object or null), `expires_in` (seconds, 1 to 3600, or null; the board refuses the command with `expired` after that). 202 with the `Command` in state `sent`; 400, 404, 409 as above |
+| `GET /api/devices/{name}/commands?limit=` | `CommandList`, newest first (default 100, at most 1000) |
+| `GET /api/devices/{name}/commands/{id}` | one `Command` |
+| `GET /api/devices/{name}/monitor` | `MonitorStreams`: the streams the server keeps alive for the device |
+| `GET /api/ntrip` | `NtripSettings`: whether a caster is set, host, port, mount point and user, and `password_set`; never the password |
+
+Commands a user may send: gateway `ping`, `restart`, `ota` (`version`, optional
+`file`, `size`), `autopilot_reset`; autopilot `stop`, `manual_start`,
+`manual_stop`, `blade` (`on`), `follow` (`points` 1 to 100 of `[lat, lon]`,
+optional `reverse`, `blade`, `speed`), `record_start` (`session`, optional
+`spacing`), `record_stop`, `job_start` (`job`, `size`, `sha256`, optional
+`from_point`), `pause`, `resume`, `clear_fault`, `ota`, `restart`.
+
+WebSocket requests (`op`):
+
+| `op` | Fields | Answer (`data.kind`) |
+|---|---|---|
+| `drive` | `device`, `v`, `w` | none, unless it fails (an error response) |
+| `monitor_watch` | `device`, `board`, `metrics`, `rate` | `monitor_watching`: a `MonitorWatching` (`session`, `state`, `budget`, `used`) |
+| `monitor_unwatch` | `device`, `session` | `done` |
+
+Pushed to every open socket:
+
+| `type` | Fields | When |
+|---|---|---|
+| `command` | `command` | a command was created or changed |
+| `monitor` | `stream`, `error`, `message` | a monitor stream changed state (`starting`, `running`, `failed`, `stopped`) or the board's budget changed |
+| `monitor_samples` | `device`, `board`, `session`, `index`, `time`, `rate`, `metrics`, `samples` | the samples of a stream somebody watches |
+
+A request that gets no response at all (`drive`) is the only exception to "one
+response per request": at 10 Hz an answer to each setpoint is noise.
+
+### Live driving
+
+The browser sends `drive` with its setpoint `v` (m/s) and `w` (rad/s), as often
+as it likes (every 100 to 200 ms while driving). The server publishes the latest
+setpoint on `autopilot/drive` every 100 ms with QoS 0 as
+`{"seq", "time", "v", "w"}`: `seq` grows by one per setpoint, `time` is the
+server's clock. It falls silent 300 ms after the browser's last `drive`, and the
+autopilot stops the motors on its own after 0.5 s without a setpoint (§9). The
+server does not clamp `v` and `w`: it holds no constants about the hardware, and
+the autopilot clamps. A device that does not exist is an error response.
+
+### Monitor streams
+
+`monitor_watch` asks for a fast stream of metrics of one board (§15). The
+server checks the metrics and the rate against the board's catalogue in use (a
+metric that does not exist, or a rate it does not offer: 400), picks a session id
+(`m-…`), sends `monitor_start` with `hold` 15 and answers at once with the stream
+in state `starting`; the board's ack turns it `running` (or `failed`, with the
+board's error, for example `over_budget`) and arrives as a `monitor` push.
+
+- **Only while watched.** The client sends `monitor_watch` again every 5 to 10 s
+  while the chart is open; the same board, metrics and rate share one stream. While
+  the last watch request is less than 15 s old, the server sends `monitor_start`
+  again every 5 s with the same session and a new command id, which extends the
+  stream. After that it sends `monitor_stop` and forgets the stream. A stream
+  also ends with `monitor_unwatch`, which stops it for every client of it.
+- **Samples** from `<board>/monitor` are relayed as `monitor_samples` while the
+  stream is watched, and dropped otherwise. They are not stored.
+- **Budget.** Every `monitor_start` ack reports `budget` and `used`, on success and
+  on failure; the server keeps the last values per board and shows them in
+  `MonitorWatching`, so the app can show what is left. The server does not compute
+  the budget itself.
+- The monitor commands are not stored in `commands`: they come every few seconds.
+  They are resent, and fail with `no_ack`, like any command.
+
+### Corrections (`ntrip_set`)
+
+The NTRIP client runs on the gateway and keeps its settings across restarts, so
+the server sends them once per gateway and again when they change (§13). The
+settings are the server's environment: `NTRIP_HOST`, `NTRIP_PORT` (default 2101),
+`NTRIP_MOUNTPOINT`, `NTRIP_USER` and `NTRIP_PASSWORD`, all four or none. The
+password is a secret like `MQTT_PASSWORD`: it is read only from the environment,
+goes to the gateway in `ntrip_set` and nowhere else. It is not written to the
+database (the stored command has no `password`), not logged, not returned by the
+API and not pushed; `config.NTRIP` prints without it.
+
+The server decides when to send from the gateway's retained state, which arrives
+whenever the gateway's link to the server comes up. It sends `ntrip_set` when it
+has no fingerprint of acknowledged settings for the gateway, when the stored one
+differs from the current settings (any field, the password included), or when the
+gateway reports `ntrip: "off"` (it lost them). At most once per 30 s per gateway.
+The fingerprint (table `ntrip_sent`) is stored when the gateway acks `done`; it is
+an HMAC-SHA-256 keyed with `MQTT_PASSWORD`, so it does not reveal the password.
+Settings removed from the environment send `ntrip_clear` to a gateway that has
+them. A change of the settings is a change of the environment, so it takes
+effect when the server starts again.
 
 ## Login and sessions
 
@@ -676,9 +820,11 @@ internal/
   httpx/                Router with Public() / Protected() only, JSON helpers
   mqtt/                 broker client, topic grammar <prefix>/<device>/<suffix>, suffix → handler
   ws/                   connections, op → handler routing, event push
-  auth/ firmware/       domains (planning/ and mower/ too; later: commands), files:
+  auth/ transfer/       domains (planning/ and mower/ too), files:
                           service.go, store.go (all SQL, takes db.DBTX), http.go, ws.go,
                           mqtt.go (device payloads + topic suffixes), as far as the domain needs them
+                          (transfer/ serves chunks; mower/ also holds the command sender,
+                          the drive and monitor streams and the caster settings)
   integration/          harness (fresh database, own topic prefix, logged-in client)
                           + one _test.go per domain
   arch/                 arch_test.go: the import rules below
@@ -694,7 +840,7 @@ with its layer, from `go list`; a package that is not listed fails the test):
   (`apperr` imports `api` for the error codes.)
 - **Domains** import platform and leaves, never another domain. A
   cross-domain need is a small interface declared by the consumer (e.g.
-  `commands.DeviceLookup`), satisfied by the other domain and injected by `app`.
+  `mower.DeviceLookup`), satisfied by the other domain and injected by `app`.
 - Only `app` and `integration` import everything. `cmd/rmx-server` imports
   only `app`, `cmd/gen-ts` only `api`, `cmd/devsim` only `config` (for `.env`).
 - Each table has one owning domain; foreign keys to `devices` / `users` are
@@ -784,12 +930,15 @@ from `.env` (default `dev` / `dev-password-123`). The script:
   terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
   `.env` it rebuilds and restarts the server and the simulator; a build error
   waits for the next save. Ctrl+C stops all three;
-- sets `FIRMWARE_DIR=dev/firmware` (gitignored) when `.env` sets none, so the
-  simulator's `ota` works: drop any `<version>.bin` there.
+- sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it) and
+  `JOB_DIR=dev/jobs` (both gitignored) when `.env` sets none: drop any
+  `<version>.bin` into the board's subdirectory.
 
 **Simulated device** (`cmd/devsim`). It behaves like rmx-mower-gateway on the
 local broker, written from the firmware's contract (`remote_cmd.h`, `ota.c`)
-and from [Firmware over MQTT](#firmware-over-mqtt), not from the server code:
+and from the firmware's older topics (`mower/<name>/cmd`, `fw/…`), not from the server code.
+It is being rewritten to the contract ([rmx-server-app#91](https://github.com/rmx-lt/rmx-server-app/issues/91)):
+until then it does not speak the topics the server serves now (see [Firmware over MQTT](#firmware-over-mqtt)):
 
 - logs in as `test-device` with the client id `<name>` (default `mower-sim`,
   `DEVSIM_NAME` or `-name`); retained `online` on `mower/<name>/status`, last
@@ -842,8 +991,8 @@ go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
 
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
 `test-device` with the `TEST_DEVICE_PASSWORD` from `.env`
-(`test-device-dev`), publishing to `mower/<client-id>/fw/req` (needs
-`FIRMWARE_DIR`) or watching `mower/status/server`.
+(`test-device-dev`), publishing to `mower/<name>/gateway/fw/req` (needs
+`FIRMWARE_DIR`), watching the server's commands on `mower/<name>/gateway/cmd`, or watching `mower/status/server`.
 
 Local ports (chosen so they don't clash with a Postgres or Mosquitto
 installed on the PC):
@@ -897,11 +1046,15 @@ Then open <http://localhost:8080/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `firmware_test.go`, `mower_test.go`, `planning_test.go`) start the real
+`app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
-ping, a firmware download (every chunk, including a resume from the middle,
-checked against the file's SHA-256), health, that the records routes and
+ping, chunk transfer (a job file and firmware images side by side, every chunk
+checked against the file's SHA-256, the three sets kept apart), the commands
+(an ack, the resend of a lost ack after 5 s with the same id, open commands
+failed by a new boot, a gateway restart refused while the autopilot is not idle),
+live driving, a monitor stream that runs only while watched, the caster settings
+sent once and on change (the password only on the wire), health, that the records routes and
 tables are gone, the retained server status and graceful shutdown, and the
 login: wrong
 password and unknown user, protected routes (REST, WebSocket)
@@ -954,7 +1107,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 - Listens on **`0.0.0.0:8080`** (HTTP; TLS is Caddy's job). Publish no port;
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
-  unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
+  unless `FIRMWARE_DIR` or `JOB_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
 - `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
@@ -979,8 +1132,9 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `MQTT_TOPIC_PREFIX` | no | `mower` | |
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
-| `FIRMWARE_DIR` | no | `/firmware` | directory of `*.bin` images. Unset: firmware requests are not served. See [Firmware over MQTT](#firmware-over-mqtt) |
-| `FIRMWARE_CHUNK_BYTES` | no | `4096` | 256–16384. Every chunk except the last is this long |
+| `FIRMWARE_DIR` | no | `/firmware` | firmware images in the subdirectories `gateway/` and `autopilot/` (`<version>.bin`). Unset: no firmware is served. See [Firmware over MQTT](#firmware-over-mqtt) |
+| `JOB_DIR` | no | `/jobs` | job files (`<job>.json`) served to the autopilot. Unset: none are served |
+| `NTRIP_HOST`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` | no | (secret, server-side `.env`) | the caster the server tells the gateways to use; all four or none. The password is never logged or returned. `NTRIP_PORT` defaults to `2101`. See [Mower commands](#mower-commands) |
 
 **Database:** TimescaleDB on Postgres 17 (`timescale/timescaledb:2.30.2-pg17`
 or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS
