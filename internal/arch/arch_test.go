@@ -46,9 +46,9 @@ var layers = map[string]layer{
 	"internal/clientip": platform,
 
 	"internal/auth":     domain,
-	"internal/firmware": domain,
 	"internal/mower":    domain,
 	"internal/planning": domain,
+	"internal/transfer": domain,
 
 	"internal/app":         root,
 	"internal/integration": root,
@@ -263,11 +263,11 @@ func TestRulesAreCheckable(t *testing.T) {
 		from, to string
 		want     bool
 	}{
-		{"internal/auth", "internal/firmware", false},
-		{"internal/mqtt", "internal/firmware", false},
+		{"internal/auth", "internal/transfer", false},
+		{"internal/mqtt", "internal/transfer", false},
 		{"internal/core", "internal/api", false},
 		{"internal/apperr", "internal/api", true},
-		{"internal/firmware", "internal/mqtt", true},
+		{"internal/transfer", "internal/mqtt", true},
 		{"internal/app", "internal/auth", true},
 		{"cmd/rmx-server", "internal/auth", false},
 		{"cmd/rmx-server", "internal/app", true},

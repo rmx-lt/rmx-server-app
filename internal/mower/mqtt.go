@@ -17,8 +17,9 @@ import (
 
 // Device payloads (wiki Mower-Protocol §3, §4, §6, §7, §16): what the boards
 // publish and how the server reads it. The domain subscribes to everything
-// under gateway/ and autopilot/ and handles the topics below; the rest of
-// those trees (commands, acks, monitor, chunk transfer) belongs to other features.
+// under gateway/ and autopilot/ and handles the topics below (state, telemetry,
+// events, catalogues, command acks, monitor samples); the chunk transfer topics
+// in those trees have their own handlers (the transfer domain).
 
 // Roots of the device topic trees the domain subscribes to (<prefix>/+/<root>/#).
 const (
@@ -59,6 +60,8 @@ const (
 	topicTelemetry
 	topicEvent
 	topicMetrics
+	topicAck
+	topicMonitor
 )
 
 // parseSuffix classifies a topic suffix such as "gateway/metrics/battery".
@@ -85,6 +88,10 @@ func parseSuffix(suffix string) (board api.Board, kind topicKind, part string) {
 		return board, topicStatus, ""
 	case rest == "event" && board == api.BoardAutopilot:
 		return board, topicEvent, ""
+	case rest == "cmd/ack":
+		return board, topicAck, ""
+	case rest == "monitor":
+		return board, topicMonitor, ""
 	}
 	if p, ok := strings.CutPrefix(rest, "metrics/"); ok && ValidPartName(p) {
 		return board, topicMetrics, p
@@ -102,6 +109,8 @@ type State struct {
 	// Mode is the autopilot's mode; AutopilotLink the gateway's view of the board link.
 	Mode          string
 	AutopilotLink string
+	// NTRIP is the gateway's caster state (§6.2); empty when the state has none.
+	NTRIP string
 }
 
 // ParseState checks a state message: one JSON object. Fields the server does
@@ -113,6 +122,7 @@ func ParseState(payload []byte) (State, error) {
 		Protocol      *string         `json:"protocol"`
 		Mode          *string         `json:"mode"`
 		AutopilotLink *string         `json:"autopilot_link"`
+		NTRIP         *string         `json:"ntrip"`
 	}
 	if err := decodeObject(payload, &raw); err != nil {
 		return State{}, err
@@ -133,6 +143,9 @@ func ParseState(payload []byte) (State, error) {
 	}
 	if raw.AutopilotLink != nil {
 		s.AutopilotLink = *raw.AutopilotLink
+	}
+	if raw.NTRIP != nil {
+		s.NTRIP = *raw.NTRIP
 	}
 	return s, nil
 }

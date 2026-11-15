@@ -297,3 +297,117 @@ func getDevice(ctx context.Context, q db.DBTX, device core.DeviceID) (deviceRow,
 	}
 	return d, err
 }
+
+// ---- Commands -----------------------------------------------------------------------------
+
+var errNoCommand = errors.New("no such command")
+
+const commandColumns = `id, device, board, cmd, params, state, error, message, result, attempts, requested_by, created_at, updated_at, finished_at`
+
+func scanCommand(row pgx.Row) (api.Command, error) {
+	var c api.Command
+	var board, state string
+	var params, result []byte
+	err := row.Scan(&c.ID, &c.Device, &board, &c.Cmd, &params, &state, &c.Error, &c.Message, &result,
+		&c.Attempts, &c.RequestedBy, &c.CreatedAt, &c.UpdatedAt, &c.FinishedAt)
+	c.Board, c.State = api.Board(board), api.CommandState(state)
+	c.Params, c.Result = json.RawMessage(params), json.RawMessage(result)
+	return c, err
+}
+
+func getCommand(ctx context.Context, q db.DBTX, id string) (api.Command, error) {
+	c, err := scanCommand(q.QueryRow(ctx, `SELECT `+commandColumns+` FROM commands WHERE id = $1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c, errNoCommand
+	}
+	return c, err
+}
+
+func listCommands(ctx context.Context, q db.DBTX, device core.DeviceID, limit int) ([]api.Command, error) {
+	rows, err := q.Query(ctx,
+		`SELECT `+commandColumns+` FROM commands WHERE device = $1 ORDER BY created_at DESC, id LIMIT $2`, string(device), limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (api.Command, error) { return scanCommand(row) })
+}
+
+// dbLedger keeps the commands in the commands table.
+type dbLedger struct{ pool *db.Pool }
+
+func (l dbLedger) insert(ctx context.Context, c api.Command) error {
+	_, err := l.pool.Exec(ctx,
+		`INSERT INTO commands (id, device, board, cmd, params, state, attempts, requested_by, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+		c.ID, c.Device, string(c.Board), c.Cmd, []byte(c.Params), string(c.State), c.Attempts, c.RequestedBy, c.CreatedAt)
+	return err
+}
+
+func (l dbLedger) update(ctx context.Context, id string, fn func(api.Command) (api.Command, bool)) (api.Command, bool, error) {
+	var out api.Command
+	var changed bool
+	err := db.InTx(ctx, l.pool, func(tx db.DBTX) error {
+		cur, err := scanCommand(tx.QueryRow(ctx, `SELECT `+commandColumns+` FROM commands WHERE id = $1 FOR UPDATE`, id))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		out = cur
+		next, ok := fn(cur)
+		if !ok {
+			return nil
+		}
+		var result []byte
+		if next.Result != nil {
+			result = []byte(next.Result)
+		}
+		_, err = tx.Exec(ctx,
+			`UPDATE commands SET state = $2, error = $3, message = $4, result = $5, attempts = $6, updated_at = $7, finished_at = $8 WHERE id = $1`,
+			id, string(next.State), next.Error, next.Message, result, next.Attempts, next.UpdatedAt, next.FinishedAt)
+		out, changed = next, err == nil
+		return err
+	})
+	return out, changed, err
+}
+
+func (l dbLedger) openIDs(ctx context.Context, device core.DeviceID, board api.Board) ([]string, error) {
+	var rows pgx.Rows
+	var err error
+	if device == "" {
+		rows, err = l.pool.Query(ctx, `SELECT id FROM commands WHERE state IN ('sent', 'accepted')`)
+	} else {
+		rows, err = l.pool.Query(ctx, `SELECT id FROM commands WHERE device = $1 AND board = $2 AND state IN ('sent', 'accepted')`, string(device), string(board))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// ---- Corrections --------------------------------------------------------------------------
+
+// ntripFingerprint is the fingerprint of the caster settings the gateway of
+// device last acknowledged; "" for none.
+func ntripFingerprint(ctx context.Context, q db.DBTX, device core.DeviceID) (string, error) {
+	var fp string
+	err := q.QueryRow(ctx, `SELECT fingerprint FROM ntrip_sent WHERE device = $1`, string(device)).Scan(&fp)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return fp, err
+}
+
+func saveNtripFingerprint(ctx context.Context, q db.DBTX, device core.DeviceID, fp string, at time.Time) error {
+	_, err := q.Exec(ctx,
+		`INSERT INTO ntrip_sent (device, fingerprint, sent_at) VALUES ($1, $2, $3)
+		 ON CONFLICT (device) DO UPDATE SET fingerprint = EXCLUDED.fingerprint, sent_at = EXCLUDED.sent_at`,
+		string(device), fp, at)
+	return err
+}
+
+func deleteNtripFingerprint(ctx context.Context, q db.DBTX, device core.DeviceID) error {
+	_, err := q.Exec(ctx, `DELETE FROM ntrip_sent WHERE device = $1`, string(device))
+	return err
+}

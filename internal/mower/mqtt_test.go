@@ -25,10 +25,12 @@ func TestParseSuffix(t *testing.T) {
 		{"autopilot/telemetry", api.BoardAutopilot, topicTelemetry, ""},
 		{"autopilot/event", api.BoardAutopilot, topicEvent, ""},
 		{"autopilot/metrics/battery", api.BoardAutopilot, topicMetrics, "battery"},
-		// Not this domain's: other features.
+		{"gateway/cmd/ack", api.BoardGateway, topicAck, ""},
+		{"autopilot/cmd/ack", api.BoardAutopilot, topicAck, ""},
+		{"gateway/monitor", api.BoardGateway, topicMonitor, ""},
+		{"autopilot/monitor", api.BoardAutopilot, topicMonitor, ""},
+		// Not handled here: commands go down, chunk transfer has its own handlers.
 		{"gateway/cmd", api.BoardGateway, topicOther, ""},
-		{"gateway/cmd/ack", api.BoardGateway, topicOther, ""},
-		{"gateway/monitor", api.BoardGateway, topicOther, ""},
 		{"gateway/fw/req", api.BoardGateway, topicOther, ""},
 		{"autopilot/drive", api.BoardAutopilot, topicOther, ""},
 		{"autopilot/job/chunk", api.BoardAutopilot, topicOther, ""},

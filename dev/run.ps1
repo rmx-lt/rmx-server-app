@@ -36,7 +36,8 @@ $devPassword = if ($dotenv.DEV_PASSWORD) { $dotenv.DEV_PASSWORD } else { 'dev-pa
 if (-not $SimName) { $SimName = if ($dotenv.DEVSIM_NAME) { $dotenv.DEVSIM_NAME } else { 'mower-sim' } }
 # Firmware served to the simulator's `ota` (and any local device).
 if (-not $dotenv.FIRMWARE_DIR -and -not $env:FIRMWARE_DIR) { $env:FIRMWARE_DIR = 'dev/firmware' }
-New-Item -ItemType Directory -Force -Path dev/firmware, .dev | Out-Null
+if (-not $dotenv.JOB_DIR -and -not $env:JOB_DIR) { $env:JOB_DIR = 'dev/jobs' }
+New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, dev/jobs, .dev | Out-Null
 
 # --- ports --------------------------------------------------------------------
 # A leftover server or web dev server on these ports would answer instead of

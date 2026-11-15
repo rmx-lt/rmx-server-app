@@ -36,4 +36,37 @@ export type Request =
      * Rate of change instead of values; default true for a counter, false otherwise.
      */
     rate: boolean | null,
+  }
+  | {
+    "op": "drive",
+    device: string,
+    /**
+     * Forward speed, m/s; negative is backwards.
+     */
+    v: number,
+    /**
+     * Turn rate, rad/s; positive turns left.
+     */
+    w: number,
+  }
+  | {
+    "op": "monitor_watch",
+    device: string,
+    board: Board,
+    /**
+     * Metric names from the board's catalogue, one or more.
+     */
+    metrics: Array<string>,
+    /**
+     * Samples per second; one of the rates of every metric asked for.
+     */
+    rate: number,
+  }
+  | {
+    "op": "monitor_unwatch",
+    device: string,
+    /**
+     * The session of a MonitorWatching.
+     */
+    session: string,
   };

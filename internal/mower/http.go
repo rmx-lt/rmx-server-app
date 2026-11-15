@@ -7,10 +7,11 @@ import (
 
 	"github.com/rmx-lt/rmx-server-app/internal/api"
 	"github.com/rmx-lt/rmx-server-app/internal/apperr"
+	"github.com/rmx-lt/rmx-server-app/internal/core"
 	"github.com/rmx-lt/rmx-server-app/internal/httpx"
 )
 
-// Routes registers the /api/devices routes, all protected. Every user sees
+// Routes registers the /api/devices routes and /api/ntrip, all protected. Every user sees
 // every device: devices do not belong to users yet.
 func (s *Service) Routes(r *httpx.Router) {
 	p := r.Protected()
@@ -18,6 +19,11 @@ func (s *Service) Routes(r *httpx.Router) {
 	p.HandleFunc("GET /api/devices/{name}", s.handleGet)
 	p.HandleFunc("GET /api/devices/{name}/history", s.handleHistory)
 	p.HandleFunc("GET /api/devices/{name}/events", s.handleEvents)
+	p.HandleFunc("POST /api/devices/{name}/commands", s.handleSendCommand)
+	p.HandleFunc("GET /api/devices/{name}/commands", s.handleCommands)
+	p.HandleFunc("GET /api/devices/{name}/commands/{id}", s.handleCommand)
+	p.HandleFunc("GET /api/devices/{name}/monitor", s.handleMonitor)
+	p.HandleFunc("GET /api/ntrip", s.handleNTRIP)
 }
 
 func (s *Service) handleList(w http.ResponseWriter, r *http.Request) {
@@ -102,4 +108,62 @@ func (s *Service) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, list)
+}
+
+// handleSendCommand sends a command to one of the device's boards and answers
+// 202 with the command in state "sent".
+func (s *Service) handleSendCommand(w http.ResponseWriter, r *http.Request) {
+	var req api.CommandRequest
+	if err := httpx.ReadJSON(w, r, &req); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	user, _ := core.UserFrom(r.Context())
+	c, err := s.SendCommand(r.Context(), user, r.PathValue("name"), req)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusAccepted, c)
+}
+
+func (s *Service) handleCommands(w http.ResponseWriter, r *http.Request) {
+	limit := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		var err error
+		if limit, err = strconv.Atoi(v); err != nil {
+			httpx.WriteError(w, apperr.BadRequest("limit must be a whole number"))
+			return
+		}
+	}
+	list, err := s.Commands(r.Context(), r.PathValue("name"), limit)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, list)
+}
+
+func (s *Service) handleCommand(w http.ResponseWriter, r *http.Request) {
+	c, err := s.Command(r.Context(), r.PathValue("name"), r.PathValue("id"))
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, c)
+}
+
+func (s *Service) handleMonitor(w http.ResponseWriter, r *http.Request) {
+	m, err := s.Streams(r.PathValue("name"))
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, m)
+}
+
+// handleNTRIP shows the caster settings the server sends to the gateways,
+// without the password.
+func (s *Service) handleNTRIP(w http.ResponseWriter, r *http.Request) {
+	httpx.WriteJSON(w, http.StatusOK, s.NTRIP())
 }
