@@ -1,6 +1,9 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,7 +32,7 @@ func TestDefaults(t *testing.T) {
 	}
 	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "rmx-server" ||
 		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
-		c.FirmwareDir != "" || c.FirmwareChunkBytes != 4096 ||
+		c.FirmwareDir != "" || c.JobDir != "" || c.NTRIP.Configured() ||
 		!slices.Equal(c.AllowedOrigins, []string{"https://app.rmx.lt"}) {
 		t.Fatalf("%+v", c)
 	}
@@ -74,11 +77,11 @@ func TestMissingRequired(t *testing.T) {
 
 func TestInvalidValues(t *testing.T) {
 	for key, bad := range map[string]string{
-		"MQTT_PORT":            "abc",
-		"MQTT_TOPIC_PREFIX":    "app/#",
-		"BIND_ADDR":            "8080",
-		"DB_MAX_CONNECTIONS":   "-1",
-		"FIRMWARE_CHUNK_BYTES": "100",
+		"MQTT_PORT":          "abc",
+		"MQTT_TOPIC_PREFIX":  "app/#",
+		"BIND_ADDR":          "8080",
+		"DB_MAX_CONNECTIONS": "-1",
+		"NTRIP_HOST":         "caster.example", // the other NTRIP settings are missing
 	} {
 		vars := base()
 		vars[key] = bad
@@ -88,20 +91,52 @@ func TestInvalidValues(t *testing.T) {
 	}
 }
 
-func TestFirmwareSettings(t *testing.T) {
+func TestTransferDirectories(t *testing.T) {
 	vars := base()
 	vars["FIRMWARE_DIR"] = "  /firmware  "
-	vars["FIRMWARE_CHUNK_BYTES"] = "8192"
+	vars["JOB_DIR"] = "/jobs"
 	c, err := load(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.FirmwareDir != "/firmware" || c.FirmwareChunkBytes != 8192 {
+	if c.FirmwareDir != "/firmware" || c.JobDir != "/jobs" {
 		t.Fatalf("%+v", c)
 	}
-	vars["FIRMWARE_CHUNK_BYTES"] = "16385"
+}
+
+func TestNTRIPSettings(t *testing.T) {
+	vars := base()
+	vars["NTRIP_HOST"] = "caster.example"
+	vars["NTRIP_MOUNTPOINT"] = "MOUNT"
+	vars["NTRIP_USER"] = "me"
+	vars["NTRIP_PASSWORD"] = "hunter2-not-real"
+	c, err := load(vars)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := c.NTRIP
+	if !n.Configured() || n.Host != "caster.example" || n.Port != 2101 || n.Mountpoint != "MOUNT" || n.User != "me" || n.Password != "hunter2-not-real" {
+		t.Fatalf("%+v", n)
+	}
+	// The password never shows in a formatted config or in a log line.
+	for _, out := range []string{fmt.Sprintf("%v", n), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", n), fmt.Sprint(c.NTRIP)} {
+		if strings.Contains(out, "hunter2") {
+			t.Fatalf("the password was formatted: %s", out)
+		}
+	}
+	var buf bytes.Buffer
+	slog.New(slog.NewTextHandler(&buf, nil)).Info("config", "ntrip", n)
+	if strings.Contains(buf.String(), "hunter2") {
+		t.Fatalf("the password was logged: %s", buf.String())
+	}
+	vars["NTRIP_PORT"] = "0"
 	if _, err := load(vars); err == nil {
-		t.Fatal("chunk size above the header limit accepted")
+		t.Fatal("port 0 accepted")
+	}
+	delete(vars, "NTRIP_PASSWORD")
+	vars["NTRIP_PORT"] = "2102"
+	if _, err := load(vars); err == nil || !strings.Contains(err.Error(), "NTRIP_PASSWORD") {
+		t.Fatalf("a missing password: %v", err)
 	}
 }
 

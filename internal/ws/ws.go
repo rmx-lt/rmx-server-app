@@ -7,7 +7,9 @@
 // Server to client: ServerMessage JSON, the response to each request, and
 // pushed events.
 //
-// Domains register their ops with Handle; ping is built in.
+// Domains register their ops with Handle; ping is built in. A handler that
+// returns NoResponse and no error sends no response, for requests that are a
+// stream (live-driving setpoints at 10 Hz).
 package ws
 
 import (
@@ -46,6 +48,9 @@ const (
 // SessionCheck reports whether the session of user is still valid. A socket
 // stays open for hours, so it is asked again with every keep-alive ping.
 type SessionCheck func(ctx context.Context, user core.CurrentUser) bool
+
+// NoResponse is what a handler returns, with a nil error, to send no response.
+var NoResponse = &struct{ noResponse bool }{true}
 
 type handler func(ctx context.Context, user core.CurrentUser, req any) (any, error)
 
@@ -149,8 +154,8 @@ func (s *Server) serveSocket(conn *websocket.Conn, user core.CurrentUser) {
 	for {
 		select {
 		case text := <-texts:
-			response := s.respond(ctx, user, text)
-			if !send(api.ServerMessage{V: api.MsgResponse{Response: response}}) {
+			response, answer := s.respond(ctx, user, text)
+			if answer && !send(api.ServerMessage{V: api.MsgResponse{Response: response}}) {
 				return
 			}
 
@@ -186,19 +191,22 @@ func (s *Server) serveSocket(conn *websocket.Conn, user core.CurrentUser) {
 	}
 }
 
-// respond answers one request.
-func (s *Server) respond(ctx context.Context, user core.CurrentUser, text []byte) api.ResponseEnvelope {
+// respond answers one request; the bool is false when the handler chose not to answer.
+func (s *Server) respond(ctx context.Context, user core.CurrentUser, text []byte) (api.ResponseEnvelope, bool) {
 	env, failure := ParseRequest(text)
 	if failure != nil {
-		return *failure
+		return *failure, true
 	}
 	var result api.RpcResult
 	h, ok := s.handlers[reflect.TypeOf(env.Request.V)]
 	if !ok { // a variant added to the union but not handled
 		result.V = api.RpcError{Error: api.ApiError{Code: api.CodeInternal, Message: "request not supported"}}
-		return api.ResponseEnvelope{RequestID: env.RequestID, Result: result}
+		return api.ResponseEnvelope{RequestID: env.RequestID, Result: result}, true
 	}
 	data, err := h(ctx, user, env.Request.V)
+	if err == nil && data == any(NoResponse) {
+		return api.ResponseEnvelope{}, false
+	}
 	if err != nil {
 		e := apperr.From(err)
 		e.Log()
@@ -206,7 +214,7 @@ func (s *Server) respond(ctx context.Context, user core.CurrentUser, text []byte
 	} else {
 		result.V = api.RpcOk{Data: api.RpcData{V: data}}
 	}
-	return api.ResponseEnvelope{RequestID: env.RequestID, Result: result}
+	return api.ResponseEnvelope{RequestID: env.RequestID, Result: result}, true
 }
 
 // ParseRequest parses a RequestEnvelope. On failure it returns the error

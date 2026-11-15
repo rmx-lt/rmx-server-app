@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -38,15 +39,36 @@ func TestInvalidRequestKeepsRequestID(t *testing.T) {
 func TestPingIsAnsweredWithPong(t *testing.T) {
 	s := New(context.Background(), nil)
 	ctx := context.Background()
-	res := s.respond(ctx, core.CurrentUser{}, []byte(`{"request_id":"p1","request":{"op":"ping"}}`))
+	res, answered := s.respond(ctx, core.CurrentUser{}, []byte(`{"request_id":"p1","request":{"op":"ping"}}`))
 	ok, isOk := res.Result.V.(api.RpcOk)
-	if res.RequestID != "p1" || !isOk || ok.Data.V != (api.RpcPong{}) {
+	if !answered || res.RequestID != "p1" || !isOk || ok.Data.V != (api.RpcPong{}) {
 		t.Fatalf("%+v", res)
 	}
 	// The records requests are gone.
-	res = s.respond(ctx, core.CurrentUser{}, []byte(`{"request_id":"l1","request":{"op":"list"}}`))
+	res, _ = s.respond(ctx, core.CurrentUser{}, []byte(`{"request_id":"l1","request":{"op":"list"}}`))
 	if e, isErr := res.Result.V.(api.RpcError); !isErr || e.Error.Code != api.CodeBadRequest || res.RequestID != "l1" {
 		t.Fatalf("%+v", res)
+	}
+}
+
+// A handler that returns NoResponse sends no answer, but an error is still answered.
+func TestNoResponseHandler(t *testing.T) {
+	s := New(context.Background(), nil)
+	var fail bool
+	Handle(s, func(context.Context, core.CurrentUser, api.RequestDrive) (any, error) {
+		if fail {
+			return NoResponse, errors.New("nope")
+		}
+		return NoResponse, nil
+	})
+	body := []byte(`{"request_id":"d1","request":{"op":"drive","device":"m1","v":0.5,"w":0}}`)
+	if _, answered := s.respond(context.Background(), core.CurrentUser{}, body); answered {
+		t.Fatal("a setpoint was answered")
+	}
+	fail = true
+	res, answered := s.respond(context.Background(), core.CurrentUser{}, body)
+	if _, isErr := res.Result.V.(api.RpcError); !answered || !isErr || res.RequestID != "d1" {
+		t.Fatalf("a failing setpoint is answered with an error: %+v", res)
 	}
 }
 

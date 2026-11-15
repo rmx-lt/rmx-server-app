@@ -6,6 +6,12 @@
 //   - Domains register a handler per suffix (Handle) before Start; the client
 //     subscribes to <prefix>/+/<suffix> for each, and answers with Publish on
 //     the device's own topics.
+//   - HandleTree routes a whole subtree of a device's topics
+//     (<prefix>/+/<root>/#) to one handler, which gets messages one at a time,
+//     in the order they arrived: state, catalogues and telemetry depend on it.
+//     A suffix registered with Handle inside such a subtree (the chunk
+//     transfer topics under gateway/ and autopilot/) is served by its own
+//     handler instead, concurrently with the subtree's.
 //   - It keeps a retained "online" on <prefix>/status/server, replaced by
 //     "offline" on clean shutdown or, via the last will, when the connection dies.
 //
@@ -19,7 +25,9 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,11 +50,23 @@ const (
 // Each message runs in its own goroutine; ctx ends when the client stops.
 type Handler func(ctx context.Context, device core.DeviceID, payload []byte)
 
+// TreeHandler handles one message under a registered root. suffix is the topic
+// below <prefix>/<device>/, including the root ("gateway/metrics/battery").
+// Messages reach it one at a time, in arrival order.
+type TreeHandler func(ctx context.Context, device core.DeviceID, suffix string, payload []byte)
+
+// orderedQueue is how many tree messages may wait for the handler; a message
+// that arrives when it is full is dropped (and logged).
+const orderedQueue = 4096
+
 // Client is the server's connection to the broker.
 type Client struct {
 	cfg      config.MQTT
 	handlers map[string]Handler
-	cm       *autopaho.ConnectionManager
+	trees    map[string]TreeHandler
+	// ordered carries the messages for tree handlers to their one worker.
+	ordered chan func(context.Context)
+	cm      *autopaho.ConnectionManager
 
 	connected atomic.Bool
 
@@ -58,7 +78,7 @@ type Client struct {
 
 // New returns a client that is not connected yet: register handlers, then Start.
 func New(cfg config.MQTT) *Client {
-	c := &Client{cfg: cfg, handlers: map[string]Handler{}}
+	c := &Client{cfg: cfg, handlers: map[string]Handler{}, trees: map[string]TreeHandler{}, ordered: make(chan func(context.Context), orderedQueue)}
 	c.workersCtx, c.stopWorkers = context.WithCancel(context.Background())
 	return c
 }
@@ -71,10 +91,23 @@ func (c *Client) Handle(suffix string, h Handler) {
 	c.handlers[suffix] = h
 }
 
+// HandleTree routes every message on <prefix>/<device>/<root>/... to h, in
+// arrival order. Call it before Start. root is one topic level ("gateway").
+func (c *Client) HandleTree(root string, h TreeHandler) {
+	if c.cm != nil {
+		panic("mqtt: HandleTree after Start")
+	}
+	c.trees[root] = h
+}
+
 // Start connects in the background. It keeps trying; until it has
 // connected, subscribed and announced the server, Connected is false.
 func (c *Client) Start() {
 	cfg := c.cfg
+	if len(c.trees) > 0 {
+		c.workers.Add(1)
+		go c.runOrdered()
+	}
 	acfg := autopaho.ClientConfig{
 		ServerUrls:                    []*url.URL{{Scheme: "mqtt", Host: net.JoinHostPort(cfg.Host, strconv.Itoa(int(cfg.Port)))}},
 		ConnectUsername:               cfg.Username,
@@ -111,11 +144,7 @@ func (c *Client) Start() {
 			ClientID: cfg.ClientID,
 			OnPublishReceived: []func(paho.PublishReceived) (bool, error){
 				func(pr paho.PublishReceived) (bool, error) {
-					c.workers.Add(1)
-					go func() {
-						defer c.workers.Done()
-						c.dispatch(pr.Packet.Topic, pr.Packet.Payload)
-					}()
+					c.receive(pr.Packet.Topic, pr.Packet.Payload)
 					return true, nil
 				},
 			},
@@ -143,10 +172,16 @@ func (c *Client) Connected() bool { return c != nil && c.connected.Load() }
 func (c *Client) ready(cm *autopaho.ConnectionManager) {
 	ctx, cancel := context.WithTimeout(c.workersCtx, publishTimeout)
 	defer cancel()
-	if len(c.handlers) > 0 {
-		subs := make([]paho.SubscribeOptions, 0, len(c.handlers))
+	if len(c.handlers)+len(c.trees) > 0 {
+		subs := make([]paho.SubscribeOptions, 0, len(c.handlers)+len(c.trees))
 		for suffix := range c.handlers {
+			if _, covered := c.trees[firstLevel(suffix)]; covered {
+				continue // the tree's subscription delivers it; a second one would deliver it twice
+			}
 			subs = append(subs, paho.SubscribeOptions{Topic: DeviceFilter(c.cfg.TopicPrefix, suffix), QoS: 1})
+		}
+		for root := range c.trees {
+			subs = append(subs, paho.SubscribeOptions{Topic: TreeFilter(c.cfg.TopicPrefix, root), QoS: 1})
 		}
 		if _, err := cm.Subscribe(ctx, &paho.Subscribe{Subscriptions: subs}); err != nil {
 			slog.Error("mqtt subscribe failed", "error", err)
@@ -166,14 +201,51 @@ func (c *Client) ready(cm *autopaho.ConnectionManager) {
 	c.connected.Store(true)
 }
 
-func (c *Client) dispatch(topic string, payload []byte) {
-	if device, suffix, ok := ParseDeviceTopic(c.cfg.TopicPrefix, topic); ok {
-		if h, ok := c.handlers[suffix]; ok {
+// receive routes one incoming message. A suffix with its own handler runs in
+// its own goroutine; any other message under a tree root is queued for the
+// ordered worker.
+func (c *Client) receive(topic string, payload []byte) {
+	device, suffix, ok := ParseDeviceTopic(c.cfg.TopicPrefix, topic)
+	if !ok {
+		slog.Debug("ignoring message on unexpected topic", "topic", topic)
+		return
+	}
+	if h, ok := c.handlers[suffix]; ok {
+		c.workers.Add(1)
+		go func() {
+			defer c.workers.Done()
 			h(c.workersCtx, device, payload)
+		}()
+		return
+	}
+	if th, ok := c.trees[firstLevel(suffix)]; ok {
+		payload = slices.Clone(payload)
+		select {
+		case c.ordered <- func(ctx context.Context) { th(ctx, device, suffix, payload) }:
+		default:
+			slog.Warn("mqtt queue is full; dropping a message", "topic", topic)
+		}
+		return
+	}
+	slog.Debug("ignoring message on unexpected topic", "topic", topic)
+}
+
+// runOrdered runs the tree messages one after another until the client stops.
+func (c *Client) runOrdered() {
+	defer c.workers.Done()
+	for {
+		select {
+		case fn := <-c.ordered:
+			fn(c.workersCtx)
+		case <-c.workersCtx.Done():
 			return
 		}
 	}
-	slog.Debug("ignoring message on unexpected topic", "topic", topic)
+}
+
+func firstLevel(suffix string) string {
+	first, _, _ := strings.Cut(suffix, "/")
+	return first
 }
 
 // Publish sends payload (QoS 1, not retained) on <prefix>/<device>/<suffix>.
@@ -181,6 +253,15 @@ func (c *Client) Publish(ctx context.Context, device core.DeviceID, suffix strin
 	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
 	defer cancel()
 	_, err := c.cm.Publish(ctx, &paho.Publish{Topic: DeviceTopic(c.cfg.TopicPrefix, device, suffix), QoS: 1, Payload: payload})
+	return err
+}
+
+// PublishFast sends payload with QoS 0 (no acknowledgement, not retained): for
+// messages that are worthless when late, like live-driving setpoints.
+func (c *Client) PublishFast(ctx context.Context, device core.DeviceID, suffix string, payload []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, publishTimeout)
+	defer cancel()
+	_, err := c.cm.Publish(ctx, &paho.Publish{Topic: DeviceTopic(c.cfg.TopicPrefix, device, suffix), QoS: 0, Payload: payload})
 	return err
 }
 

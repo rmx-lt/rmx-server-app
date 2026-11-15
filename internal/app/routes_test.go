@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmx-lt/rmx-server-app/internal/auth"
 	"github.com/rmx-lt/rmx-server-app/internal/config"
+	"github.com/rmx-lt/rmx-server-app/internal/mower"
 	"github.com/rmx-lt/rmx-server-app/internal/planning"
 	"github.com/rmx-lt/rmx-server-app/internal/ws"
 )
@@ -27,6 +28,7 @@ func testApp(staticDir string) *app {
 		cfg:      &config.Config{StaticDir: staticDir},
 		auth:     auth.New(nil),
 		planning: planning.New(nil),
+		mower:    mower.New(nil, nil),
 		ws:       ws.New(context.Background(), nil),
 	}
 	if staticDir != "" {
@@ -53,11 +55,20 @@ func TestProtectedRoutes(t *testing.T) {
 		"DELETE /api/maps/{id}",
 		"DELETE /api/settings/{key}",
 		"GET /api/auth/me",
+		"GET /api/devices",
+		"GET /api/devices/{name}",
+		"GET /api/devices/{name}/commands",
+		"GET /api/devices/{name}/commands/{id}",
+		"GET /api/devices/{name}/events",
+		"GET /api/devices/{name}/history",
+		"GET /api/devices/{name}/monitor",
 		"GET /api/maps",
 		"GET /api/maps/{id}",
+		"GET /api/ntrip",
 		"GET /api/settings",
 		"GET /ws",
 		"POST /api/auth/logout-all",
+		"POST /api/devices/{name}/commands",
 		"POST /api/maps",
 		"PUT /api/maps/{id}",
 		"PUT /api/settings/{key}",

@@ -35,6 +35,7 @@ func (a *app) router() *httpx.Router {
 	r.Public().HandleFunc("GET /health", a.health)
 	a.auth.Routes(r)
 	a.planning.Routes(r)
+	a.mower.Routes(r)
 	// The handshake is a normal GET with the cookie, checked before the
 	// upgrade. That's what fixes iPhones: WebKit sends cookies on WebSocket
 	// handshakes (but not basic-auth credentials).
