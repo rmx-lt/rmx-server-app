@@ -297,6 +297,9 @@ func TestPauseResume(t *testing.T) {
 	if r.apState()["paused"] != nil {
 		t.Fatal("still paused after resume")
 	}
+	if !r.m.ap.blade {
+		t.Fatal("blade did not come back after resume inside a blade-on path")
+	}
 	r.cmd("autopilot", "r2", "resume") // done also when not paused
 	r.wantAck("autopilot", "r2", "done", "")
 	r.advance(10 * time.Second)
@@ -382,13 +385,16 @@ func TestLinkLossPausesPathUntilResume(t *testing.T) {
 		t.Fatal("did not stay paused when the link returned")
 	}
 	if r.m.ap.blade {
-		t.Fatal("blade came back by itself after a pause for the link")
+		t.Fatal("blade on while paused for the link")
 	}
 	r.cmd("autopilot", "r", "resume")
 	r.wantAck("autopilot", "r", "done", "")
 	r.advance(100 * time.Millisecond)
 	if r.apState()["paused"] != nil {
 		t.Fatal("resume did not continue")
+	}
+	if !r.m.ap.blade {
+		t.Fatal("blade did not come back after resume from a link pause")
 	}
 }
 

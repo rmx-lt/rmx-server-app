@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"testing"
@@ -284,4 +286,67 @@ func TestJobFaultEndsWithFaultCode(t *testing.T) {
 	_ = r.m.set("fault", "blade_stall")
 	r.advance(100 * time.Millisecond)
 	r.wantAck("autopilot", "c-j-f", "failed", "blade_stall")
+}
+
+// The blade goes off at a pause and comes back, with the segment's state, when
+// the job continues (resume after a pause by command or link).
+func TestJobBladeBackAfterResume(t *testing.T) {
+	r := newRig(t).online()
+	file := jobFile("j-b", 0.6, seg{true, [][2]float64{r.geo(0, 0.05), r.geo(0, 40)}})
+	r.startJob("j-b", file)
+	r.advance(4 * time.Second)
+	if !r.m.ap.blade || r.m.ap.mode != "job" {
+		t.Fatal("blade not on inside the blade segment")
+	}
+	r.cmd("autopilot", "pz", "pause")
+	if r.m.ap.blade {
+		t.Fatal("blade on at the pause")
+	}
+	r.cmd("autopilot", "rz", "resume")
+	r.advance(100 * time.Millisecond)
+	if !r.m.ap.blade {
+		t.Fatal("blade not back after resume by command")
+	}
+	r.serverStatus("offline")
+	r.advance(11 * time.Second)
+	if r.m.ap.paused == nil || r.m.ap.blade {
+		t.Fatal("not paused for the link, or blade on")
+	}
+	r.serverStatus("online")
+	r.advance(2 * time.Second)
+	r.cmd("autopilot", "rz2", "resume")
+	r.advance(100 * time.Millisecond)
+	if !r.m.ap.blade {
+		t.Fatal("blade not back after resume from a link pause")
+	}
+}
+
+// The last point reached is published in telemetry before the job ends.
+func TestFinalJobPointPublishedBeforeJobEnds(t *testing.T) {
+	r := newRig(t).online()
+	r.startJob("j-2031", r.twoSegmentJob("j-2031"))
+	r.advance(20 * time.Second)
+	r.wantAck("autopilot", "c-j-2031", "done", "")
+	lastPoint, finalAck, idle := -1, -1, -1
+	for i, m := range r.out {
+		switch m.topic {
+		case "autopilot/telemetry":
+			var v struct{ Metrics map[string]any }
+			_ = json.Unmarshal(m.payload, &v)
+			if p, ok := v.Metrics["job.point"].(float64); ok && p == 3 {
+				lastPoint = i
+			}
+		case "autopilot/cmd/ack":
+			if bytes.Contains(m.payload, []byte(`"c-j-2031"`)) && bytes.Contains(m.payload, []byte(`"done"`)) {
+				finalAck = i
+			}
+		case "autopilot/state":
+			if bytes.Contains(m.payload, []byte(`"mode":"idle"`)) {
+				idle = i
+			}
+		}
+	}
+	if lastPoint < 0 || finalAck < 0 || lastPoint > finalAck || (idle >= 0 && lastPoint > idle) {
+		t.Fatalf("final job.point at %d, final ack at %d, idle state at %d", lastPoint, finalAck, idle)
+	}
 }

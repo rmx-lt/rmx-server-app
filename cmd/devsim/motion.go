@@ -36,7 +36,6 @@ type pathRun struct {
 	segFirst   []bool // point i opens a segment
 	idx        int    // the point being driven to
 	reached    int    // the last point reached, -1 before the first
-	suppress   bool   // paused by command or link: the blade stays off until the next segment
 
 	jobID string
 	size  int64
@@ -257,15 +256,15 @@ func (a *autopilot) stepPath(now time.Time) {
 			break
 		}
 		p.reached = p.idx
-		if p.segFirst[p.idx] {
-			p.suppress = false
-		}
 		p.idx++
 	}
 	if p.idx >= len(p.pts) {
 		var result any = map[string]any{}
 		if p.kind == "job" {
 			result = map[string]any{"points": len(p.pts)}
+		}
+		if p.kind == "job" {
+			a.sendJobPoint(now) // the server sees the last point before the job ends
 		}
 		a.endPath("", "", result, now)
 		return
@@ -292,7 +291,7 @@ func (a *autopilot) stepPath(now time.Time) {
 		v = -v
 	}
 	a.tgtV, a.tgtW = v, w
-	a.blade = p.bladeOn[p.idx] && !p.suppress
+	a.blade = p.bladeOn[p.idx] // back to the segment's blade state after any pause
 }
 
 // ---- the machine ------------------------------------------------------------------
@@ -415,6 +414,15 @@ func (a *autopilot) stepTelemetry(now time.Time) {
 		return
 	}
 	payload, _ := json.Marshal(map[string]any{"time": a.timeOrNil(now), "boot": a.st.Boot, "metrics": metrics})
+	a.out("telemetry", 0, false, payload)
+}
+
+// sendJobPoint publishes a telemetry message with the current job.point at
+// once, outside the metric's period.
+func (a *autopilot) sendJobPoint(now time.Time) {
+	a.tele["job.point"] = now
+	payload, _ := json.Marshal(map[string]any{"time": a.timeOrNil(now), "boot": a.st.Boot,
+		"metrics": map[string]any{"job.point": a.value("job.point")}})
 	a.out("telemetry", 0, false, payload)
 }
 

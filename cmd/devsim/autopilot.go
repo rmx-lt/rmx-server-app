@@ -678,9 +678,6 @@ func (a *autopilot) pause(reason string, now time.Time) {
 	r := reason
 	a.paused = &r
 	a.blade = false
-	if reason != "fix" && a.path != nil {
-		a.path.suppress = true
-	}
 	a.updatePauseDL(now)
 }
 
