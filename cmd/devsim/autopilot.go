@@ -122,14 +122,13 @@ type autopilot struct {
 	tgtV, tgtW  float64
 
 	// the machine
-	x, y, heading  float64 // metres east, north of the origin; degrees clockwise from north
-	speed, omega   float64 // m/s forward, rad/s left
-	vl, vr         float64
-	blade          bool
-	bladeRPM       float64
-	battery        float64 // percent
-	lastStep       time.Time
-	bladeLatchStop bool
+	x, y, heading float64 // metres east, north of the origin; degrees clockwise from north
+	speed, omega  float64 // m/s forward, rad/s left
+	vl, vr        float64
+	blade         bool
+	bladeRPM      float64
+	battery       float64 // percent
+	lastStep      time.Time
 
 	// fix and faults
 	prevRTK       bool

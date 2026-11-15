@@ -34,7 +34,6 @@ type rig struct {
 	drop   map[string]int
 	served map[string]int
 	reqIDs map[string][]string
-	nextID int
 }
 
 func newRig(t *testing.T, mutate ...func(*simConfig)) *rig {
@@ -313,11 +312,4 @@ func contains(ss []string, s string) bool {
 		}
 	}
 	return false
-}
-
-func mustf(t *testing.T, cond bool, format string, args ...any) {
-	t.Helper()
-	if !cond {
-		t.Fatalf(format, args...)
-	}
 }

@@ -167,7 +167,7 @@ func TestBoardLinkLossIsServerLinkLossForTheAutopilot(t *testing.T) {
 
 func TestNTRIP(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("gateway", "n1", "ntrip_set", `"host":"caster.example","port":2101`, `"mountpoint":"MOUNT","user":"someone","password":"hunter2-secret"`)
+	r.cmd("gateway", "n1", "ntrip_set", `"host":"caster.example","port":2101`, `"mountpoint":"MOUNT","user":"someone","password":"ntrip-test-pass"`)
 	r.wantAck("gateway", "n1", "done", "")
 	r.advance(time.Second)
 	if r.gwState()["ntrip"] != "connecting" {
@@ -179,7 +179,7 @@ func TestNTRIP(t *testing.T) {
 	}
 	// The password is never reported back.
 	for _, m := range r.out {
-		if bytes.Contains(m.payload, []byte("hunter2-secret")) {
+		if bytes.Contains(m.payload, []byte("ntrip-test-pass")) {
 			t.Fatalf("the password is in %s", m.topic)
 		}
 	}
