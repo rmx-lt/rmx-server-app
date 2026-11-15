@@ -27,11 +27,11 @@ type Set string
 const (
 	GatewayFirmware   Set = "gateway/fw"
 	AutopilotFirmware Set = "autopilot/fw"
-	AutopilotJob      Set = "autopilot/job"
+	AutopilotPath     Set = "autopilot/path"
 )
 
 // Sets lists the three sets.
-var Sets = []Set{GatewayFirmware, AutopilotFirmware, AutopilotJob}
+var Sets = []Set{GatewayFirmware, AutopilotFirmware, AutopilotPath}
 
 // Request is the suffix of the topic the board asks on.
 func (s Set) Request() string { return string(s) + "/req" }
@@ -219,15 +219,15 @@ type Service struct {
 }
 
 // Config names the directories. FirmwareDir holds the images in
-// subdirectories named after the board ("gateway", "autopilot"); JobDir holds
-// the job files. Empty means that set is not served.
+// subdirectories named after the board ("gateway", "autopilot"); PathFileDir holds
+// the path files. Empty means that set is not served.
 type Config struct {
 	FirmwareDir string
-	JobDir      string
+	PathFileDir string
 }
 
 // Open opens the directories of the configured sets. A missing firmware
-// subdirectory is logged and leaves that set empty; FIRMWARE_DIR and JOB_DIR
+// subdirectory is logged and leaves that set empty; FIRMWARE_DIR and PATH_FILE_DIR
 // themselves must exist.
 func Open(cfg Config) (*Service, error) {
 	s := &Service{dirs: map[Set]*Dir{}}
@@ -253,14 +253,14 @@ func Open(cfg Config) (*Service, error) {
 			}
 		}
 	}
-	if cfg.JobDir != "" {
-		d, err := OpenDir(cfg.JobDir, MaxJobBytes)
+	if cfg.PathFileDir != "" {
+		d, err := OpenDir(cfg.PathFileDir, MaxPathBytes)
 		if err != nil {
 			s.Close()
-			return nil, fmt.Errorf("JOB_DIR: %w", err)
+			return nil, fmt.Errorf("PATH_FILE_DIR: %w", err)
 		}
-		s.dirs[AutopilotJob] = d
-		slog.Info("transfer directory ready", "set", string(AutopilotJob), "dir", cfg.JobDir)
+		s.dirs[AutopilotPath] = d
+		slog.Info("transfer directory ready", "set", string(AutopilotPath), "dir", cfg.PathFileDir)
 	}
 	return s, nil
 }
@@ -295,7 +295,7 @@ type publisher interface {
 }
 
 // RegisterMQTT routes the requests of the three sets (<set>/req) to svc. The
-// sets are served side by side: each request runs on its own, so a job file
+// sets are served side by side: each request runs on its own, so a path file
 // and a firmware image download at the same time.
 func RegisterMQTT(c *mqtt.Client, svc *Service) {
 	h := &mqttHandler{pub: c, svc: svc}

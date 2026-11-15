@@ -279,7 +279,7 @@ func setup(t *testing.T, pub *fakePub) (*mqttHandler, map[Set][]byte) {
 	files := map[Set][]byte{
 		GatewayFirmware:   bytes.Repeat([]byte("g"), 5000),
 		AutopilotFirmware: bytes.Repeat([]byte("a"), 9000),
-		AutopilotJob:      []byte(`{"job":"j-1"}`),
+		AutopilotPath:     []byte(`{"path":"j-1"}`),
 	}
 	dirs := map[Set]*Dir{}
 	for set, body := range files {
@@ -349,8 +349,8 @@ func TestHandlerErrors(t *testing.T) {
 		{"no such file", `{"request_id":"e1","file":"nope.bin","chunk":0}`, "not_found", "e1", GatewayFirmware},
 		{"path as name", `{"request_id":"e2","file":"../x.bin","chunk":0}`, "bad_request", "e2", GatewayFirmware},
 		{"chunk past the end", `{"request_id":"e3","file":"x.bin","chunk":2}`, "bad_request", "e3", GatewayFirmware},
-		{"not json", `hello`, "bad_request", "", AutopilotJob},
-		{"bad request id", `{"request_id":"a b","file":"x.bin","chunk":0}`, "bad_request", "", AutopilotJob},
+		{"not json", `hello`, "bad_request", "", AutopilotPath},
+		{"bad request id", `{"request_id":"a b","file":"x.bin","chunk":0}`, "bad_request", "", AutopilotPath},
 	} {
 		e := ask(c.set, c.body)
 		if e.Error.Code != c.code || e.RequestID != c.id || e.Error.Message == "" {
@@ -359,7 +359,7 @@ func TestHandlerErrors(t *testing.T) {
 	}
 	// A set with no directory has no files.
 	h.svc.dirs = map[Set]*Dir{}
-	if e := ask(AutopilotJob, `{"request_id":"e4","file":"x.json","chunk":0}`); e.Error.Code != "not_found" {
+	if e := ask(AutopilotPath, `{"request_id":"e4","file":"x.json","chunk":0}`); e.Error.Code != "not_found" {
 		t.Errorf("unconfigured set: %+v", e)
 	}
 }
@@ -377,7 +377,7 @@ func TestOneRequestPerTopicSet(t *testing.T) {
 		wg.Add(1)
 		go func() { defer wg.Done(); h.handle(ctx, set, "m1", body) }()
 	}
-	run(AutopilotJob)
+	run(AutopilotPath)
 	run(AutopilotFirmware) // another set, same device: not blocked
 	for range 2 {
 		select {
@@ -387,7 +387,7 @@ func TestOneRequestPerTopicSet(t *testing.T) {
 		}
 	}
 	// A second request on a busy set is dropped without an answer.
-	h.handle(ctx, AutopilotJob, "m1", body)
+	h.handle(ctx, AutopilotPath, "m1", body)
 	select {
 	case <-pub.seen:
 		t.Fatal("a second request on the same set was answered")
@@ -395,7 +395,7 @@ func TestOneRequestPerTopicSet(t *testing.T) {
 	}
 	// Another device is not blocked either.
 	run2 := make(chan struct{})
-	go func() { h.handle(ctx, AutopilotJob, "m2", body); close(run2) }()
+	go func() { h.handle(ctx, AutopilotPath, "m2", body); close(run2) }()
 	select {
 	case <-pub.seen:
 	case <-time.After(5 * time.Second):
@@ -407,7 +407,7 @@ func TestOneRequestPerTopicSet(t *testing.T) {
 	// Once answered, the set takes the next request.
 	pub.hold = nil
 	before := len(pub.sent())
-	h.handle(ctx, AutopilotJob, "m1", body)
+	h.handle(ctx, AutopilotPath, "m1", body)
 	if len(pub.sent()) != before+1 {
 		t.Fatal("the set did not take a request after the first was answered")
 	}
@@ -415,14 +415,14 @@ func TestOneRequestPerTopicSet(t *testing.T) {
 
 func TestGate(t *testing.T) {
 	var g gate
-	if !g.acquire("m1", AutopilotJob) || g.acquire("m1", AutopilotJob) {
+	if !g.acquire("m1", AutopilotPath) || g.acquire("m1", AutopilotPath) {
 		t.Fatal("one acquire per device and set")
 	}
-	if !g.acquire("m1", AutopilotFirmware) || !g.acquire("m2", AutopilotJob) {
+	if !g.acquire("m1", AutopilotFirmware) || !g.acquire("m2", AutopilotPath) {
 		t.Fatal("another set or device was blocked")
 	}
-	g.release("m1", AutopilotJob)
-	if !g.acquire("m1", AutopilotJob) {
+	g.release("m1", AutopilotPath)
+	if !g.acquire("m1", AutopilotPath) {
 		t.Fatal("acquire after release")
 	}
 	g.release("m9", GatewayFirmware) // a spare release must not panic
@@ -436,8 +436,8 @@ func TestOpenDirectories(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fw, "gateway", "1.0.0.bin"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	jobs := t.TempDir()
-	svc, err := Open(Config{FirmwareDir: fw, JobDir: jobs})
+	paths := t.TempDir()
+	svc, err := Open(Config{FirmwareDir: fw, PathFileDir: paths})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,13 +450,13 @@ func TestOpenDirectories(t *testing.T) {
 		t.Fatalf("autopilot set: %v", err)
 	}
 	// The same name in another set does not leak across.
-	if _, _, err := svc.ReadChunk(AutopilotJob, "1.0.0.bin", 0); err != ErrNotFound {
-		t.Fatalf("job set: %v", err)
+	if _, _, err := svc.ReadChunk(AutopilotPath, "1.0.0.bin", 0); err != ErrNotFound {
+		t.Fatalf("path set: %v", err)
 	}
 	if _, err := Open(Config{FirmwareDir: filepath.Join(fw, "nope")}); err == nil {
 		t.Fatal("a missing FIRMWARE_DIR opened")
 	}
-	if _, err := Open(Config{JobDir: filepath.Join(fw, "nope")}); err == nil {
-		t.Fatal("a missing JOB_DIR opened")
+	if _, err := Open(Config{PathFileDir: filepath.Join(fw, "nope")}); err == nil {
+		t.Fatal("a missing PATH_FILE_DIR opened")
 	}
 }

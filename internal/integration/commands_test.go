@@ -107,7 +107,7 @@ func (s *sim) ack(board, id, cmd, state, extra string) {
 func (s *sim) online(mode string) {
 	s.pub("gateway/status", "online")
 	s.pub("gateway/state", `{"protocol":"0.1","boot":10,"firmware":"0.4.0","previous":null,"partition":"ota_0","autopilot_link":"up","ntrip":"off","operator":null,"time":1794650000}`)
-	s.pub("autopilot/state", fmt.Sprintf(`{"protocol":"0.1","boot":5,"firmware":"0.1.0","previous":null,"partition":"ota_0","mode":%q,"paused":null,"job":null,"recording":null,"fault":null,"time":1794650000.0}`, mode))
+	s.pub("autopilot/state", fmt.Sprintf(`{"protocol":"0.1","boot":5,"firmware":"0.1.0","previous":null,"partition":"ota_0","mode":%q,"paused":null,"path":null,"recording":null,"fault":null,"time":1794650000.0}`, mode))
 	s.app.waitDevice(s.name(), "the mower's state", func(d api.DeviceDetail) bool { return hasState(d.Gateway.State) && hasState(d.Autopilot.State) })
 }
 
@@ -302,7 +302,7 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 	m := app.sim()
 	name := m.name()
 	m.listenForCommands()
-	m.online("job")
+	m.online("path")
 
 	for _, req := range []map[string]any{
 		{"board": "gateway", "cmd": "restart"},
@@ -312,8 +312,8 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 		eq(t, status, 409)
 		e := decode[api.ApiError](t, body)
 		eq(t, e.Code, api.CodeConflict)
-		t.Logf("%s while the autopilot runs a job: %d %s", req["cmd"], status, e.Message)
-		if !strings.Contains(e.Message, "job") {
+		t.Logf("%s while the autopilot runs a path: %d %s", req["cmd"], status, e.Message)
+		if !strings.Contains(e.Message, "path") {
 			t.Fatalf("the reason does not name the mode: %s", e.Message)
 		}
 	}
@@ -325,8 +325,8 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 	eq(t, status, 202)
 	m.mustCmd("gateway", "ping")
 
-	// The job ends; the autopilot is idle: the restart goes out.
-	m.pub("autopilot/state", `{"protocol":"0.1","boot":5,"mode":"idle","job":null,"time":1794650200.0}`)
+	// The path ends; the autopilot is idle: the restart goes out.
+	m.pub("autopilot/state", `{"protocol":"0.1","boot":5,"mode":"idle","path":null,"time":1794650200.0}`)
 	app.waitDevice(name, "idle", func(d api.DeviceDetail) bool { return strings.Contains(string(d.Autopilot.State), `"idle"`) })
 	status, sent, _ := app.sendCommand(name, map[string]any{"board": "gateway", "cmd": "restart"})
 	eq(t, status, 202)
@@ -334,9 +334,9 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 	t.Logf("restart with an idle autopilot: %d, sent as %s", status, sent.ID)
 
 	// The autopilot is busy again, but the gateway reports the board link down:
-	// the stale job state does not count, and ota goes out.
-	m.pub("autopilot/state", `{"protocol":"0.1","boot":5,"mode":"job","job":"j-2","time":1794650300.0}`)
-	app.waitDevice(name, "job again", func(d api.DeviceDetail) bool { return strings.Contains(string(d.Autopilot.State), `"j-2"`) })
+	// the stale path state does not count, and ota goes out.
+	m.pub("autopilot/state", `{"protocol":"0.1","boot":5,"mode":"path","path":"j-2","time":1794650300.0}`)
+	app.waitDevice(name, "path again", func(d api.DeviceDetail) bool { return strings.Contains(string(d.Autopilot.State), `"j-2"`) })
 	status, _, _ = app.sendCommand(name, map[string]any{"board": "gateway", "cmd": "ota", "params": map[string]any{"version": "0.5.0"}})
 	eq(t, status, 409)
 	m.pub("gateway/state", `{"protocol":"0.1","boot":10,"autopilot_link":"down","time":1794650310}`)
@@ -344,7 +344,7 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 	status, sent, _ = app.sendCommand(name, map[string]any{"board": "gateway", "cmd": "ota", "params": map[string]any{"version": "0.5.0"}})
 	eq(t, status, 202)
 	eq(t, m.mustCmd("gateway", "ota").ID, sent.ID)
-	t.Logf("ota with the board link down and a stale job state: %d", status)
+	t.Logf("ota with the board link down and a stale path state: %d", status)
 }
 
 // Live driving: the browser's setpoint goes to autopilot/drive about 10 times

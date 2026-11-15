@@ -20,8 +20,8 @@ func cmdParams(r *rig, cmd string) []string {
 		return []string{pointsJSON(r.geo(30, 0))}
 	case "record_start":
 		return []string{`"session":"r-1"`}
-	case "job_start":
-		return []string{`"job":"j-1","size":10,"sha256":"` + sha64 + `"`}
+	case "path_start":
+		return []string{`"path":"j-1","size":10,"sha256":"` + sha64 + `"`}
 	case "monitor_start":
 		return []string{`"session":"m-1","metrics":["battery.v"],"rate":10`}
 	case "ota":
@@ -40,7 +40,7 @@ func inMode(r *rig, mode string) {
 	case "recording":
 		r.cmd("autopilot", "p-manual", "manual_start")
 		r.cmd("autopilot", "p-rec", "record_start", `"session":"r-0"`)
-	case "job":
+	case "path":
 		r.cmd("autopilot", "p-follow", "follow", pointsJSON(r.geo(40, 0)))
 	case "fault":
 		if err := r.m.set("fault", "motor_stall"); err != nil {
@@ -54,7 +54,7 @@ func inMode(r *rig, mode string) {
 }
 
 func TestStateMachineTable(t *testing.T) {
-	any5 := []string{"idle", "manual", "recording", "job", "fault"}
+	any5 := []string{"idle", "manual", "recording", "path", "fault"}
 	// §8, "Allowed in".
 	allowed := map[string][]string{
 		"stop":          any5,
@@ -64,9 +64,9 @@ func TestStateMachineTable(t *testing.T) {
 		"follow":        {"idle", "manual"},
 		"record_start":  {"idle", "manual"},
 		"record_stop":   {"recording"},
-		"job_start":     {"idle"},
-		"pause":         {"job"},
-		"resume":        {"job"},
+		"path_start":    {"idle"},
+		"pause":         {"path"},
+		"resume":        {"path"},
 		"clear_fault":   {"fault"},
 		"monitor_start": any5,
 		"monitor_stop":  any5,
@@ -125,7 +125,7 @@ func TestStateMachineTransitions(t *testing.T) {
 	step("b1", "manual_start", "manual")
 	r.cmd("autopilot", "b2", "follow", pointsJSON(r.geo(0.4, 0)))
 	r.advance(100 * time.Millisecond)
-	if mode() != "job" {
+	if mode() != "path" {
 		t.Fatalf("follow: mode %s", mode())
 	}
 	r.advance(5 * time.Second)
@@ -136,7 +136,7 @@ func TestStateMachineTransitions(t *testing.T) {
 }
 
 func TestStopIsAcceptedEverywhere(t *testing.T) {
-	for _, mode := range []string{"idle", "manual", "recording", "job", "fault"} {
+	for _, mode := range []string{"idle", "manual", "recording", "path", "fault"} {
 		r := newRig(t).online()
 		inMode(r, mode)
 		r.cmd("autopilot", "s-1", "stop")
@@ -208,7 +208,7 @@ func TestFollowErrors(t *testing.T) {
 	_ = r.m.set("fix", "rtk_float")
 	r.cmd("autopilot", "n1", "follow", pointsJSON(r.geo(1, 0)))
 	r.wantAck("autopilot", "n1", "failed", "no_fix")
-	r.cmd("autopilot", "n2", "job_start", `"job":"j","size":1,"sha256":"`+sha64+`"`)
+	r.cmd("autopilot", "n2", "path_start", `"path":"j","size":1,"sha256":"`+sha64+`"`)
 	r.wantAck("autopilot", "n2", "failed", "no_fix")
 	if r.m.ap.mode != "idle" {
 		t.Fatal("mode changed on no_fix")
@@ -337,21 +337,21 @@ func TestFixLossPausesAndResumes(t *testing.T) {
 	}
 	evs := r.events()
 	names := eventNames(evs)
-	if !contains(names, "fix_lost") || !contains(names, "job_paused") {
+	if !contains(names, "fix_lost") || !contains(names, "path_paused") {
 		t.Fatalf("events %v", names)
 	}
 	for _, e := range evs {
 		if e["event"] == "fix_lost" && e["fix"] != "rtk_float" {
 			t.Fatalf("fix_lost: %v", e)
 		}
-		if e["event"] == "job_paused" && e["reason"] != "fix" {
-			t.Fatalf("job_paused: %v", e)
+		if e["event"] == "path_paused" && e["reason"] != "fix" {
+			t.Fatalf("path_paused: %v", e)
 		}
 	}
 	_ = r.m.set("fix", "rtk_fixed")
 	r.advance(500 * time.Millisecond)
 	names = eventNames(r.events())
-	if !contains(names, "fix_regained") || !contains(names, "job_resumed") {
+	if !contains(names, "fix_regained") || !contains(names, "path_resumed") {
 		t.Fatalf("events after fix returned: %v", names)
 	}
 	if r.m.ap.paused != nil {
@@ -376,8 +376,8 @@ func TestLinkLossPausesPathUntilResume(t *testing.T) {
 	if p := r.apState()["paused"]; p != "link" {
 		t.Fatalf("paused = %v, want link", p)
 	}
-	if !contains(eventNames(r.events()), "job_paused") {
-		t.Fatal("no job_paused event")
+	if !contains(eventNames(r.events()), "path_paused") {
+		t.Fatal("no path_paused event")
 	}
 	r.serverStatus("online")
 	r.advance(3 * time.Second)
@@ -477,7 +477,7 @@ func TestFaults(t *testing.T) {
 }
 
 func TestFaultFromAnyMode(t *testing.T) {
-	for _, mode := range []string{"idle", "manual", "recording", "job"} {
+	for _, mode := range []string{"idle", "manual", "recording", "path"} {
 		for _, code := range faultCodes {
 			r := newRig(t).online()
 			inMode(r, mode)

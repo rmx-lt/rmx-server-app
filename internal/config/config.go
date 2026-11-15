@@ -35,9 +35,9 @@ type Config struct {
 	// over MQTT, in the subdirectories "gateway" and "autopilot". Empty means
 	// no firmware is served.
 	FirmwareDir string
-	// JobDir is JOB_DIR: the job files (<job>.json) served to the autopilot
-	// over MQTT. Empty means no job files are served.
-	JobDir string
+	// PathFileDir is PATH_FILE_DIR: the path files (<path>.json) served to the autopilot
+	// over MQTT. Empty means no path files are served.
+	PathFileDir string
 	// NTRIP is the correction caster the gateways use (NTRIP_* variables).
 	// The zero value means none is configured.
 	NTRIP NTRIP
@@ -142,7 +142,7 @@ func FromLookup(lookup func(string) (string, bool)) (*Config, error) {
 		},
 		StaticDir:   get("STATIC_DIR"),
 		FirmwareDir: strings.TrimSpace(get("FIRMWARE_DIR")),
-		JobDir:      strings.TrimSpace(get("JOB_DIR")),
+		PathFileDir: strings.TrimSpace(get("PATH_FILE_DIR")),
 	}
 	if v := get("BIND_ADDR"); v != "" {
 		if _, err := netip.ParseAddrPort(strings.TrimSpace(v)); err != nil {
