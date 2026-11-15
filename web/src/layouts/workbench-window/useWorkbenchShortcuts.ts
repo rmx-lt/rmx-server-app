@@ -1,15 +1,11 @@
 import { useEffect } from "react";
 import { useShortcut, addShortcutBlockListener, removeShortcutBlockListener } from "@/hooks/shortcut-manager/useShortcut";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
-import { useMapPickerStore } from "@/features/map-manager/stores/mapPickerStore";
-import { useUiControlsPanelStore } from "@/features/ui-manager/stores/uiControlsPanelStore";
-import { useUiInspectorPanelStore } from "@/features/ui-manager/stores/uiInspectorPanelStore";
+import { useUiShellStore } from "@/features/ui-manager/stores/uiShellStore";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 import { useCanvasToolStore } from "@/features/canvas-editing/stores/canvasToolStore";
-import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
-import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
-import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
+import { deleteAction, redoAction, toggleTool, undoAction } from "@/features/canvas-editing/data/canvasActions";
 import { newMap } from "@/features/map-manager/data/mapBridge";
 
 /**
@@ -30,68 +26,18 @@ export function useWorkbenchShortcuts() {
 
     useShortcut("map.new", S["map.new"].keys, () => void newMap().catch(console.error));
 
-    useShortcut("map.open", S["map.open"].keys, () =>
-        useMapPickerStore.getState().open(),
-    );
+    useShortcut("controls.toggle", S["controls.toggle"].keys, () => useUiShellStore.getState().toggleSide());
 
-    useShortcut("controls.toggle", S["controls.toggle"].keys, () =>
-        useUiControlsPanelStore
-            .getState()
-            .setVisibility(!useUiControlsPanelStore.getState().isVisible),
-    );
-
-    useShortcut("inspector.toggle", S["inspector.toggle"].keys, () =>
-        useUiInspectorPanelStore
-            .getState()
-            .setVisibility(!useUiInspectorPanelStore.getState().isVisible),
-    );
+    useShortcut("inspector.toggle", S["inspector.toggle"].keys, () => useUiShellStore.getState().toggleRight());
 
     useShortcut("canvas.reset-view", S["canvas.reset-view"].keys, () =>
         useCanvasViewStore.getState().resetView(),
     );
 
-    useShortcut("canvas.tool-select", S["canvas.tool-select"].keys, () => {
-        const { activeTool, setActiveTool } = useCanvasToolStore.getState();
-        useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "select" ? null : "select");
-    });
-
-    useShortcut("canvas.tool-add-mowing-zone", S["canvas.tool-add-mowing-zone"].keys, () => {
-        const { activeTool, setActiveTool } = useCanvasToolStore.getState();
-        useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "addMowingZone" ? null : "addMowingZone");
-    });
-
-    useShortcut("canvas.tool-add-no-go-zone", S["canvas.tool-add-no-go-zone"].keys, () => {
-        const { activeTool, setActiveTool } = useCanvasToolStore.getState();
-        useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "addNoGoZone" ? null : "addNoGoZone");
-    });
-
-    useShortcut("canvas.tool-delete", S["canvas.tool-delete"].keys, () => {
-        const { activeTool, setActiveTool } = useCanvasToolStore.getState();
-        const { selectedObject, selectedVertexRefs, clearSelection, selectVertex } =
-            useCanvasSelectionStore.getState();
-        const { deleteObject, deleteVertices } = useCanvasObjectStore.getState();
-        if (activeTool === "select" && selectedObject !== null) {
-            if (selectedVertexRefs.length > 0) {
-                deleteVertices(selectedObject, selectedVertexRefs);
-                selectVertex(null);
-            } else {
-                deleteObject(selectedObject);
-                clearSelection();
-            }
-            return;
-        }
-        useCanvasDrawingStore.getState().cancelDrawing();
-        setActiveTool(activeTool === "delete" ? null : "delete");
-    });
-
-    useShortcut("canvas.undo", S["canvas.undo"].keys, () =>
-        useCanvasHistoryStore.getState().undo(),
-    );
-
-    useShortcut("canvas.redo", S["canvas.redo"].keys, () =>
-        useCanvasHistoryStore.getState().redo(),
-    );
+    useShortcut("canvas.tool-select", S["canvas.tool-select"].keys, () => toggleTool("select"));
+    useShortcut("canvas.tool-add-mowing-zone", S["canvas.tool-add-mowing-zone"].keys, () => toggleTool("addMowingZone"));
+    useShortcut("canvas.tool-add-no-go-zone", S["canvas.tool-add-no-go-zone"].keys, () => toggleTool("addNoGoZone"));
+    useShortcut("canvas.tool-delete", S["canvas.tool-delete"].keys, deleteAction);
+    useShortcut("canvas.undo", S["canvas.undo"].keys, undoAction);
+    useShortcut("canvas.redo", S["canvas.redo"].keys, redoAction);
 }

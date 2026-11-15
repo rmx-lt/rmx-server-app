@@ -3,6 +3,7 @@ import ShortcutManager from "@/components/shortcut-manager/ShortcutManager";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
+import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { openLatestMap } from "@/features/map-manager/data/mapBridge";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
@@ -40,6 +41,7 @@ function Workbench() {
     // A new login: read this user's settings.
     resetSettings();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
+    useGeoAnchorStore.getState().loadSystemGeoAnchor().catch(console.error);
     openLatestMap().catch(console.error);
     return () => {
       stopConnections();

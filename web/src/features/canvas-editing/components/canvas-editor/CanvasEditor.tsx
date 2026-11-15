@@ -14,6 +14,8 @@ import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasPanning } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasPanning";
 import { useCanvasZoom } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasZoom";
 import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { isLayerVisible } from "@/config/modes/modes";
+import { useModeStore } from "@/model/modeStore";
 import { useCanvasDrawing } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasDrawing";
 import { useCanvasMidpointDrag } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasMidpointDrag";
 import { useCanvasVertexDrag } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasVertexDrag";
@@ -33,6 +35,7 @@ export default function CanvasEditor() {
   const [isHoveringObject, setIsHoveringObject] = useState<Zone | null>(null);
   const centeredRef = useRef(false);
 
+  const zonesVisible = isLayerVisible(useModeStore((s) => s.mode), "zones");
   const scale = useCanvasViewStore((s) => s.scale);
   const position = useCanvasViewStore((s) => s.position);
   const setPosition = useCanvasViewStore((s) => s.setPosition);
@@ -275,7 +278,7 @@ export default function CanvasEditor() {
         onDragEnd={handleDragEnd}
       >
         <CanvasGridLayer width={size.width} height={size.height} />
-        {[ZONE_CATEGORY.MOWING, ZONE_CATEGORY.NO_GO].map((category) => (
+        {zonesVisible && [ZONE_CATEGORY.MOWING, ZONE_CATEGORY.NO_GO].map((category) => (
           <CanvasPolygonObjectsLayer
             key={category}
             category={category}

@@ -6,6 +6,10 @@ import { useCanvasObjectStore } from "../stores/canvasObjectStore";
 import { useMapStore } from "@/model/mapStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useConnectionStore } from "@/model/connectionStore";
+import { useMapListStore } from "@/model/mapListStore";
+import { useModeStore } from "@/model/modeStore";
+import { useCanvasToolStore } from "../stores/canvasToolStore";
+import { useCanvasDrawingStore } from "../stores/canvasDrawingStore";
 
 // ── Count synchronization ──────────────────────────────────────────────────
 // Reactively keeps the mapStore mowing and no-go zone counts derived from the
@@ -50,6 +54,7 @@ function adoptMapId(id: number): void {
 async function saveOpenMap(): Promise<void> {
     const content = currentMapContent();
     const id = await saveMap(content);
+    void useMapListStore.getState().refresh();
     // The map shown may have changed while the save ran.
     if (content.map.id !== id && useMapStore.getState().map.id === content.map.id) adoptMapId(id);
 }
@@ -65,4 +70,11 @@ export const resetSave = autosaver.reset;
 
 useConnectionStore.subscribe((s, prev) => {
     if (s.live && !prev.live) autosaver.retryNow();
+});
+
+// A tool belongs to Plan mode: leaving it puts the tool away.
+useModeStore.subscribe((s, prev) => {
+    if (s.mode === prev.mode) return;
+    useCanvasDrawingStore.getState().cancelDrawing();
+    useCanvasToolStore.getState().setActiveTool(null);
 });

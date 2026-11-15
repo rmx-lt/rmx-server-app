@@ -173,6 +173,12 @@ export async function overwriteMap(id: number, content: MapContent, name: string
     return remember(saved);
 }
 
+/** Renames a map that is not the open one (the open one is renamed in the store and saved with the autosave). */
+export async function renameMap(id: number, name: string): Promise<void> {
+    const current = await fetchMap(id);
+    remember(await putMap(id, { name: trimName(name), revision: current.revision, doc: current.doc }));
+}
+
 /** Deletes a map. */
 export async function deleteMap(id: number): Promise<void> {
     await removeMap(id);
