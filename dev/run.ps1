@@ -1,19 +1,23 @@
 # Local development in one command (PowerShell, from anywhere in the repo):
 #
-#   dev\run.ps1             # stack + Go server (restarts on save) + web dev server + simulated device
-#   dev\run.ps1 -NoSim      # without the simulated device
+#   dev\run.ps1             # stack + Go server (restarts on save) + web dev server + simulated mower
+#   dev\run.ps1 -NoSim      # without the simulated mower
+#   dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set
 #   dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations, new dev login)
 #
 # Then open http://localhost:3000/ and log in with DEV_USER / DEV_PASSWORD
 # from .env (default dev / dev-password-123). Ctrl+C stops the Go server, the
-# web dev server and the simulator; the compose stack keeps running
+# web dev server and the simulated mower (flip its switches while it runs with
+# `go run ./cmd/devsim ctl fix none`); the compose stack keeps running
 # (docker compose -f compose.dev.yaml down to stop it).
 #
 # Needs Docker Desktop, Go and Bun (wiki Server-App, "Local development").
 param(
     [switch]$NoSim,
     [switch]$ResetDb,
-    [string]$SimName = ''
+    [string]$SimName = '',
+    # Switches for the simulated mower at start: name=value (wiki Server-App, Local development).
+    [string[]]$SimSet = @()
 )
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
@@ -34,7 +38,7 @@ foreach ($line in Get-Content .env) {
 $devUser = if ($dotenv.DEV_USER) { $dotenv.DEV_USER } else { 'dev' }
 $devPassword = if ($dotenv.DEV_PASSWORD) { $dotenv.DEV_PASSWORD } else { 'dev-password-123' }
 if (-not $SimName) { $SimName = if ($dotenv.DEVSIM_NAME) { $dotenv.DEVSIM_NAME } else { 'mower-sim' } }
-# Firmware served to the simulator's `ota` (and any local device).
+# Firmware (gateway/ and autopilot/ below) and job files the server serves to the simulated mower.
 if (-not $dotenv.FIRMWARE_DIR -and -not $env:FIRMWARE_DIR) { $env:FIRMWARE_DIR = 'dev/firmware' }
 if (-not $dotenv.JOB_DIR -and -not $env:JOB_DIR) { $env:JOB_DIR = 'dev/jobs' }
 New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, dev/jobs, .dev | Out-Null
@@ -102,7 +106,11 @@ try {
     $stamp = SourceStamp
     while ($true) {
         $srv = Start-Process $server -NoNewWindow -PassThru
-        if (-not $NoSim) { $dev = Start-Process $sim -ArgumentList '-name', $SimName -NoNewWindow -PassThru }
+        if (-not $NoSim) {
+            $simArgs = @('-name', $SimName)
+            foreach ($kv in $SimSet) { $simArgs += '-set', $kv }
+            $dev = Start-Process $sim -ArgumentList $simArgs -NoNewWindow -PassThru
+        }
         Say "running: http://localhost:3000/  (server pid $($srv.Id); Ctrl+C stops)"
         # Wait for a source change, then rebuild and restart the Go side.
         while ($true) {
