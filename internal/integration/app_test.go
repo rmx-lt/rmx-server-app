@@ -153,7 +153,7 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 		// Back to the schema sqlx left behind: undo what the migrations after
 		// its three created (20261113000000_records_drop only drops, with IF EXISTS).
 		`DROP TABLE maps, user_settings`,
-		`DROP TABLE commands, ntrip_sent`,
+		`DROP TABLE commands, ntrip_sent, paths`,
 		`DROP TABLE telemetry, metric_latest, device_events, catalogues, catalogue_parts, board_state, devices`,
 		`CREATE TABLE _sqlx_migrations (version bigint PRIMARY KEY, description text NOT NULL,
 		   installed_on timestamptz NOT NULL DEFAULT now(), success boolean NOT NULL,
@@ -174,7 +174,7 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The three it adopted, plus the ones after them.
-	eq(t, applied, 7)
+	eq(t, applied, 8)
 	// Running again does nothing, and the old table is still there.
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)

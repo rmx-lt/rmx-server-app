@@ -32,7 +32,7 @@ func TestDefaults(t *testing.T) {
 	}
 	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "rmx-server" ||
 		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
-		c.FirmwareDir != "" || c.PathFileDir != "" || c.NTRIP.Configured() ||
+		c.FirmwareDir != "" || c.NTRIP.Configured() ||
 		!slices.Equal(c.AllowedOrigins, []string{"https://app.rmx.lt"}) {
 		t.Fatalf("%+v", c)
 	}
@@ -94,12 +94,11 @@ func TestInvalidValues(t *testing.T) {
 func TestTransferDirectories(t *testing.T) {
 	vars := base()
 	vars["FIRMWARE_DIR"] = "  /firmware  "
-	vars["PATH_FILE_DIR"] = "/paths"
 	c, err := load(vars)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.FirmwareDir != "/firmware" || c.PathFileDir != "/paths" {
+	if c.FirmwareDir != "/firmware" {
 		t.Fatalf("%+v", c)
 	}
 }

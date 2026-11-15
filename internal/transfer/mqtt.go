@@ -12,10 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/rmx-lt/rmx-server-app/internal/api"
 	"github.com/rmx-lt/rmx-server-app/internal/core"
+	"github.com/rmx-lt/rmx-server-app/internal/db"
 	"github.com/rmx-lt/rmx-server-app/internal/mqtt"
 )
 
@@ -212,25 +214,29 @@ type ErrorMessage struct {
 
 // ---- The service ---------------------------------------------------------------
 
-// Service serves the three sets of files. A set whose directory is not
-// configured has no files: every request for it is not_found.
+// Service serves the three sets of files. A firmware set whose directory is
+// not configured has no files: every request for it is not_found. The path
+// set is read from the paths table.
 type Service struct {
 	dirs map[Set]*Dir
+	// path returns the stored file of a path id and its SHA-256, or ErrNotFound.
+	path func(ctx context.Context, id string) ([]byte, [32]byte, error)
 }
 
-// Config names the directories. FirmwareDir holds the images in
-// subdirectories named after the board ("gateway", "autopilot"); PathFileDir holds
-// the path files. Empty means that set is not served.
+// Config names the firmware directory: FIRMWARE_DIR holds the images in
+// subdirectories named after the board ("gateway", "autopilot"). Empty means
+// the firmware sets are not served.
 type Config struct {
 	FirmwareDir string
-	PathFileDir string
 }
 
-// Open opens the directories of the configured sets. A missing firmware
-// subdirectory is logged and leaves that set empty; FIRMWARE_DIR and PATH_FILE_DIR
-// themselves must exist.
-func Open(cfg Config) (*Service, error) {
-	s := &Service{dirs: map[Set]*Dir{}}
+// Open opens the firmware directories. A missing firmware subdirectory is
+// logged and leaves that set empty; FIRMWARE_DIR itself must exist. Paths are
+// read through paths.
+func Open(cfg Config, paths db.DBTX) (*Service, error) {
+	s := &Service{dirs: map[Set]*Dir{}, path: func(ctx context.Context, id string) ([]byte, [32]byte, error) {
+		return getPath(ctx, paths, id)
+	}}
 	if cfg.FirmwareDir != "" {
 		if _, err := os.Stat(cfg.FirmwareDir); err != nil {
 			return nil, fmt.Errorf("FIRMWARE_DIR: %w", err)
@@ -253,20 +259,8 @@ func Open(cfg Config) (*Service, error) {
 			}
 		}
 	}
-	if cfg.PathFileDir != "" {
-		d, err := OpenDir(cfg.PathFileDir, MaxPathBytes)
-		if err != nil {
-			s.Close()
-			return nil, fmt.Errorf("PATH_FILE_DIR: %w", err)
-		}
-		s.dirs[AutopilotPath] = d
-		slog.Info("transfer directory ready", "set", string(AutopilotPath), "dir", cfg.PathFileDir)
-	}
 	return s, nil
 }
-
-// NewService returns a service over already opened directories.
-func NewService(dirs map[Set]*Dir) *Service { return &Service{dirs: dirs} }
 
 // Close closes every directory.
 func (s *Service) Close() {
@@ -276,12 +270,24 @@ func (s *Service) Close() {
 }
 
 // ReadChunk returns chunk index of file in set, and the file's description.
-func (s *Service) ReadChunk(set Set, file string, index uint32) (Meta, []byte, error) {
+// A path file is "<path id>.json" in the paths table.
+func (s *Service) ReadChunk(ctx context.Context, set Set, file string, index uint32) (Meta, []byte, error) {
+	if !ValidFileName(file) {
+		return Meta{}, nil, ErrBadName
+	}
+	if set == AutopilotPath {
+		id, ok := strings.CutSuffix(file, ".json")
+		if !ok {
+			return Meta{}, nil, ErrNotFound
+		}
+		doc, sum, err := s.path(ctx, id)
+		if err != nil {
+			return Meta{}, nil, err
+		}
+		return sliceChunk(file, doc, sum, index)
+	}
 	d, ok := s.dirs[set]
 	if !ok {
-		if !ValidFileName(file) {
-			return Meta{}, nil, ErrBadName
-		}
 		return Meta{}, nil, ErrNotFound
 	}
 	return d.ReadChunk(file, index)
@@ -357,7 +363,7 @@ func (h *mqttHandler) handle(ctx context.Context, set Set, device core.DeviceID,
 		h.publishError(ctx, set, device, req.RequestID, api.CodeBadRequest, msg)
 		return
 	}
-	meta, data, err := h.svc.ReadChunk(set, req.File, req.Chunk)
+	meta, data, err := h.svc.ReadChunk(ctx, set, req.File, req.Chunk)
 	if err != nil {
 		h.publishFailure(ctx, set, device, req.RequestID, err)
 		return

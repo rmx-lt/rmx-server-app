@@ -60,7 +60,7 @@ func Run(ctx context.Context, cfg *config.Config, ln net.Listener) error {
 // when it stops.
 func Serve(ctx context.Context, cfg *config.Config, pool *db.Pool, ln net.Listener) error {
 	defer pool.Close()
-	files, err := transfer.Open(transfer.Config{FirmwareDir: cfg.FirmwareDir, PathFileDir: cfg.PathFileDir})
+	files, err := transfer.Open(transfer.Config{FirmwareDir: cfg.FirmwareDir}, pool)
 	if err != nil {
 		return err
 	}

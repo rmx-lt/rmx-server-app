@@ -7,6 +7,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -45,7 +46,7 @@ func (d *mqttDevice) download(set transfer.Set, file string) []byte {
 }
 
 func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
-	fw, paths := t.TempDir(), t.TempDir()
+	fw := t.TempDir()
 	for _, sub := range []string{"gateway", "autopilot"} {
 		if err := os.Mkdir(filepath.Join(fw, sub), 0o755); err != nil {
 			t.Fatal(err)
@@ -55,16 +56,19 @@ func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
 	gwImage := bytes.Repeat([]byte("gateway-image-"), 650)
 	apImage := bytes.Repeat([]byte("autopilot-"), 900)
 	path := []byte(`{"path":"j-1","speed":0.5,"segments":[{"blade":false,"points":[[54.1,25.1]]}]}`)
-	for path, body := range map[string][]byte{
+	for file, body := range map[string][]byte{
 		filepath.Join(fw, "gateway", "1.0.0.bin"):   gwImage,
 		filepath.Join(fw, "autopilot", "1.0.0.bin"): apImage,
-		filepath.Join(paths, "j-1.json"):            path,
 	} {
-		if err := os.WriteFile(path, body, 0o644); err != nil {
+		if err := os.WriteFile(file, body, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	app := startAppOptions(t, newDatabase(t), appOptions{firmwareDir: fw, pathFileDir: paths})
+	pool := newDatabase(t)
+	if err := transfer.StorePath(context.Background(), pool, "j-1", path); err != nil {
+		t.Fatal(err)
+	}
+	app := startAppOptions(t, pool, appOptions{firmwareDir: fw})
 	dev := app.mqttConnect()
 	for _, set := range transfer.Sets {
 		dev.subscribe(dev.topic(set.Chunk()), dev.topic(set.Response()))
@@ -104,6 +108,10 @@ func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
 	}
 	eq(t, ask(transfer.AutopilotFirmware, `{"request_id":"e1","file":"j-1.json","chunk":0}`).Error.Code, "not_found")
 	eq(t, ask(transfer.AutopilotPath, `{"request_id":"e2","file":"1.0.0.bin","chunk":0}`).Error.Code, "not_found")
+	// A path id that is not in the table is not_found, as a missing file is (§12.3).
+	missing := ask(transfer.AutopilotPath, `{"request_id":"e5","file":"j-404.json","chunk":0}`)
+	eq(t, missing.Error.Code, "not_found")
+	eq(t, missing.RequestID, "e5")
 	bad := ask(transfer.GatewayFirmware, `{"request_id":"e3","file":"../autopilot/1.0.0.bin","chunk":0}`)
 	eq(t, bad.Error.Code, "bad_request")
 	eq(t, bad.RequestID, "e3")
