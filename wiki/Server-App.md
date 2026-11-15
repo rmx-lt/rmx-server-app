@@ -372,6 +372,9 @@ stored one means the board restarted: the server records it (`boot_seen_at`)
 and pushes a `device_changed` with change `boot`. A lower one is ignored for
 this purpose, because the counter only grows and a lower value is a message
 held up from before the restart. Every stored value carries its `boot`.
+The `speed_limit` field of the autopilot's state (§7.1: `max`, `transit`,
+`edge`, `fill`, `manual`, in m/s) is stored and shown like the rest of it; the
+server reads nothing from it.
 
 `autopilot_stale` is true while the gateway's status is not `online` or the
 gateway's state says `autopilot_link` is not `up` (§7.1), and also while the
@@ -530,7 +533,11 @@ All routes need a session (and an allowed `Origin` for the POST).
 Commands a user may send: gateway `ping`, `restart`, `ota` (`version`, optional
 `file`, `size`), `autopilot_reset`; autopilot `stop`, `manual_start`,
 `manual_stop`, `blade` (`on`), `follow` (`points` 1 to 100 of `[lat, lon]`,
-optional `reverse`, `blade`, `speed`), `record_start` (`session`, optional
+optional `reverse`, optional `type`: `transit` (the default), `edge` or `fill`),
+`speed_limit` (`limits`: one or more of `max`, `transit`, `edge`, `fill`,
+`manual`, each a number of 0 or above in m/s, 0 meaning no limit, or `null` for
+the firmware's default; any other name or value is a `400`, and the server sets
+no upper bound), `record_start` (`session`, optional
 `spacing`), `record_stop`, `path_start` (`path`, `size`, `sha256`, optional
 `from_point`), `pause`, `resume`, `clear_fault`, `ota`, `restart`.
 
@@ -990,11 +997,23 @@ still counts and relays the autopilot's topics as it would.
   catalogue (at least 10 s in `idle`) with every key of §16.4 linked, events
   with `boot` and `seq`, live driving on `autopilot/drive` (the setpoint rules
   and the 0.5 s timeout of §9), border recording in batches (§10), `follow`
-  (`reverse`, `blade`, `speed`), and paths: `path_start` downloads `<path>.json`
-  over `autopilot/path/…`, checks size and SHA-256, drives to the start with the
-  blade off and follows the segments; `path.point` counts the points reached, `path.points` is the length of the file, and
+  (`reverse`, `type`; `transit` when it is absent, `bad_request` for an unknown
+  type), and paths: `path_start` downloads `<path>.json` over
+  `autopilot/path/…`, checks size and SHA-256, drives to the start with the
+  blade off and follows the segments, the blade on for `edge` and `fill` and off
+  for `transit` (a segment with another type ends the path with `bad_path`); `path.point` counts the points reached, `path.points` is the length of the file, and
   `from_point` continues. Pauses for command, link or fix (§7.1), faults, `ota`,
   and monitor streams with the budget of 400 values per second.
+- **Speed limits** (§7.1, §8): `speed_limit` is allowed in every mode and applies
+  at once, to a running path (each segment is driven at the limit of its type)
+  and to live driving (`v` is limited by `manual` and `max`, both ways). The
+  speed is never above the limit of the type, nor above `max`; a limit of 0 is
+  no limit, and with `max` at 0 as well the mower uses its top speed, 0.6 m/s
+  (the one top speed of the simulator, also the ceiling for larger limits). The
+  firmware defaults, which `null` returns to: `max` 0.6, `transit` 0.6, `edge`
+  0.3, `fill` 0.5, `manual` 0.6 m/s. The limits are reported in the state, kept
+  with the boot counters (so they survive a restart), and the ack's `result` is
+  the object as it now is.
 - **Motion model.** A differential drive following the live setpoints or the
   path: up to 0.6 m/s with acceleration limits, a heading that is only reported
   while moving (one antenna), a position around a fixed origin (54.687157,
@@ -1003,7 +1022,7 @@ still counts and relays the autopilot's topics as it would.
   spins up and down.
 - **Boot counters** and the running firmware are kept in
   `.dev/devsim-<name>.json`, so restarting devsim is a reboot of the mower:
-  `boot` grows and counters start again. `-state -` keeps them in memory;
+  `boot` grows and counters start again; the speed limits stay. `-state -` keeps them in memory;
   delete the file to start from boot 1.
 - **Not simulated:** the board link frames, the NTRIP connection itself (its
   states and byte counts are), the fix following the corrections (it follows
@@ -1033,7 +1052,8 @@ the acks up to the final one (a value is JSON when it parses as JSON):
 ```powershell
 go run ./cmd/devsim send ping
 go run ./cmd/devsim send -board autopilot manual_start
-go run ./cmd/devsim send -board autopilot follow 'points=[[54.68722,25.27965]]' blade=true
+go run ./cmd/devsim send -board autopilot follow 'points=[[54.68722,25.27965]]' type=edge
+go run ./cmd/devsim send -board autopilot speed_limit 'limits={"edge":0.2,"max":null}'
 go run ./cmd/devsim ctl fix rtk_float
 go run ./cmd/devsim -name mower-02                     # a second mower
 ```
@@ -1165,8 +1185,10 @@ streams and their budget, and the catalogues checked against §16.4 and §16.5.
 compose Mosquitto on a private topic prefix and plays the server: retained
 `mower/status/server`, commands and repeated ids, driving, recording, a path
 and a gateway update served over chunk transfer, and the switches. The integration run also builds devsim and runs it against the
-real server: a path stored in the table is downloaded in chunks and followed
-(`devsim_path_test.go`).
+real server: a path stored in the table is downloaded in chunks and followed,
+and a path with all three segment types is followed with the blade on only for
+`edge` and `fill`, while a `speed_limit` sent during the path changes the speed
+at once and shows in the state (`devsim_path_test.go`).
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
