@@ -27,7 +27,7 @@ You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 dev\run.ps1    # everything: database + broker, Go server (restarts on save), web dev server, simulated device
 ```
 
-Open <http://localhost:3000/app/> and log in as `dev` / `dev-password-123`
+Open <http://localhost:3000/> and log in as `dev` / `dev-password-123`
 (`DEV_USER` / `DEV_PASSWORD` in `.env`). `go run ./cmd/devsim send status`
 talks to the simulated device. Details, and the steps by hand: wiki Server-App,
 "Local development". By hand:
@@ -47,7 +47,7 @@ bun run dev
 ```
 
 Create a login once (`go run ./cmd/rmx-server create-user dev`, any
-password of 12+ characters), then open <http://localhost:3000/app/> and log in; the workbench loads. Ports, MQTT testing and
+password of 12+ characters), then open <http://localhost:3000/> and log in; the workbench loads. Ports, MQTT testing and
 the checks CI runs: see the wiki page Server-App.
 
 Checks before a pull request:

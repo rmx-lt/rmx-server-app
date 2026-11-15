@@ -10,18 +10,18 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/httpx"
 )
 
-// Routes registers the /app/api/maps and /app/api/settings routes, all of
+// Routes registers the /api/maps and /api/settings routes, all of
 // them protected: the session middleware puts the user into the context.
 func (s *Service) Routes(r *httpx.Router) {
 	p := r.Protected()
-	p.HandleFunc("GET /app/api/maps", s.handleList)
-	p.HandleFunc("POST /app/api/maps", s.handleCreate)
-	p.HandleFunc("GET /app/api/maps/{id}", s.handleGet)
-	p.HandleFunc("PUT /app/api/maps/{id}", s.handleUpdate)
-	p.HandleFunc("DELETE /app/api/maps/{id}", s.handleDelete)
-	p.HandleFunc("GET /app/api/settings", s.handleSettings)
-	p.HandleFunc("PUT /app/api/settings/{key}", s.handleSetSetting)
-	p.HandleFunc("DELETE /app/api/settings/{key}", s.handleDeleteSetting)
+	p.HandleFunc("GET /api/maps", s.handleList)
+	p.HandleFunc("POST /api/maps", s.handleCreate)
+	p.HandleFunc("GET /api/maps/{id}", s.handleGet)
+	p.HandleFunc("PUT /api/maps/{id}", s.handleUpdate)
+	p.HandleFunc("DELETE /api/maps/{id}", s.handleDelete)
+	p.HandleFunc("GET /api/settings", s.handleSettings)
+	p.HandleFunc("PUT /api/settings/{key}", s.handleSetSetting)
+	p.HandleFunc("DELETE /api/settings/{key}", s.handleDeleteSetting)
 }
 
 func userID(r *http.Request) core.UserID {

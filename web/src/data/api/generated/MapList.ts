@@ -2,7 +2,7 @@
 import type { MapSummary } from "./MapSummary";
 
 /**
- * MapList is the body of GET /app/api/maps, newest change first.
+ * MapList is the body of GET /api/maps, newest change first.
  */
 export type MapList = {
   maps: Array<MapSummary>,

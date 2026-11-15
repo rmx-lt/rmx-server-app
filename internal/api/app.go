@@ -1,6 +1,6 @@
 package api
 
-// Health is the body of GET /app/health.
+// Health is the body of GET /health.
 type Health struct {
 	// "ok" when the database and the MQTT broker are both reachable, else "degraded".
 	Status  string `json:"status"`

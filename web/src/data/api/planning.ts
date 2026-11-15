@@ -13,7 +13,6 @@ import type { Setting } from "./generated/Setting";
 import type { SettingList } from "./generated/SettingList";
 import type { Zone } from "./generated/Zone";
 import type { ZoneCategory } from "./generated/ZoneCategory";
-import { BASE } from "./paths";
 
 // REST client of the planning API (wiki Server-App, "Planning API"): the
 // user's maps and settings. Every call needs the session cookie, which the
@@ -53,7 +52,7 @@ export function isConflict(err: unknown): boolean {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
     try {
-        res = await fetch(`${BASE}/api${path}`, {
+        res = await fetch(`/api${path}`, {
             method,
             headers: body === undefined ? undefined : { "content-type": "application/json" },
             body: body === undefined ? undefined : JSON.stringify(body),
@@ -70,42 +69,42 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     return (await res.json()) as T;
 }
 
-/** GET /app/api/maps: the user's maps, newest change first. */
+/** GET /api/maps: the user's maps, newest change first. */
 export async function fetchMaps(): Promise<MapSummary[]> {
     return (await request<MapList>("GET", "/maps")).maps;
 }
 
-/** GET /app/api/maps/{id}. */
+/** GET /api/maps/{id}. */
 export function fetchMap(id: number): Promise<MapDetail> {
     return request<MapDetail>("GET", `/maps/${id}`);
 }
 
-/** POST /app/api/maps: a new map at revision 1. */
+/** POST /api/maps: a new map at revision 1. */
 export function postMap(body: MapCreate): Promise<MapDetail> {
     return request<MapDetail>("POST", "/maps", body);
 }
 
-/** PUT /app/api/maps/{id}; fails with code "conflict" when body.revision is stale. */
+/** PUT /api/maps/{id}; fails with code "conflict" when body.revision is stale. */
 export function putMap(id: number, body: MapUpdate): Promise<MapDetail> {
     return request<MapDetail>("PUT", `/maps/${id}`, body);
 }
 
-/** DELETE /app/api/maps/{id}. */
+/** DELETE /api/maps/{id}. */
 export function removeMap(id: number): Promise<void> {
     return request<void>("DELETE", `/maps/${id}`);
 }
 
-/** GET /app/api/settings. */
+/** GET /api/settings. */
 export async function fetchSettings(): Promise<Setting[]> {
     return (await request<SettingList>("GET", "/settings")).settings;
 }
 
-/** PUT /app/api/settings/{key}; value is any JSON value but null. */
+/** PUT /api/settings/{key}; value is any JSON value but null. */
 export function putSetting(key: string, value: unknown): Promise<void> {
     return request<void>("PUT", `/settings/${encodeURIComponent(key)}`, { value });
 }
 
-/** DELETE /app/api/settings/{key}. */
+/** DELETE /api/settings/{key}. */
 export function removeSetting(key: string): Promise<void> {
     return request<void>("DELETE", `/settings/${encodeURIComponent(key)}`);
 }

@@ -27,7 +27,7 @@ func TestLoginMeAndLogout(t *testing.T) {
 	eq(t, res.StatusCode, 200)
 	eq(t, res.Header.Get("Cache-Control"), "no-store")
 	set := res.Header.Get("Set-Cookie")
-	for _, attr := range []string{"Path=/app", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
+	for _, attr := range []string{"Path=/", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
 		if !strings.Contains(set, attr) {
 			t.Errorf("%s lacks %s", set, attr)
 		}

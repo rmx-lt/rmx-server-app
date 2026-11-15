@@ -11,16 +11,16 @@ import (
 
 // CookieName is the session cookie's name.
 //
-// __Secure-: browsers accept this cookie only with Secure and only from an
-// HTTPS page, so a plain-HTTP response can never set or overwrite it. The
-// stronger __Host- prefix would also forbid Domain (no cookie set by a sibling
-// like api.rmx.lt could shadow it), but it requires Path=/, and the app shares
-// rmx.lt with the static site, so its cookie stays under /app. A cookie of
-// our own name sent twice is rejected (see SessionCookie).
-const CookieName = "__Secure-app_session"
+// __Host-: browsers accept this cookie only with Secure, only from an HTTPS
+// page, only with Path=/ and only without Domain. So a plain-HTTP response
+// can never set or overwrite it, and it belongs to this host alone: no other
+// host under rmx.lt can set a cookie of this name that would be sent here.
+// The app has its own host (app.rmx.lt), so Path=/ costs nothing. A cookie
+// of our own name sent twice is still rejected (see SessionCookie).
+const CookieName = "__Host-app_session"
 
-// CookiePath: the cookie is sent only to URLs under this path.
-const CookiePath = "/app"
+// CookiePath is "/", as the __Host- prefix requires: the whole host is the app.
+const CookiePath = "/"
 
 // tokenBytes: 32 random bytes = 256 bits, written as 64 lower-case hex characters.
 const tokenBytes = 32
@@ -73,10 +73,11 @@ const (
 	CookieMissing CookieState = iota
 	// CookieFound: exactly one cookie with our name and a well-formed value.
 	CookieFound
-	// CookieInvalid: malformed, or sent more than once. More than once can only
-	// happen if some other site under rmx.lt set a cookie with our name
-	// (Domain= or another path): rather than guess which one is ours (and maybe
-	// log the user into someone else's account), treat the request as logged out.
+	// CookieInvalid: malformed, or sent more than once. The __Host- prefix
+	// should make a second cookie of our name impossible; if one arrives
+	// anyway (a browser that ignores the prefix), rather than guess which one
+	// is ours (and maybe log the user into someone else's account), treat the
+	// request as logged out.
 	CookieInvalid
 )
 
@@ -106,12 +107,12 @@ func SessionCookie(h http.Header) (SessionToken, CookieState) {
 
 // SetCookie is the Set-Cookie header for a new session. Each attribute and why:
 //   - HttpOnly: page JavaScript can't read it, so an XSS bug can't steal it.
-//   - Secure: sent over HTTPS only (required by the __Secure- prefix).
+//   - Secure: sent over HTTPS only (required by the __Host- prefix).
 //   - SameSite=Strict: never sent on requests started by another site, which
 //     blocks CSRF in all current browsers. Lax would also send it when someone
 //     follows a link here from another site; we don't need that, because the
 //     page itself is public and only its own API calls (same-site) need it.
-//   - Path=/app: not sent to the rest of rmx.lt (the static site).
+//   - Path=/, no Domain: required by the __Host- prefix; sent to this host only.
 //   - Max-Age: the browser keeps it until the absolute timeout; the server
 //     enforces the idle timeout on its own.
 func SetCookie(t SessionToken, maxAgeSecs int) string {

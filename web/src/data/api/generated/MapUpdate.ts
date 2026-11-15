@@ -2,7 +2,7 @@
 import type { MapDoc } from "./MapDoc";
 
 /**
- * MapUpdate is the body of PUT /app/api/maps/{id}. A revision other than
+ * MapUpdate is the body of PUT /api/maps/{id}. A revision other than
  * the stored one is refused with 409 (code "conflict"): someone else saved
  * in between.
  */

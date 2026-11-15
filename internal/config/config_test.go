@@ -14,7 +14,7 @@ func base() map[string]string {
 		"MQTT_HOST":       "mosquitto",
 		"MQTT_USERNAME":   "app",
 		"MQTT_PASSWORD":   "secret",
-		"ALLOWED_ORIGINS": "https://api.rmx.lt",
+		"ALLOWED_ORIGINS": "https://app.rmx.lt",
 	}
 }
 
@@ -30,7 +30,7 @@ func TestDefaults(t *testing.T) {
 	if c.BindAddr != "0.0.0.0:8080" || c.MQTT.Port != 1883 || c.MQTT.ClientID != "rmx-server" ||
 		c.MQTT.TopicPrefix != "mower" || c.DBMaxConnections != 5 || c.StaticDir != "" ||
 		c.FirmwareDir != "" || c.FirmwareChunkBytes != 4096 ||
-		!slices.Equal(c.AllowedOrigins, []string{"https://api.rmx.lt"}) {
+		!slices.Equal(c.AllowedOrigins, []string{"https://app.rmx.lt"}) {
 		t.Fatalf("%+v", c)
 	}
 }
@@ -45,7 +45,7 @@ func TestAllowedOrigins(t *testing.T) {
 	if !slices.Equal(c.AllowedOrigins, []string{"http://localhost:3000", "https://a.example"}) {
 		t.Fatal(c.AllowedOrigins)
 	}
-	for _, bad := range []string{"api.rmx.lt", "https://api.rmx.lt/", "https://*.rmx.lt", "ftp://x", "https://"} {
+	for _, bad := range []string{"app.rmx.lt", "https://app.rmx.lt/", "https://*.rmx.lt", "ftp://x", "https://"} {
 		vars["ALLOWED_ORIGINS"] = bad
 		if _, err := load(vars); err == nil {
 			t.Errorf("accepted %q", bad)

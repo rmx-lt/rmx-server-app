@@ -2,7 +2,7 @@
 import type { MapDoc } from "./MapDoc";
 
 /**
- * MapCreate is the body of POST /app/api/maps.
+ * MapCreate is the body of POST /api/maps.
  */
 export type MapCreate = {
   /**

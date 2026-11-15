@@ -15,12 +15,11 @@ import (
 // publicRoutes is the allow-list of routes that work without a session.
 // Adding one here is a security decision: say why in the pull request.
 var publicRoutes = []string{
-	"/app/",                     // the built web app (no data)
-	"/app/api/",                 // 404 for unknown API paths
-	"GET /app",                  // redirect to /app/
-	"GET /app/health",           // status only, for the deploy script and monitoring
-	"POST /app/api/auth/login",  // the login itself
-	"POST /app/api/auth/logout", // always 204, also without a session
+	"/",                     // the built web app (no data)
+	"/api/",                 // 404 for unknown API paths
+	"GET /health",           // status only, for the deploy script and monitoring
+	"POST /api/auth/login",  // the login itself
+	"POST /api/auth/logout", // always 204, also without a session
 }
 
 func testApp(staticDir string) *app {
@@ -43,25 +42,25 @@ func TestPublicRoutes(t *testing.T) {
 		t.Fatalf("public routes changed:\n got %q\nwant %q", got, want)
 	}
 	// Without STATIC_DIR, the web app is not served at all.
-	if slices.Contains(testApp("").router().PublicRoutes(), "/app/") {
-		t.Fatal("/app/ is served without STATIC_DIR")
+	if slices.Contains(testApp("").router().PublicRoutes(), "/") {
+		t.Fatal("/ is served without STATIC_DIR")
 	}
 }
 
 func TestProtectedRoutes(t *testing.T) {
 	got := testApp("").router().ProtectedRoutes()
 	want := []string{
-		"DELETE /app/api/maps/{id}",
-		"DELETE /app/api/settings/{key}",
-		"GET /app/api/auth/me",
-		"GET /app/api/maps",
-		"GET /app/api/maps/{id}",
-		"GET /app/api/settings",
-		"GET /app/ws",
-		"POST /app/api/auth/logout-all",
-		"POST /app/api/maps",
-		"PUT /app/api/maps/{id}",
-		"PUT /app/api/settings/{key}",
+		"DELETE /api/maps/{id}",
+		"DELETE /api/settings/{key}",
+		"GET /api/auth/me",
+		"GET /api/maps",
+		"GET /api/maps/{id}",
+		"GET /api/settings",
+		"GET /ws",
+		"POST /api/auth/logout-all",
+		"POST /api/maps",
+		"PUT /api/maps/{id}",
+		"PUT /api/settings/{key}",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("protected routes: got %q, want %q", got, want)

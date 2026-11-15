@@ -1,6 +1,6 @@
 import { fetchSettings, putSetting, removeSetting } from "@/data/api/planning";
 
-// The user's settings, kept on the server (GET/PUT /app/api/settings) and
+// The user's settings, kept on the server (GET/PUT /api/settings) and
 // read once per login into this cache. Writes update the cache at once and
 // go to the server in the background.
 

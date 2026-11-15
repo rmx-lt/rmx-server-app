@@ -52,7 +52,7 @@ describe("loadMap", () => {
     test("keeps the server's zone categories and keeps navigation zones out of the canvas", async () => {
         answers.push({ status: 200, body: detail(7, 3) });
         const content = await loadMap(7);
-        expect(calls[0]).toMatchObject({ method: "GET", url: "/app/api/maps/7" });
+        expect(calls[0]).toMatchObject({ method: "GET", url: "/api/maps/7" });
         expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingZoneCount: 1, noGoZoneCount: 1, headlandWidth: "10" });
         expect(content.zones.map((z) => [z.id, z.category, z.mapId])).toEqual([
             [1, "mowing", 7],
@@ -80,7 +80,7 @@ describe("saveMap", () => {
         expect(await saveMap({ ...content, map: { ...content.map, name: "  Front  " } })).toBe(7);
         const put = calls[1]!;
         expect(put.method).toBe("PUT");
-        expect(put.url).toBe("/app/api/maps/7");
+        expect(put.url).toBe("/api/maps/7");
         const body = put.body as { name: string; revision: number; doc: MapDoc };
         expect(body.name).toBe("Front");
         expect(body.revision).toBe(3);
@@ -117,7 +117,7 @@ describe("saveMap", () => {
         answers.push({ status: 201, body: detail(9, 1) });
         const id = await saveMap({ ...content, map: { ...content.map, id: 0, name: "New" } });
         expect(id).toBe(9);
-        expect(calls[1]).toMatchObject({ method: "POST", url: "/app/api/maps" });
+        expect(calls[1]).toMatchObject({ method: "POST", url: "/api/maps" });
     });
 
     test("a stale revision is a conflict", async () => {
@@ -154,6 +154,6 @@ describe("copies and the list", () => {
         ]);
         answers.push({ status: 204 });
         await deleteMap(7);
-        expect(calls[1]).toMatchObject({ method: "DELETE", url: "/app/api/maps/7" });
+        expect(calls[1]).toMatchObject({ method: "DELETE", url: "/api/maps/7" });
     });
 });
