@@ -93,11 +93,10 @@ if ($LASTEXITCODE -ne 0) { throw "could not create the dev login $devUser (DEV_P
 Say "login: $devUser (password from DEV_PASSWORD in .env, default dev-password-123)"
 
 # --- web dev server -----------------------------------------------------------
-if (-not (Test-Path web/node_modules)) {
-    Say 'bun install'
-    Push-Location web; bun install; Pop-Location
-    if ($LASTEXITCODE -ne 0) { throw 'bun install failed' }
-}
+# Every run: a pulled change may have added a dependency; it is quick when nothing changed.
+Say 'bun install'
+Push-Location web; bun install; Pop-Location
+if ($LASTEXITCODE -ne 0) { throw 'bun install failed' }
 
 $web = $null; $srv = $null; $dev = $null
 try {
