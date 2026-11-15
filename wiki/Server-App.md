@@ -743,7 +743,8 @@ save; there is no migration.
 
 **Revisions instead of last-write-wins.** Every save names the revision it
 started from. If another browser saved in between, the save is refused with
-409 and the client has to reload; nothing is overwritten silently.
+409. The web app then saves over the stored revision (see
+[Web app](#web-app), "Saving"); another client may instead reload.
 
 **Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
 spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
@@ -774,15 +775,22 @@ whether the session still exists and shows the login form if not.
   `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
   and writes them back unchanged on every save (renumbered if a drawn zone took
   their id).
-- **Saving.** A save sends the whole map. The status bar shows the save state;
-  File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
-  starts a new blank map, which gets its id from the server on its first save;
-  saved ones open with File → Open (Ctrl+O), which can also reopen the open map
-  to get the server's version. With File → Autosave on, the map is saved one
-  second after the last change. When the map was saved elsewhere in between,
-  the save is refused (409) and a message says to use Save As or reopen it;
-  nothing is overwritten. The browser warns before leaving while a change is
-  not on the server yet.
+- **Saving.** Everything is saved by itself; there is no save status, Save
+  button, autosave switch or leave-page warning. A new map (File → New, Ctrl+Alt+N)
+  is created on the server at once, and a page load opens the map changed last
+  (or creates one when the user has none). File → Open (Ctrl+O) opens another;
+  File → Duplicate makes a copy ("name (copy)") and opens it. A change is saved
+  one second after the last one (a burst is one save): the whole map with the
+  `revision` it was loaded or saved at (`web/src/data/planning/autosave.ts`,
+  wired up in `features/canvas-editing/data/canvasBridge.ts`). A failed save is
+  retried after 1 s, then 2, 4, 8 and at most every 15 s, and at once when the
+  WebSocket opens again, so changes made while the server is down are sent when
+  it is back. Before another map is opened or made, a waiting save is run first;
+  if it fails the switch is refused. When the map was saved elsewhere in
+  between (409 `conflict`), the client reads the stored revision and saves its
+  own document over it: the user's change is never dropped, the other window's
+  change to the same map is. The only state shown is the connection: "Live"
+  while the WebSocket is open, "Offline" otherwise (status bar, left).
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
   read once per login.

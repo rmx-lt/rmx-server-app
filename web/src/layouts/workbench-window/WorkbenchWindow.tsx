@@ -7,8 +7,6 @@ import CanvasEditorLayout from "./canvas-editor/CanvasEditorLayout";
 import ConfirmationModal from "@/components/modals/confirmation-modal/ConfirmationModal";
 import { useWorkbenchShortcuts } from "@/layouts/workbench-window/useWorkbenchShortcuts";
 import MapPickerModal from "@/features/map-manager/components/map-picker-modal/MapPickerModal";
-import SaveAsModal from "@/features/map-manager/components/save-as-modal/SaveAsModal";
-import CopyMapModal from "@/features/map-manager/components/copy-map-modal/CopyMapModal";
 import GeoAnchorModal from "@/features/geo-anchor/components/GeoAnchorModal";
 
 export default function WorkbenchWindow() {
@@ -29,8 +27,6 @@ export default function WorkbenchWindow() {
       <StatusBar />
       <MapPickerModal />
       <ConfirmationModal />
-      <SaveAsModal />
-      <CopyMapModal />
       <GeoAnchorModal />
     </div>
   );

@@ -49,15 +49,9 @@ export interface CanvasObjectState {
     deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
     /** Inserts a new vertex after afterIndex. Returns the VertexRef for the new vertex. */
     insertVertex: (objectId: number, afterIndex: number, pos: Point) => VertexRef;
-    /** Resets dirty tracking. Called by canvas bridge after a successful save. */
-    clearDirty: () => void;
     /** Replaces all in-memory objects and resets dirty tracking. Used by the canvas bridge for load and reset. */
     setObjects: (objects: Zone[]) => void;
 }
-
-/** Selector: true when there are unsaved canvas changes. */
-export const selectIsDirty = (s: CanvasObjectState): boolean =>
-    s.dirtyObjects.length > 0 || s.deletedObjects.length > 0;
 
 export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
     objects: [],
@@ -146,12 +140,6 @@ export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
         });
         return newRef;
     },
-
-    clearDirty: () =>
-        set({
-            dirtyObjects: [],
-            deletedObjects: [],
-        }),
 
     setObjects: (objects) =>
         set({

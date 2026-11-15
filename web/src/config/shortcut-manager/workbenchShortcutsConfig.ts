@@ -7,17 +7,9 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "Ctrl+Alt+N",
         shortcut: ["Ctrl", "Alt", "N"],
     } satisfies ShortcutBindingConfig,
-    "map.save-as": {
-        keys: "Ctrl+Shift+S",
-        shortcut: ["Ctrl", "Shift", "S"],
-    } satisfies ShortcutBindingConfig,
     "map.open": {
         keys: "Ctrl+O",
         shortcut: ["Ctrl", "O"],
-    } satisfies ShortcutBindingConfig,
-    "map.save": {
-        keys: "Ctrl+S",
-        shortcut: ["Ctrl", "S"],
     } satisfies ShortcutBindingConfig,
     "controls.toggle": {
         keys: "Ctrl+Alt+C",

@@ -1,12 +1,11 @@
 import { saveMap, type MapContent } from "@/data/planning/maps";
-import { isConflict } from "@/data/api/planning";
+import { createAutosaver } from "@/data/planning/autosave";
 import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import type { Zone } from "@/data/planning/schemaTypes";
-import { useCanvasObjectStore, selectIsDirty } from "../stores/canvasObjectStore";
+import { useCanvasObjectStore } from "../stores/canvasObjectStore";
 import { useMapStore } from "@/model/mapStore";
-import { getSavableMapGeoAnchor, useGeoAnchorStore } from "@/model/geoAnchorStore";
-import { getSaveMode } from "@/model/saveModeStore";
-import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
+import { useGeoAnchorStore } from "@/model/geoAnchorStore";
+import { useConnectionStore } from "@/model/connectionStore";
 
 // ── Count synchronization ──────────────────────────────────────────────────
 // Reactively keeps the mapStore mowing and no-go zone counts derived from the
@@ -33,19 +32,8 @@ export function currentMapContent(): MapContent {
     return {
         map: useMapStore.getState().map,
         zones: useCanvasObjectStore.getState().objects,
-        geoAnchor: getSavableMapGeoAnchor(useGeoAnchorStore.getState()),
+        geoAnchor: useGeoAnchorStore.getState().mapGeoAnchor,
     };
-}
-
-/** True when anything of the open map (or the default geo anchor) changed since the last save or load. */
-export function isMapDirty(): boolean {
-    const geo = useGeoAnchorStore.getState();
-    return (
-        useMapStore.getState().isMapDirty ||
-        selectIsDirty(useCanvasObjectStore.getState()) ||
-        geo.isSystemGeoAnchorDirty ||
-        geo.isMapGeoAnchorDirty
-    );
 }
 
 /** Gives the stores the id the server assigned to a new map. */
@@ -54,79 +42,27 @@ function adoptMapId(id: number): void {
     useCanvasObjectStore.setState((s) => ({ objects: s.objects.map((o) => ({ ...o, mapId: id })) }));
 }
 
-function markSaved(): void {
-    useCanvasObjectStore.getState().clearDirty();
-    useMapStore.getState().clearDirty();
+// ── Saving ─────────────────────────────────────────────────────────────────
+// Every change is saved by itself (data/planning/autosave.ts), the whole
+// document with its revision. The connection coming back retries a save that
+// failed while it was down.
+
+async function saveOpenMap(): Promise<void> {
+    const content = currentMapContent();
+    const id = await saveMap(content);
+    // The map shown may have changed while the save ran.
+    if (content.map.id !== id && useMapStore.getState().map.id === content.map.id) adoptMapId(id);
 }
 
-function reportSaveError(err: unknown): void {
-    console.error("saving the map failed", err);
-    const conflict = isConflict(err);
-    useConfirmationModalStore.getState().requestConfirmation({
-        title: conflict ? "Map Changed Elsewhere" : "Save Failed",
-        message: conflict
-            ? "This map was saved in another window since you opened it, so your changes were not saved. " +
-              "Use File → Save As to keep them as a new map, or File → Open to load the other version."
-            : `Your changes were not saved: ${err instanceof Error ? err.message : String(err)}`,
-        tone: "danger",
-        confirmLabel: "Dismiss",
-    });
-}
+const autosaver = createAutosaver(saveOpenMap);
 
-// ── Canvas save ────────────────────────────────────────────────────────────
+/** The open map changed: save it soon. */
+export const requestSave = autosaver.request;
+/** Saves what is waiting now; throws when it cannot (call before another map replaces the open one). */
+export const flushSave = autosaver.flush;
+/** Drops what is waiting (another map is shown, or the open one was deleted). */
+export const resetSave = autosaver.reset;
 
-let _isSaving = false;
-
-/**
- * Saves the open map to the server as a whole (a new map gets its id here).
- * Returns true when something was saved, false when nothing was dirty, a
- * save was already running, or the save failed (the user is told why).
- */
-export async function saveCanvas(): Promise<boolean> {
-    if (_isSaving || !isMapDirty()) return false;
-
-    _isSaving = true;
-    try {
-        const content = currentMapContent();
-        const id = await saveMap(content);
-        if (content.map.id !== id) adoptMapId(id);
-        await useGeoAnchorStore.getState().saveGeoAnchors();
-        markSaved();
-        return true;
-    } catch (err) {
-        reportSaveError(err);
-        return false;
-    } finally {
-        _isSaving = false;
-    }
-}
-
-// ── Autosave ───────────────────────────────────────────────────────────────
-
-const AUTOSAVE_DELAY_MS = 1000;
-let autosaveTimer: ReturnType<typeof setTimeout> | undefined;
-
-/**
- * With autosave on, saves the map a moment after the last change (a burst
- * of edits is one save). A change made while a save runs is saved after it.
- */
-export function requestAutosave(): void {
-    if (getSaveMode() !== "autosave") return;
-    clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(() => {
-        if (_isSaving) {
-            requestAutosave();
-            return;
-        }
-        void saveCanvas();
-    }, AUTOSAVE_DELAY_MS);
-}
-
-/**
- * Runs a pending autosave now. Call before the open map is replaced (another
- * map opened, a new one started), so the last changes aren't lost.
- */
-export async function flushAutosave(): Promise<void> {
-    clearTimeout(autosaveTimer);
-    if (getSaveMode() === "autosave" && isMapDirty()) await saveCanvas();
-}
+useConnectionStore.subscribe((s, prev) => {
+    if (s.live && !prev.live) autosaver.retryNow();
+});

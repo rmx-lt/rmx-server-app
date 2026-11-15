@@ -4,8 +4,7 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { initializeMap } from "@/features/map-manager/data/mapBridge";
-import { useBeforeUnload } from "@/app/useBeforeUnload";
+import { openLatestMap } from "@/features/map-manager/data/mapBridge";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
 import { startConnections } from "./connections";
 import { resetSettings } from "@/data/planning/settings";
@@ -34,16 +33,14 @@ export function App() {
   return <Workbench />;
 }
 
-/** blade-terminal's workbench; mounted only while logged in. */
+/** The workbench; mounted only while logged in. */
 function Workbench() {
-  useBeforeUnload();
-
   useEffect(() => {
     const stopConnections = startConnections();
     // A new login: read this user's settings.
     resetSettings();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
-    initializeMap().catch(console.error);
+    openLatestMap().catch(console.error);
     return () => {
       stopConnections();
     };
