@@ -146,7 +146,6 @@ func startApp(t *testing.T, pool *db.Pool) *testApp { return startAppWith(t, poo
 type appOptions struct {
 	staticDir   string
 	firmwareDir string
-	pathFileDir string
 	// env sets more settings (the NTRIP_* variables).
 	env map[string]string
 	// sameDatabase: the pool already has the test user (a second server on it).
@@ -173,8 +172,6 @@ func startAppOptions(t *testing.T, pool *db.Pool, opts appOptions) *testApp {
 			return opts.staticDir, opts.staticDir != ""
 		case "FIRMWARE_DIR":
 			return opts.firmwareDir, opts.firmwareDir != ""
-		case "PATH_FILE_DIR":
-			return opts.pathFileDir, opts.pathFileDir != ""
 		case "ALLOWED_ORIGINS":
 			return origin + ",http://other.allowed.test", true
 		}

@@ -16,6 +16,17 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/core"
 )
 
+// fakePaths is the paths table: path id -> file.
+type fakePaths map[string][]byte
+
+func (f fakePaths) get(_ context.Context, id string) ([]byte, [32]byte, error) {
+	doc, ok := f[id]
+	if !ok {
+		return nil, [32]byte{}, ErrNotFound
+	}
+	return doc, sha256.Sum256(doc), nil
+}
+
 func TestValidFileName(t *testing.T) {
 	for _, name := range []string{"app.bin", "1.2.3.bin", "a_b-c.d.bin", "j-2031.json", "a", strings.Repeat("a", 128)} {
 		if !ValidFileName(name) {
@@ -283,6 +294,9 @@ func setup(t *testing.T, pub *fakePub) (*mqttHandler, map[Set][]byte) {
 	}
 	dirs := map[Set]*Dir{}
 	for set, body := range files {
+		if set == AutopilotPath {
+			continue
+		}
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "x.bin"), body, 0o644); err != nil {
 			t.Fatal(err)
@@ -294,14 +308,15 @@ func setup(t *testing.T, pub *fakePub) (*mqttHandler, map[Set][]byte) {
 		t.Cleanup(func() { _ = d.Close() })
 		dirs[set] = d
 	}
-	return &mqttHandler{pub: pub, svc: NewService(dirs)}, files
+	return &mqttHandler{pub: pub, svc: &Service{dirs: dirs, path: fakePaths{"x": files[AutopilotPath]}.get}}, files
 }
 
 func TestHandlerAnswersChunkOnItsOwnSetOnly(t *testing.T) {
 	pub := &fakePub{}
 	h, files := setup(t, pub)
 	for _, set := range Sets {
-		h.handle(context.Background(), set, "m1", []byte(`{"request_id":"q","file":"x.bin","chunk":0}`))
+		file := map[bool]string{true: "x.json", false: "x.bin"}[set == AutopilotPath]
+		h.handle(context.Background(), set, "m1", []byte(`{"request_id":"q","file":"`+file+`","chunk":0}`))
 	}
 	out := pub.sent()
 	if len(out) != 3 {
@@ -357,9 +372,18 @@ func TestHandlerErrors(t *testing.T) {
 			t.Errorf("%s: %+v", c.name, e)
 		}
 	}
-	// A set with no directory has no files.
+	// A path id that is not in the table, or a name that is not "<id>.json", is not_found.
+	for _, file := range []string{"nope.json", "x.bin", "x"} {
+		if e := ask(AutopilotPath, `{"request_id":"e4","file":"`+file+`","chunk":0}`); e.Error.Code != "not_found" {
+			t.Errorf("path file %s: %+v", file, e)
+		}
+	}
+	if e := ask(AutopilotPath, `{"request_id":"e5","file":"x.json","chunk":1}`); e.Error.Code != "bad_request" {
+		t.Errorf("path chunk past the end: %+v", e)
+	}
+	// A firmware set with no directory has no files.
 	h.svc.dirs = map[Set]*Dir{}
-	if e := ask(AutopilotPath, `{"request_id":"e4","file":"x.json","chunk":0}`); e.Error.Code != "not_found" {
+	if e := ask(AutopilotFirmware, `{"request_id":"e6","file":"x.bin","chunk":0}`); e.Error.Code != "not_found" {
 		t.Errorf("unconfigured set: %+v", e)
 	}
 }
@@ -436,27 +460,49 @@ func TestOpenDirectories(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fw, "gateway", "1.0.0.bin"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	paths := t.TempDir()
-	svc, err := Open(Config{FirmwareDir: fw, PathFileDir: paths})
+	ctx := context.Background()
+	svc, err := Open(Config{FirmwareDir: fw}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer svc.Close()
-	// The autopilot subdirectory is missing: that set is empty, not an error.
-	if _, _, err := svc.ReadChunk(GatewayFirmware, "1.0.0.bin", 0); err != nil {
+	if _, _, err := svc.ReadChunk(ctx, GatewayFirmware, "1.0.0.bin", 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := svc.ReadChunk(AutopilotFirmware, "1.0.0.bin", 0); err != ErrNotFound {
+	// The autopilot subdirectory is missing: that set is empty, not an error.
+	if _, _, err := svc.ReadChunk(ctx, AutopilotFirmware, "1.0.0.bin", 0); err != ErrNotFound {
 		t.Fatalf("autopilot set: %v", err)
 	}
 	// The same name in another set does not leak across.
-	if _, _, err := svc.ReadChunk(AutopilotPath, "1.0.0.bin", 0); err != ErrNotFound {
+	if _, _, err := svc.ReadChunk(ctx, AutopilotPath, "1.0.0.bin", 0); err != ErrNotFound {
 		t.Fatalf("path set: %v", err)
 	}
-	if _, err := Open(Config{FirmwareDir: filepath.Join(fw, "nope")}); err == nil {
+	if _, _, err := svc.ReadChunk(ctx, GatewayFirmware, "1.json", 0); err != ErrNotFound {
+		t.Fatalf("a path in a firmware set: %v", err)
+	}
+	if _, err := Open(Config{FirmwareDir: filepath.Join(fw, "nope")}, nil); err == nil {
 		t.Fatal("a missing FIRMWARE_DIR opened")
 	}
-	if _, err := Open(Config{PathFileDir: filepath.Join(fw, "nope")}); err == nil {
-		t.Fatal("a missing PATH_FILE_DIR opened")
+}
+
+func TestPathChunks(t *testing.T) {
+	doc := bytes.Repeat([]byte("p"), 9000)
+	svc := &Service{path: fakePaths{"j-1": doc}.get}
+	var got []byte
+	for i := uint32(0); i < 3; i++ {
+		meta, chunk, err := svc.ReadChunk(context.Background(), AutopilotPath, "j-1.json", i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if meta.Size != 9000 || meta.Chunks != 3 || meta.Sum != sha256.Sum256(doc) {
+			t.Fatalf("meta %+v", meta)
+		}
+		got = append(got, chunk...)
+	}
+	if !bytes.Equal(got, doc) {
+		t.Fatal("chunks do not add up to the file")
+	}
+	if _, _, err := svc.ReadChunk(context.Background(), AutopilotPath, "j-1.json", 3); err != ErrBadIndex {
+		t.Fatalf("past the end: %v", err)
 	}
 }
