@@ -55,7 +55,7 @@ func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
 	// 9000 bytes: 4096 + 4096 + 808 chunks.
 	gwImage := bytes.Repeat([]byte("gateway-image-"), 650)
 	apImage := bytes.Repeat([]byte("autopilot-"), 900)
-	path := []byte(`{"path":"j-1","speed":0.5,"segments":[{"blade":false,"points":[[54.1,25.1]]}]}`)
+	path := []byte(`{"path":"j-1","segments":[{"type":"transit","points":[[54.1,25.1]]}]}`)
 	for file, body := range map[string][]byte{
 		filepath.Join(fw, "gateway", "1.0.0.bin"):   gwImage,
 		filepath.Join(fw, "autopilot", "1.0.0.bin"): apImage,

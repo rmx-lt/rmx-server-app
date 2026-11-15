@@ -11,7 +11,9 @@ import (
 	"log/slog"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -506,10 +508,12 @@ const (
 	pFile                  // a file name: 1 to 128 of [A-Za-z0-9._-], not a path
 	pID                    // an id (§4)
 	pBool                  //
-	pPositive              // a number above 0 (a limit in m/s, a spacing in m)
+	pPositive              // a number above 0 (a spacing in m)
 	pCount                 // a whole number from 0 up to 2^32 - 1 (bytes, a point number)
 	pSHA256                // 64 lower-case hex characters
 	pPoints                // 1 to 100 points [lat, lon]
+	pType                  // a segment type (§11)
+	pLimits                // speed limits (§8): one or more of limitNames, each a number of 0 or above or null
 )
 
 // commandSpecs lists the commands a user may send (§6.4, §8) and their
@@ -531,8 +535,9 @@ var commandSpecs = map[api.Board]map[string][]param{
 		"manual_stop":  nil,
 		"blade":        {{"on", pBool, true}},
 		"follow": {
-			{"points", pPoints, true}, {"reverse", pBool, false}, {"blade", pBool, false}, {"speed", pPositive, false},
+			{"points", pPoints, true}, {"reverse", pBool, false}, {"type", pType, false},
 		},
+		"speed_limit":  {{"limits", pLimits, true}},
 		"record_start": {{"session", pID, true}, {"spacing", pPositive, false}},
 		"record_stop":  nil,
 		"path_start": {
@@ -552,6 +557,12 @@ var (
 	versionRE = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
 	fileRE    = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 	sha256RE  = regexp.MustCompile(`^[0-9a-f]{64}$`)
+)
+
+// segmentTypes are the path segment types (§11); limitNames the speed limits (§7.1).
+var (
+	segmentTypes = []string{"transit", "edge", "fill"}
+	limitNames   = []string{"max", "transit", "edge", "fill", "manual"}
 )
 
 // maxPoints is how many points a follow command takes (§8).
@@ -648,6 +659,25 @@ func checkParam(p param, v json.RawMessage) (json.RawMessage, error) {
 			return nil, errors.New("must be a whole number from 0 to 4294967295")
 		}
 		_ = n
+	case pType:
+		var t string
+		if err := json.Unmarshal(v, &t); err != nil || !slices.Contains(segmentTypes, t) {
+			return nil, fmt.Errorf("must be one of %s", strings.Join(segmentTypes, ", "))
+		}
+	case pLimits:
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(v, &m); err != nil || len(m) == 0 {
+			return nil, errors.New("must be an object with one or more limits")
+		}
+		for name, lv := range m {
+			lv = bytes.TrimSpace(lv)
+			if !slices.Contains(limitNames, name) {
+				return nil, fmt.Errorf("has no limit %q", truncate(name, 20))
+			}
+			if f, err := strconv.ParseFloat(string(lv), 64); string(lv) != "null" && (err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f < 0 || !numberLiteral(lv)) {
+				return nil, fmt.Errorf("limit %s must be a number of 0 or above, or null", name)
+			}
+		}
 	case pPoints:
 		var pts [][]float64
 		if err := json.Unmarshal(v, &pts); err != nil {

@@ -207,7 +207,7 @@ func TestCommandIsAcknowledged(t *testing.T) {
 
 	// A long-running command: accepted, then a failure with the board's error.
 	_, follow, _ := app.sendCommand(name, map[string]any{"board": "autopilot", "cmd": "follow",
-		"params": map[string]any{"points": [][]float64{{54.68712345, 25.27965432}}, "speed": 0.5}, "expires_in": 60})
+		"params": map[string]any{"points": [][]float64{{54.68712345, 25.27965432}}, "type": "edge"}, "expires_in": 60})
 	fc := m.mustCmd("autopilot", "follow")
 	if fc.ExpiresAt == nil || *fc.ExpiresAt < time.Now().Unix() {
 		t.Fatalf("expires_at: %s", fc.Raw)

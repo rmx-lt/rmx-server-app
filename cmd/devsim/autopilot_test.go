@@ -16,6 +16,8 @@ func cmdParams(r *rig, cmd string) []string {
 	switch cmd {
 	case "blade":
 		return []string{`"on":true`}
+	case "speed_limit":
+		return []string{`"limits":{"edge":0.3}`}
 	case "follow":
 		return []string{pointsJSON(r.geo(30, 0))}
 	case "record_start":
@@ -61,6 +63,7 @@ func TestStateMachineTable(t *testing.T) {
 		"manual_start":  {"idle"},
 		"manual_stop":   {"manual"},
 		"blade":         {"manual", "recording"},
+		"speed_limit":   any5,
 		"follow":        {"idle", "manual"},
 		"record_start":  {"idle", "manual"},
 		"record_stop":   {"recording"},
@@ -184,7 +187,7 @@ func TestFollowErrors(t *testing.T) {
 		"e2": {`"points":[]`},
 		"e3": {`"points":[[1]]`},
 		"e4": {`"points":[[91,0]]`},
-		"e5": {pointsJSON(r.geo(1, 0)), `"speed":-1`},
+		"e5": {pointsJSON(r.geo(1, 0)), `"type":"mow"`},
 		"e6": {pointsJSON(r.geo(1, 0)), `"reverse":"yes"`},
 	} {
 		r.cmd("autopilot", id, "follow", params...)
@@ -235,10 +238,10 @@ func TestFollowReverseKeepsHeading(t *testing.T) {
 
 func TestFollowBlade(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("autopilot", "b1", "follow", pointsJSON(r.geo(2, 0)), `"blade":true`)
+	r.cmd("autopilot", "b1", "follow", pointsJSON(r.geo(2, 0)), `"type":"fill"`)
 	r.advance(2 * time.Second)
 	if !r.m.ap.blade {
-		t.Fatal("blade off during a follow with blade: true")
+		t.Fatal("blade off during a follow of type fill")
 	}
 	r.advance(10 * time.Second)
 	r.wantAck("autopilot", "b1", "done", "")
@@ -248,7 +251,7 @@ func TestFollowBlade(t *testing.T) {
 	r.cmd("autopilot", "b2", "follow", pointsJSON(r.geo(4, 0)))
 	r.advance(2 * time.Second)
 	if r.m.ap.blade {
-		t.Fatal("blade on without blade: true")
+		t.Fatal("blade on in a follow without type")
 	}
 }
 
@@ -275,7 +278,7 @@ func TestBladeRules(t *testing.T) {
 
 func TestPauseResume(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(3, 0)), `"blade":true`)
+	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(3, 0)), `"type":"fill"`)
 	r.advance(2 * time.Second)
 	r.cmd("autopilot", "p1", "pause")
 	r.wantAck("autopilot", "p1", "done", "")
@@ -320,7 +323,7 @@ func TestPauseResume(t *testing.T) {
 
 func TestFixLossPausesAndResumes(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"blade":true`)
+	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"type":"fill"`)
 	r.advance(2 * time.Second)
 	r.events()
 	_ = r.m.set("fix", "rtk_float")
@@ -364,7 +367,7 @@ func TestFixLossPausesAndResumes(t *testing.T) {
 
 func TestLinkLossPausesPathUntilResume(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"blade":true`)
+	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"type":"fill"`)
 	r.advance(2 * time.Second)
 	r.events()
 	r.serverStatus("offline")
@@ -434,7 +437,7 @@ func TestFixPauseBecomesLinkPause(t *testing.T) {
 
 func TestFaults(t *testing.T) {
 	r := newRig(t).online()
-	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"blade":true`)
+	r.cmd("autopilot", "f", "follow", pointsJSON(r.geo(40, 0)), `"type":"fill"`)
 	r.advance(2 * time.Second)
 	r.events()
 	_ = r.m.set("fault", "motor_stall")
