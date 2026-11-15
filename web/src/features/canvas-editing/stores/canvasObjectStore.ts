@@ -5,7 +5,6 @@ import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { type ZoneCategory, type ZoneType } from "@/config/db-ops/enums";
 import { useMapStore } from "@/model/mapStore";
 import { syncObject, normalizeObject, markDirty, markDeleted } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import { computeModifiedVertices } from "@/features/canvas-editing/utils/vertexModifier";
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -50,12 +49,6 @@ export interface CanvasObjectState {
     deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
     /** Inserts a new vertex after afterIndex. Returns the VertexRef for the new vertex. */
     insertVertex: (objectId: number, afterIndex: number, pos: Point) => VertexRef;
-    /**
-     * Batch-modifies the vertices of a polygon object.
-     * `multiplier` scales the vertex count (< 1 removes, > 1 adds, = 1 no-op).
-     * `maxRandomOffset` is the maximum perpendicular displacement for newly inserted vertices.
-     */
-    modifyObjectVertices: (objectId: number, multiplier: number, maxRandomOffset: number) => void;
     /** Updates the type of a single object. Marks it dirty. */
     updateObjectType: (obj: Zone, type: ZoneType) => void;
     /** Bulk-updates the type of every object. Marks all dirty. */
@@ -158,20 +151,6 @@ export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
         });
         return newRef;
     },
-
-    modifyObjectVertices: (objectId, multiplier, maxRandomOffset) =>
-        set((state) => {
-            const o = state.objects.find((x) => x.id === objectId);
-            if (!o) return state;
-            const newVertices = computeModifiedVertices(o.vertices, { multiplier, maxRandomOffset });
-            // Same reference means no structural change — skip dirty commit
-            if (newVertices === o.vertices) return state;
-            return commitObject(
-                state,
-                state.objects.map((x) => x.id === objectId ? { ...x, vertices: newVertices } : x),
-                objectId,
-            );
-        }),
 
     updateObjectType: (obj, type) =>
         set((state) => {

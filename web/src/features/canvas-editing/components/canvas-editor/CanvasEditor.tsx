@@ -28,8 +28,6 @@ import { CanvasDrawingPreviewLayer } from "@/features/canvas-editing/components/
 import { CanvasMapPointsLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasMapPointsLayer";
 import { CanvasMapTileLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasMapTileLayer";
 import { CanvasSystemPolygonResultLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasSystemPolygonResultLayer";
-import CanvasModifierFloatingControl from "@/features/canvas-editing/components/floating-control/CanvasModifierFloatingControl";
-import CanvasGeneratorFloatingControl from "@/features/canvas-editing/components/floating-control/CanvasGeneratorFloatingControl";
 import { useMapPointStore } from "@/model/mapPointStore";
 import { useMapStore } from "@/model/mapStore";
 import {
@@ -415,8 +413,6 @@ export default function CanvasEditor() {
           scale={scale}
         />
       </Stage>
-      <CanvasModifierFloatingControl />
-      <CanvasGeneratorFloatingControl />
     </div>
   );
 }

@@ -6,8 +6,6 @@ import MenuSeparator from "@/components/menu-bar/MenuBarSeparator";
 import UiInspectorButton from "@/features/ui-manager/components/menu-bar/UiInspectorButton";
 import UiControlsButton from "@/features/ui-manager/components/menu-bar/UiControlsButton";
 import UiStatusBarButton from "@/features/ui-manager/components/menu-bar/UiStatusBarButton";
-import CanvasModifierControlButton from "@/features/canvas-editing/components/menu-bar/CanvasModifierControlButton";
-import CanvasGeneratorControlButton from "@/features/canvas-editing/components/menu-bar/CanvasGeneratorControlButton";
 import GeoAnchorModalButton from "@/features/geo-anchor/components/menu-bar/GeoAnchorModalButton";
 import MenuBarSubmenu from "@/components/menu-bar/MenuBarSubmenu";
 
@@ -30,11 +28,6 @@ export default function MenuBarViewSubmenu() {
       <UiInspectorButton />
       <UiControlsButton />
       <UiStatusBarButton />
-
-      <MenuSeparator />
-
-      <CanvasModifierControlButton />
-      <CanvasGeneratorControlButton />
 
       <MenuSeparator />
 
