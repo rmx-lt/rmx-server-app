@@ -24,12 +24,12 @@ types in `web/src/data/api/generated` are generated from the Go types in
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 
 ```powershell
-dev\run.ps1    # everything: database + broker, Go server (restarts on save), web dev server, simulated device
+dev\run.ps1    # everything: database + broker, Go server (restarts on save), web dev server, simulated mower
 ```
 
 Open <http://localhost:3000/> and log in as `dev` / `dev-password-123`
-(`DEV_USER` / `DEV_PASSWORD` in `.env`). `go run ./cmd/devsim send status`
-talks to the simulated device. Details, and the steps by hand: wiki Server-App,
+(`DEV_USER` / `DEV_PASSWORD` in `.env`). `go run ./cmd/devsim send ping`
+talks to the simulated mower. Details, and the steps by hand: wiki Server-App,
 "Local development". By hand:
 
 ```powershell

@@ -810,7 +810,7 @@ new domains and the ported blade-terminal client fit without a later move.
 go.mod, go.sum          Go module (go 1.26), staticcheck pinned as a tool
 cmd/rmx-server/         main: serve, healthcheck, user commands (imports app only)
 cmd/gen-ts/             TypeScript generator; reads internal/api only
-cmd/devsim/             simulated gateway for local development (config for .env, paho)
+cmd/devsim/             simulated mower (both boards) for local development (config for .env, paho)
 dev/                    local broker config; run.ps1 starts the whole local environment
 internal/
   app/                  composition root: construct, wire, start/stop, health, static files, CLI
@@ -914,8 +914,9 @@ You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 **One command** (PowerShell, from the repo):
 
 ```powershell
-dev\run.ps1             # stack + Go server + web dev server + simulated device
-dev\run.ps1 -NoSim      # without the simulated device
+dev\run.ps1             # stack + Go server + web dev server + simulated mower
+dev\run.ps1 -NoSim      # without the simulated mower
+dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (below)
 dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
@@ -929,40 +930,103 @@ from `.env` (default `dev` / `dev-password-123`). The script:
   Ctrl+C, stop them with `docker compose -f compose.dev.yaml down`);
 - builds `rmx-server` and `devsim` into `.dev/` (gitignored), creates the dev
   login or resets its password to `DEV_PASSWORD`;
-- runs the web dev server (hot reload), the server and the simulator in one
-  terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
-  `.env` it rebuilds and restarts the server and the simulator; a build error
+- runs the web dev server (hot reload), the server and the simulated mower in
+  one terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
+  `.env` it rebuilds and restarts the server and the mower; a build error
   waits for the next save. Ctrl+C stops all three;
 - sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it) and
   `JOB_DIR=dev/jobs` (both gitignored) when `.env` sets none: drop any
   `<version>.bin` into the board's subdirectory.
 
-**Simulated device** (`cmd/devsim`). It behaves like rmx-mower-gateway on the
-local broker, written from the firmware's contract (`remote_cmd.h`, `ota.c`)
-and from the firmware's older topics (`mower/<name>/cmd`, `fw/…`), not from the server code.
-It is being rewritten to the contract ([rmx-server-app#91](https://github.com/rmx-lt/rmx-server-app/issues/91)):
-until then it does not speak the topics the server serves now (see [Firmware over MQTT](#firmware-over-mqtt)):
 
-- logs in as `test-device` with the client id `<name>` (default `mower-sim`,
-  `DEVSIM_NAME` or `-name`); retained `online` on `mower/<name>/status`, last
-  will `offline`;
-- answers `ping`, `status`, `gps` (a fixed position), `ota` and `restart` on
-  `mower/<name>/cmd` with the firmware's replies and error codes on
-  `mower/<name>/cmd/ack` (`expires_at`, duplicate ids, `busy`, `same_version`,
-  `unknown_cmd`, ...);
-- `ota` downloads the file from the local server chunk by chunk, checks size,
-  SHA-256 and (for a real ESP-IDF image) the version, acks `done`, then
-  "restarts": `offline`, 3 s, `online` with the new version on the other
-  partition, and a retained report on `mower/<name>/firmware`. A test file of
-  any content works; there is no signature check;
-- `go run ./cmd/devsim send <cmd> [key=value ...]` publishes a command as the
-  `app` login and prints the ack(s), like the gateway's `tools/mqtt_cmd.ps1`:
+**Simulated mower** (`cmd/devsim`). Both boards of a mower on the local
+broker, written from wiki [Mower-Protocol](Mower-Protocol) (not from firmware
+or server code), so a server and an app built against it work with the real
+mower. It implements version 0.1 of the contract. The UART between the boards
+(§14) is not simulated: the two boards talk inside the program, and the gateway
+still counts and relays the autopilot's topics as it would.
+
+- **Connection.** Logs in as `test-device`, client id `<name>` (default
+  `mower-sim`, `DEVSIM_NAME` or `-name`), keep-alive 15 s. `gateway/status` is
+  `online` after every connect, with the last will `offline`. State and
+  catalogues are published when the server link is up (§4.2): the broker
+  connection works **and** the retained `mower/status/server` says `online`, so
+  with no server running only the status appears. A server that stops or
+  crashes counts as a lost link too.
+- **Gateway** (§6, §12, §15, §16): retained state (`autopilot_link`, `ntrip`,
+  firmware, partition), telemetry every 60 s (`-gateway-period` changes it, and
+  the catalogue says so) with signal, load, link counters and the data-usage
+  counters, counted per topic as whole MQTT packets; the commands `ping`,
+  `restart`, `ota`, `ntrip_set`, `ntrip_clear`, `autopilot_reset`,
+  `monitor_start` and `monitor_stop`, with the acks, error codes and the
+  2-minute memory of command ids of §5; monitor streams with the budget of 100
+  values per second. `ota` pulls `<version>.bin` over `gateway/fw/…` in
+  4096-byte chunks (one request open, a new one after 10 s, five retries),
+  checks size, SHA-256 and the version of an ESP-IDF image (any other file is
+  accepted: there is no signature check), restarts into it and sends the final
+  ack when the new image has reached the server. Reliable messages from the
+  autopilot are held while the connection is down (60 s, 64 KB).
+- **Autopilot** (§7 to §11): the state machine of §8 (every command in every
+  mode, `wrong_mode` otherwise), retained state, telemetry at the periods of its
+  catalogue (at least 10 s in `idle`) with every key of §16.4 linked, events
+  with `boot` and `seq`, live driving on `autopilot/drive` (the setpoint rules
+  and the 0.5 s timeout of §9), border recording in batches (§10), `follow`
+  (`reverse`, `blade`, `speed`), and jobs: `job_start` downloads `<job>.json`
+  over `autopilot/job/…`, checks size and SHA-256, drives to the start with the
+  blade off and follows the segments; `job.point` counts the points reached and
+  `from_point` continues. Pauses for command, link or fix (§7.1), faults, `ota`,
+  and monitor streams with the budget of 400 values per second.
+- **Motion model.** A differential drive following the live setpoints or the
+  path: up to 0.6 m/s with acceleration limits, a heading that is only reported
+  while moving (one antenna), a position around a fixed origin (54.687157,
+  25.279652) in degrees with 8 decimals, a battery that drains with the load
+  (150 Wh), and voltage, current and power that follow the load. The blade
+  spins up and down.
+- **Boot counters** and the running firmware are kept in
+  `.dev/devsim-<name>.json`, so restarting devsim is a reboot of the mower:
+  `boot` grows and counters start again. `-state -` keeps them in memory;
+  delete the file to start from boot 1.
+- **Not simulated:** the board link frames, the NTRIP connection itself (its
+  states and byte counts are), the fix following the corrections (it follows
+  the `fix` switch, default `rtk_fixed`), signatures of firmware images.
+
+**Switches** provoke the edge cases. Set them at start with `-set name=value`
+(`dev\run.ps1 -SimSet`), or on the running mower with
+`go run ./cmd/devsim ctl <name> <value>` (the control endpoint listens on
+`127.0.0.1:18090`; `-control` changes it):
+
+| Switch | Does |
+|---|---|
+| `drop-acks N` | the next N acks of either board are not sent (lost acks); the server's repeat gets the remembered ack |
+| `link down` / `link up` | the gateway is cut off from the server: `gateway/status` `offline`, nothing sent or received, reliable messages held; after 10 s the autopilot treats the link as lost |
+| `board-link down` / `up` | the UART between the boards is cut: `autopilot_link` goes `down` after 3 s, commands to the autopilot are lost, and the autopilot loses the server link |
+| `fix none`, `single`, `dgps`, `rtk_float`, `rtk_fixed` | fix loss: a path pauses after 3 s, recording takes no points below `rtk_float` |
+| `fault motor_stall`, `blade_stall`, `battery_low`, `internal`, or `fault none` | the autopilot detects a fault; `clear_fault` fails while the cause is there |
+| `battery <pct>` | sets the battery level (the warning event at 15, the `battery_low` fault at 8) |
+| `signal <dBm>` | the modem's signal; an `ota` below -105 is refused with `low_signal` |
+| `ota-rollback on` | the next update does not confirm: the old image runs again, final ack `rolled_back` |
+| `ntrip ok` or `error` | the NTRIP client's state |
+
+`go run ./cmd/devsim send [-board gateway|autopilot] <cmd> [key=value ...]`
+publishes a command as the `app` login, standing in for the server, and prints
+the acks up to the final one (a value is JSON when it parses as JSON):
 
 ```powershell
-go run ./cmd/devsim send status
-go run ./cmd/devsim send ota version=0.4.0 size=9000   # dev/firmware/0.4.0.bin
-go run ./cmd/devsim -name mower-02                     # a second device
+go run ./cmd/devsim send ping
+go run ./cmd/devsim send -board autopilot manual_start
+go run ./cmd/devsim send -board autopilot follow 'points=[[54.68722,25.27965]]' blade=true
+go run ./cmd/devsim ctl fix rtk_float
+go run ./cmd/devsim -name mower-02                     # a second mower
 ```
+
+The server stores what the mower reports ([Mower ingest](#mower-ingest)),
+sends commands and live-driving setpoints and serves chunk transfer
+([Mower commands](#mower-commands)): `POST /api/devices/<name>/commands` with
+`{"board":"gateway","cmd":"ping"}` reaches the simulated mower and its ack comes
+back in the command's state. A gateway `ota` needs `<version>.bin` in
+`dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a job
+its file in `dev/jobs/`. `devsim send` and the tests
+([Tests and checks](#tests-and-checks)) play the server's part without it.
 
 The real board connects only to the VPS broker (port 8884, client
 certificate), so testing with it means a production deploy.
@@ -1071,6 +1135,17 @@ state, catalogues, telemetry and events, and the API and WebSocket show the
 device, its keys, latest values, the history of a gauge and of a counter across
 a restart, an incomplete catalogue that is not used, duplicate events that are
 dropped, and an autopilot state that is out of date.
+
+The simulated mower has its own tests in `cmd/devsim`. The unit tests run both
+boards on a fake clock and play the server over the same topics: the state
+machine of [Mower-Protocol](Mower-Protocol) §8 (every command in every mode),
+the command id memory and lost acks, live driving and its 0.5 s timeout,
+recording, jobs with chunk download and retry, pauses and faults, monitor
+streams and their budget, and the catalogues checked against §16.4 and §16.5.
+`e2e_integration_test.go` (in the integration run) starts devsim against the
+compose Mosquitto on a private topic prefix and plays the server: retained
+`mower/status/server`, commands and repeated ids, driving, recording, a job
+and a gateway update served over chunk transfer, and the switches.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
