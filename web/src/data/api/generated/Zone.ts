@@ -12,10 +12,6 @@ export type Zone = {
   id: number,
   category: ZoneCategory,
   /**
-   * "", "offline" or "online".
-   */
-  type: string,
-  /**
    * Vertices in draw order: mowing and navigation zones clockwise, no-go
    * zones counter-clockwise (screen coordinates, y down).
    */

@@ -17,17 +17,13 @@ import (
 
 func planDoc() api.MapDoc {
 	return api.MapDoc{
-		Format: "polygon", Type: "any_offline", CoordSystem: "Cartesian",
-		HeadlandEnabled: true, HeadlandWidth: "10",
 		Zones: []api.Zone{
 			{ID: 1, Category: "mowing", Vertices: []api.Point{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}},
 			{ID: 2, Category: "mowing", Vertices: []api.Point{{X: 20, Y: 0}, {X: 30, Y: 0}, {X: 30, Y: 10}}},
-			{ID: 3, Category: "no_go", Type: "offline", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
+			{ID: 3, Category: "no_go", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
 			{ID: 4, Category: "navigation", Vertices: []api.Point{{X: 10, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 2}}},
 		},
-		Points:        []api.RoutePoint{{Type: "start_end", Point: api.Point{X: 5, Y: 5}}},
-		LayerSettings: []api.LayerSetting{{ID: 1, LayerID: 2, Value: "#00ff00"}},
-		GeoAnchor:     &api.GeoAnchor{Lat: 54.68, Lon: 25.28},
+		GeoAnchor: &api.GeoAnchor{Lat: 54.68, Lon: 25.28},
 	}
 }
 

@@ -15,3 +15,6 @@
 .idea
 .DS_Store
 *.code-workspace
+
+# Built devsim (go build ./cmd/devsim)
+/cmd/devsim/devsim.exe
