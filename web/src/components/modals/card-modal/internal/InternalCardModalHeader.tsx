@@ -1,13 +1,9 @@
 import InternalCardModalHeaderActions from "./InternalCardModalHeaderActions";
 
-export type InternalCardModalSavedState = "saved" | "unsaved" | "saving" | "nothing_to_save";
 
 interface InternalCardModalHeaderProps {
     recordId: number | null;
     recordName: string;
-    savedState: InternalCardModalSavedState;
-    onSave: () => void;
-    canSave?: boolean;
     isEditMode: boolean;
     onEdit: () => void;
     onNew: () => void;
@@ -17,60 +13,9 @@ interface InternalCardModalHeaderProps {
     canDelete?: boolean;
 }
 
-function SavedStateButton({
-    savedState,
-    onSave,
-    canSave = true,
-}: {
-    savedState: InternalCardModalSavedState;
-    onSave: () => void;
-    canSave?: boolean;
-}) {
-    if (savedState === "nothing_to_save") return null;
-
-    const isUnsaved = savedState === "unsaved";
-    const isSaving = savedState === "saving";
-    const isSaveEnabled = isUnsaved && canSave;
-
-    return (
-        <button
-            type="button"
-            onClick={isSaveEnabled ? onSave : undefined}
-            disabled={!isSaveEnabled}
-            title={
-                savedState === "saved"
-                    ? "All changes saved"
-                    : isSaving
-                        ? "Autosave pending"
-                        : canSave
-                            ? "Save changes"
-                            : "Fill required fields to save"
-            }
-            className={[
-                "flex items-center gap-1 px-2 py-0.5 rounded text-sm transition-colors",
-                isSaveEnabled
-                    ? "text-amber-600 hover:bg-amber-50 cursor-pointer"
-                    : isSaving
-                        ? "text-gray-500 animate-pulse cursor-default"
-                        : isUnsaved
-                            ? "text-amber-500 opacity-70 cursor-not-allowed"
-                            : "text-gray-500 cursor-default",
-            ].join(" ")}
-        >
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                {isUnsaved ? "save" : isSaving ? "schedule" : "check_circle"}
-            </span>
-            {isUnsaved ? "Unsaved" : isSaving ? "Saving..." : "Saved"}
-        </button>
-    );
-}
-
 export default function InternalCardModalHeader({
     recordId,
     recordName,
-    savedState,
-    onSave,
-    canSave = true,
     isEditMode,
     onEdit,
     onNew,
@@ -105,9 +50,7 @@ export default function InternalCardModalHeader({
                 />
             </div>
 
-            <div className="flex items-center justify-end flex-1">
-                <SavedStateButton savedState={savedState} onSave={onSave} canSave={canSave} />
-            </div>
+            <div className="flex-1" />
         </div>
     );
 }

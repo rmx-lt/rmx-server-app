@@ -2,9 +2,6 @@ import { useEffect } from "react";
 import { useShortcut, addShortcutBlockListener, removeShortcutBlockListener } from "@/hooks/shortcut-manager/useShortcut";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
 import { useMapPickerStore } from "@/features/map-manager/stores/mapPickerStore";
-import { useSaveModalStore } from "@/features/map-manager/stores/saveModalStore";
-import { useSaveAsModalStore } from "@/features/map-manager/stores/saveAsModalStore";
-import { useSaveModeStore } from "@/model/saveModeStore";
 import { useUiControlsPanelStore } from "@/features/ui-manager/stores/uiControlsPanelStore";
 import { useUiInspectorPanelStore } from "@/features/ui-manager/stores/uiInspectorPanelStore";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
@@ -13,8 +10,7 @@ import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObj
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
-import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
-import { resetMap } from "@/features/map-manager/data/mapBridge";
+import { newMap } from "@/features/map-manager/data/mapBridge";
 
 /**
  * Registers all shortcuts that are scoped to the Workbench.
@@ -32,26 +28,11 @@ export function useWorkbenchShortcuts() {
         return () => removeShortcutBlockListener(deactivateTools);
     }, []);
 
-    useShortcut("map.new", S["map.new"].keys, () =>
-        useSaveModalStore.getState().requestWithSaveGuard(resetMap),
-    );
-
-    useShortcut("map.save-as", S["map.save-as"].keys, () =>
-        useSaveAsModalStore.getState().open().catch(console.error),
-    );
+    useShortcut("map.new", S["map.new"].keys, () => void newMap().catch(console.error));
 
     useShortcut("map.open", S["map.open"].keys, () =>
         useMapPickerStore.getState().open(),
     );
-
-    useShortcut("map.save", S["map.save"].keys, () => {
-        const { mode, setMode, isAutoSaveEnabled } = useSaveModeStore.getState();
-        saveCanvas()
-            .then((saved) => {
-                if (saved && mode === "session") setMode(isAutoSaveEnabled ? "autosave" : "manual");
-            })
-            .catch(console.error);
-    });
 
     useShortcut("controls.toggle", S["controls.toggle"].keys, () =>
         useUiControlsPanelStore

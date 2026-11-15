@@ -1,5 +1,5 @@
 import UiStatusBar from "@/features/ui-manager/components/status-bar/UiStatusBar";
-import SaveStateButton from "@/features/map-manager/components/status-bar/SaveStateButton";
+import ConnectionIndicator from "@/features/ui-manager/components/status-bar/ConnectionIndicator";
 import CanvasPointerPosition from "@/features/canvas-editing/components/status-bar/CanvasPointerPosition";
 import CanvasGridScale from "@/features/canvas-editing/components/status-bar/CanvasGridScale";
 import CanvasZoomLevel from "@/features/canvas-editing/components/status-bar/CanvasZoomLevel";
@@ -9,7 +9,7 @@ import StatusBarSeparator from "@/components/status-bar/StatusBarSeparator";
 export default function StatusBar() {
   return (
     <UiStatusBar
-      leftChildren={<SaveStateButton />}
+      leftChildren={<ConnectionIndicator />}
       rightChildren={
         <>
           <UnitOfMeasureSelect />

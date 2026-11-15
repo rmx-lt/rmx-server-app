@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import ModalActionBar, { type ModalActionBarItem } from "@/components/modal/modal-action-bar/ModalActionBar";
 import ModalTitle from "@/components/modal/modal-title/ModalTitle";
-import InternalCardModalHeader, { type InternalCardModalSavedState } from "./internal/InternalCardModalHeader";
+import InternalCardModalHeader from "./internal/InternalCardModalHeader";
 import InternalCardModalFastTab from "./internal/InternalCardModalFastTab";
 import CardModalField, { type CardModalFieldConfig } from "./CardModalField";
 import InternalCardModalListPart from "./internal/InternalCardModalListPart";
@@ -10,7 +10,6 @@ import type {
 } from "./CardModalListPart.types";
 import { useModalLifecycle } from "../../../hooks/modals/useModalLifecycle";
 
-export type CardModalSavedState = InternalCardModalSavedState;
 export type {
     CardModalListPartBaseRow,
     CardModalListPartCell,
@@ -31,9 +30,6 @@ export type {
 export interface CardModalHeaderConfig {
     recordId: number | null;
     recordName: string;
-    savedState: CardModalSavedState;
-    onSave: () => void;
-    canSave?: boolean;
     isEditMode: boolean;
     onEdit: () => void;
     onNew: () => void;

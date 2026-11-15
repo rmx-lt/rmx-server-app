@@ -1,9 +1,8 @@
 import { useState } from "react";
-import CardModal, { type CardModalFastTabConfig, type CardModalSavedState } from "@/components/modals/card-modal/CardModal";
+import CardModal, { type CardModalFastTabConfig } from "@/components/modals/card-modal/CardModal";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useMapStore } from "@/model/mapStore";
 import { useGeoAnchorModalStore } from "@/features/geo-anchor/stores/geoAnchorModalStore";
-import { useSaveStatusStore } from "@/features/canvas-editing/stores/saveStatusStore";
 
 function validateLat(v: string): string | undefined {
     const n = Number.parseFloat(v);
@@ -17,11 +16,6 @@ function validateLon(v: string): string | undefined {
     if (n < -180 || n > 180) return "Range: -180 to 180";
 }
 
-function toCardSavedState(status: "nothing_to_save" | "unsaved" | "saved", isSaving: boolean): CardModalSavedState {
-    if (isSaving) return "saving";
-    return status;
-}
-
 function GeoAnchorSystemModal({
     isOpen,
     onClose,
@@ -32,38 +26,21 @@ function GeoAnchorSystemModal({
     const systemDraft = useGeoAnchorStore((s) => s.systemDraft);
     const setSystemGeoAnchor = useGeoAnchorStore((s) => s.setSystemGeoAnchor);
     const setSystemGeoAnchorDraft = useGeoAnchorStore((s) => s.setSystemGeoAnchorDraft);
-    const saveStatus = useSaveStatusStore((s) => s.status);
-    const saveAll = useSaveStatusStore((s) => s.save);
 
     const [systemExpanded, setSystemExpanded] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
-    // Closing resets edit mode and the saving flag (adjusted during render, not in an effect).
+    // Closing resets edit mode (adjusted during render, not in an effect).
     const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
     if (isOpen !== prevIsOpen) {
         setPrevIsOpen(isOpen);
         if (!isOpen) {
             setIsEditMode(false);
-            setIsSaving(false);
         }
     }
 
     const systemLatError = validateLat(systemDraft.lat);
     const systemLonError = validateLon(systemDraft.lon);
-    const savedState = toCardSavedState(saveStatus, isSaving);
-    const canSave = saveStatus === "unsaved";
-
-    async function handleSave() {
-        if (!canSave) return;
-        setIsSaving(true);
-        try {
-            await saveAll();
-        } finally {
-            setIsSaving(false);
-        }
-    }
-
     async function handleDelete() {
         await setSystemGeoAnchor(null);
         setIsEditMode(false);
@@ -85,7 +62,6 @@ function GeoAnchorSystemModal({
                     hint: systemLatError,
                     hintState: systemLatError ? "error" : undefined,
                     onChange: (v) => void setSystemGeoAnchorDraft({ ...systemDraft, lat: v }),
-                    onConfirm: () => void handleSave(),
                 },
                 {
                     id: "system-lon",
@@ -95,7 +71,6 @@ function GeoAnchorSystemModal({
                     hint: systemLonError,
                     hintState: systemLonError ? "error" : undefined,
                     onChange: (v) => void setSystemGeoAnchorDraft({ ...systemDraft, lon: v }),
-                    onConfirm: () => void handleSave(),
                 },
             ],
         },
@@ -111,9 +86,6 @@ function GeoAnchorSystemModal({
             header={{
                 recordId: null,
                 recordName: "System",
-                savedState,
-                onSave: () => void handleSave(),
-                canSave,
                 isEditMode,
                 onEdit: () => setIsEditMode((v) => !v),
                 onNew: () => { },
@@ -134,15 +106,12 @@ export default function GeoAnchorModal() {
     const mapDraft = useGeoAnchorStore((s) => s.mapDraft);
     const setMapGeoAnchor = useGeoAnchorStore((s) => s.setMapGeoAnchor);
     const setMapGeoAnchorDraft = useGeoAnchorStore((s) => s.setMapGeoAnchorDraft);
-    const saveStatus = useSaveStatusStore((s) => s.status);
-    const saveAll = useSaveStatusStore((s) => s.save);
 
     const [mapExpanded, setMapExpanded] = useState(true);
     const [isSystemModalOpen, setSystemModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
-    // Closing closes the system modal and resets edit mode and the saving flag
+    // Closing closes the system modal and resets edit mode
     // (adjusted during render, not in an effect).
     const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
     if (isOpen !== prevIsOpen) {
@@ -150,25 +119,11 @@ export default function GeoAnchorModal() {
         if (!isOpen) {
             setSystemModalOpen(false);
             setIsEditMode(false);
-            setIsSaving(false);
         }
     }
 
     const mapLatError = validateLat(mapDraft.lat);
     const mapLonError = validateLon(mapDraft.lon);
-
-    const savedState = toCardSavedState(saveStatus, isSaving);
-    const canSave = saveStatus === "unsaved";
-
-    async function handleSave() {
-        if (!canSave) return;
-        setIsSaving(true);
-        try {
-            await saveAll();
-        } finally {
-            setIsSaving(false);
-        }
-    }
 
     async function handleDelete() {
         if (map.id <= 0) return;
@@ -192,7 +147,6 @@ export default function GeoAnchorModal() {
                     hint: mapLatError,
                     hintState: mapLatError ? "error" : undefined,
                     onChange: (v) => void setMapGeoAnchorDraft(map.id, { ...mapDraft, lat: v }),
-                    onConfirm: () => void handleSave(),
                 },
                 {
                     id: "map-lon",
@@ -202,7 +156,6 @@ export default function GeoAnchorModal() {
                     hint: mapLonError,
                     hintState: mapLonError ? "error" : undefined,
                     onChange: (v) => void setMapGeoAnchorDraft(map.id, { ...mapDraft, lon: v }),
-                    onConfirm: () => void handleSave(),
                 },
             ],
         },
@@ -219,9 +172,6 @@ export default function GeoAnchorModal() {
                 header={{
                     recordId: null,
                     recordName: map.name,
-                    savedState,
-                    onSave: () => void handleSave(),
-                    canSave,
                     isEditMode,
                     onEdit: () => setIsEditMode((v) => !v),
                     onNew: () => { },

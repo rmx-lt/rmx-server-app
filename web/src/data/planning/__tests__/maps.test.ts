@@ -108,11 +108,26 @@ describe("saveMap", () => {
         expect(calls[1]).toMatchObject({ method: "POST", url: "/api/maps" });
     });
 
-    test("a stale revision is a conflict", async () => {
+    test("a stale revision is overwritten with the user's document, never dropped", async () => {
         const content = await loaded();
         answers.push({ status: 409, body: { code: "conflict", message: "changed elsewhere" } });
+        answers.push({ status: 200, body: detail(7, 8) }); // the other save, read for its revision
+        answers.push({ status: 200, body: detail(7, 9) });
+        expect(await saveMap(content)).toBe(7);
+        expect(calls.map((c) => c.method)).toEqual(["GET", "PUT", "GET", "PUT"]);
+        expect((calls[3]!.body as { revision: number }).revision).toBe(8);
+        // and the next save names the revision just written
+        answers.push({ status: 200, body: detail(7, 10) });
+        await saveMap(content);
+        expect((calls[4]!.body as { revision: number }).revision).toBe(9);
+    });
+
+    test("another refusal is thrown (the autosave retries it)", async () => {
+        const content = await loaded();
+        answers.push({ status: 500 });
         const err = await saveMap(content).catch((e: unknown) => e);
-        expect(isConflict(err)).toBe(true);
+        expect(isConflict(err)).toBe(false);
+        expect(err).toBeInstanceOf(Error);
     });
 });
 

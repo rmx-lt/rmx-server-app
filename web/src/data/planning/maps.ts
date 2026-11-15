@@ -4,6 +4,7 @@ import {
     postMap,
     putMap,
     removeMap,
+    isConflict,
     type MapDetail,
     type MapDoc,
     type Zone as ApiZone,
@@ -139,16 +140,20 @@ export async function loadMap(id: number): Promise<MapContent> {
 /**
  * Saves content as the map content.map.id: creates it when the id is 0,
  * otherwise saves over the revision last loaded or saved. Returns the map's
- * id. Throws an ApiRequestError with code "conflict" (see isConflict) when
- * the map was saved elsewhere in between.
+ * id. When the map was saved elsewhere in between (a "conflict"), this
+ * document replaces the other one: the user's change is never dropped.
  */
 export async function saveMap(content: MapContent): Promise<number> {
     const id = content.map.id;
     if (id === 0) return createMap(content, content.map.name);
     const revision = revisions.get(id);
     if (revision === undefined) throw new Error(`map ${id} was not loaded`);
-    const saved = await putMap(id, { name: trimName(content.map.name), revision, doc: toWire(content, id) });
-    return remember(saved);
+    try {
+        return remember(await putMap(id, { name: trimName(content.map.name), revision, doc: toWire(content, id) }));
+    } catch (err) {
+        if (!isConflict(err)) throw err;
+        return overwriteMap(id, content, content.map.name);
+    }
 }
 
 /** Saves content as a new map named name. Returns its id. */

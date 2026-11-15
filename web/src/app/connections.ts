@@ -9,9 +9,11 @@
 import { wsUrl } from "@/data/api/paths";
 import { WssConnection } from "@/data/api/wss";
 import { checkSession } from "@/features/auth/data/session";
+import { useConnectionStore } from "@/model/connectionStore";
 
 const wss = new WssConnection(wsUrl(), {
   onState: (state) => {
+    useConnectionStore.setState({ live: state === "open" });
     if (state === "closed") void checkSession();
   },
 });
