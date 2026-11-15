@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 import { useMapStore } from "@/model/mapStore";
-import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useMapPointStore } from "@/model/mapPointStore";
 import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
@@ -15,11 +13,9 @@ export function useBeforeUnload(): void {
     const isCanvasDirty = useCanvasObjectStore(selectIsDirty);
     const isSystemGeoAnchorDirty = useGeoAnchorStore((state) => state.isSystemGeoAnchorDirty);
     const isMapGeoAnchorDirty = useGeoAnchorStore((state) => state.isMapGeoAnchorDirty);
-    const isLayerSettingsDirty = useLayerSettingsStore((state) => state.isLayerSettingsDirty);
-    const isMapPointsDirty = useMapPointStore((state) => state.isMapPointsDirty);
 
     const shouldWarn =
-        isMapDirty || isCanvasDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty || isLayerSettingsDirty || isMapPointsDirty;
+        isMapDirty || isCanvasDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty;
 
     useEffect(() => {
         if (!shouldWarn) return;

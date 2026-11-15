@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { Layer, Circle } from "react-konva";
-import { CanvasVertexIdLabel } from "@/features/canvas-editing/components/canvas-editor/shapes/CanvasVertexIdLabel";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
 import type { Zone } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
@@ -9,9 +8,9 @@ import {
     COLOR_VERTEX_FILL,
     COLOR_EDGE_MIDPOINT_FILL,
     COLOR_EDGE_MIDPOINT_STROKE,
+    LAYER_STYLE,
 } from "@/config/canvas-editing/canvasConfig";
 import { deriveActiveFill } from "@/utils/colorUtils";
-import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";
 import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
 
 interface CanvasVertexHandlesLayerProps {
@@ -44,7 +43,7 @@ export function CanvasVertexHandlesLayerInner({
     onHandleHoverChange,
 }: CanvasVertexHandlesLayerProps) {
     const category = (selectedObject?.category ?? ZONE_CATEGORY.MOWING) as ZoneCategory;
-    const { stroke: accentColor, edgeWidth, showVertexIds } = usePolygonLayerStyle(category);
+    const { stroke: accentColor, edgeWidth } = LAYER_STYLE[category];
     const isLayerListening = activeTool === "select" && selectedObject !== null;
     const edgeMidpoints = selectedObject ? computeEdgeMidpoints(selectedObjectVertices) : [];
     if (!selectedObject) return <Layer />;
@@ -86,17 +85,6 @@ export function CanvasVertexHandlesLayerInner({
                         onMouseEnter={() => onHandleHoverChange(true)}
                         onMouseLeave={() => onHandleHoverChange(false)}
                     />,
-                    showVertexIds && (
-                        <CanvasVertexIdLabel
-                            key={`vertex-id-label-${i}`}
-                            index={i}
-                            x={v.x}
-                            y={v.y}
-                            scale={scale}
-                            edgeWidth={edgeWidth}
-                            accentColor={accentColor}
-                        />
-                    ),
                     <Circle
                         key={`edge-midpoint-handle-${i}`}
                         x={mid.x}

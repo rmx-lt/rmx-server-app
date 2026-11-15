@@ -3,7 +3,7 @@ import { useUiControlsPanelStore } from "@/features/ui-manager/stores/uiControls
 import { useUiInspectorPanelStore } from "@/features/ui-manager/stores/uiInspectorPanelStore";
 
 interface UiControlsPanelProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const MIN_WIDTH = 150;

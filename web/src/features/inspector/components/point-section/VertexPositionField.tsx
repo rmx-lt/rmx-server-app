@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { useMapPointStore } from "@/model/mapPointStore";
-import { useMapStore } from "@/model/mapStore";
 import {
     formatNumber,
     unitLabel,
@@ -63,53 +61,16 @@ function CoordInput({
     );
 }
 
-export default function PointPositionField() {
+export default function VertexPositionField() {
     const selectedObject = useCanvasSelectionStore((s) => s.selectedObject);
     const selectedVertexRefs = useCanvasSelectionStore((s) => s.selectedVertexRefs);
-    const selectedMapPointType = useCanvasSelectionStore((s) => s.selectedMapPointType);
-    const startPoint = useMapPointStore((s) => s.startPoint);
-    const endPoint = useMapPointStore((s) => s.endPoint);
-    const startEndPoint = useMapPointStore((s) => s.startEndPoint);
-    const upsertPoint = useMapPointStore((s) => s.upsertPoint);
     const objects = useCanvasObjectStore((s) => s.objects);
     const moveVertexAt = useCanvasObjectStore((s) => s.moveVertexAt);
     const finalizeVertexMoveAt = useCanvasObjectStore((s) => s.finalizeVertexMoveAt);
-    const mapId = useMapStore((s) => s.map.id);
     const selectedUnit = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
     const xLabel = unitLabel(selectedUnit) ? `X (${unitLabel(selectedUnit)})` : "X";
     const yLabel = unitLabel(selectedUnit) ? `Y (${unitLabel(selectedUnit)})` : "Y";
-
-    if (selectedMapPointType) {
-        const mapPointType = selectedMapPointType;
-        const currentPoint =
-            mapPointType === "start"
-                ? startPoint
-                : mapPointType === "end"
-                    ? endPoint
-                    : startEndPoint;
-        if (!currentPoint) return null;
-
-        const { x, y } = currentPoint.point;
-
-        function commitX(newX: number) {
-            upsertPoint(mapId, mapPointType, { x: newX, y });
-        }
-
-        function commitY(newY: number) {
-            upsertPoint(mapId, mapPointType, { x, y: newY });
-        }
-
-        return (
-            <div className="flex items-center gap-2 px-5 py-1">
-                <span className="w-[30%] shrink-0 truncate text-sm text-gray-800">Position</span>
-                <div className="flex-1 min-w-0 flex gap-1.5">
-                    <CoordInput label={xLabel} baseValue={x} unit={selectedUnit} onCommit={commitX} />
-                    <CoordInput label={yLabel} baseValue={y} unit={selectedUnit} onCommit={commitY} />
-                </div>
-            </div>
-        );
-    }
 
     if (!selectedObject || selectedVertexRefs.length !== 1) return null;
 

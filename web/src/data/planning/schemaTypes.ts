@@ -1,4 +1,4 @@
-import type { CoordSystemType, MapFormat, MapType, ZoneCategory, ZoneType } from "@/config/db-ops/enums";
+import type { ZoneCategory } from "@/config/db-ops/enums";
 
 /**
  * Geographic anchor that binds the canvas world origin (0, 0) to a real-world
@@ -15,11 +15,6 @@ export interface GeoAnchor {
 export interface MapInfo {
     id: number;
     name: string;
-    format: MapFormat;
-    type: MapType;
-    coordSystem: CoordSystemType;
-    headlandEnabled: boolean;
-    headlandWidth: string;
     mowingZoneCount: number;
     noGoZoneCount: number;
 }
@@ -44,25 +39,10 @@ export interface Zone {
     id: number;
     mapId: number;
     category: ZoneCategory;
-    /**
-     * Vertex winding convention (in screen coordinates, Y increases downward):
-     * - `zone`     → vertices inserted **clockwise** (positive signed area)
-     * - `no-go zone` → vertices inserted **counter-clockwise** (negative signed area)
-     */
-    type: ZoneType;
     /** Cached: precomputed number of vertices. */
     vertexCount: number;
     /** Cached: precomputed polygon area (shoelace formula). */
     area: number;
     /** Polygon vertices in draw order. */
     vertices: Array<{ x: number; y: number }>;
-}
-
-export type MapPointType = "start" | "end" | "start_end";
-
-export interface MapPoint {
-    id?: number;
-    mapId: number;
-    type: MapPointType;
-    point: { x: number; y: number };
 }

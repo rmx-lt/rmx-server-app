@@ -13,8 +13,6 @@ import { useCanvasSize } from "@/features/canvas-editing/hooks/canvas-editor/use
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasPanning } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasPanning";
 import { useCanvasZoom } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasZoom";
-import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import { useCanvasDrawing } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasDrawing";
 import { useCanvasMidpointDrag } from "@/features/canvas-editing/hooks/canvas-editor/useCanvasMidpointDrag";
@@ -25,22 +23,13 @@ import { CanvasGridLayer } from "@/features/canvas-editing/components/canvas-edi
 import { CanvasPolygonObjectsLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasPolygonObjectsLayer";
 import { CanvasVertexHandlesLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasVertexHandlesLayer";
 import { CanvasDrawingPreviewLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasDrawingPreviewLayer";
-import { CanvasMapPointsLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasMapPointsLayer";
 import { CanvasMapTileLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasMapTileLayer";
-import { CanvasSystemPolygonResultLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasSystemPolygonResultLayer";
-import { useMapPointStore } from "@/model/mapPointStore";
-import { useMapStore } from "@/model/mapStore";
-import {
-  computeHeadlandDerivedGeometry,
-  parseHeadlandWidth,
-} from "@/features/canvas-editing/utils/headlandGeometry";
 
 export default function CanvasEditor() {
   const stageRef = useRef<Konva.Stage>(null);
   const [draggingVertexRef, setDraggingVertexRef] = useState<VertexRef | null>(null);
   const [movingObject, setMovingObject] = useState<Zone | null>(null);
   const [isHoveringHandle, setIsHoveringHandle] = useState(false);
-  const [isHoveringMapPoint, setIsHoveringMapPoint] = useState(false);
   const [isHoveringObject, setIsHoveringObject] = useState<Zone | null>(null);
   const centeredRef = useRef(false);
 
@@ -50,9 +39,6 @@ export default function CanvasEditor() {
   const setScale = useCanvasViewStore((s) => s.setScale);
   const setCanvasSize = useCanvasViewStore((s) => s.setCanvasSize);
   const { activeTool, setActiveTool } = useCanvasToolStore();
-  const layerSettings = useLayerSettingsStore((s) => s.layers);
-  const headlandEnabled = useMapStore((s) => s.map.headlandEnabled);
-  const headlandWidthRaw = useMapStore((s) => s.map.headlandWidth);
   const {
     objects,
     addObject,
@@ -68,15 +54,11 @@ export default function CanvasEditor() {
   const {
     selectedObject: selectedStoreObject,
     selectedVertexRefs,
-    selectedMapPointType,
     selectObject,
     clearSelection,
     selectVertex,
     toggleVertexSelection,
   } = useCanvasSelectionStore();
-
-  const deletePoint = useMapPointStore((s) => s.deletePoint);
-  const mapId = useMapStore((s) => s.map.id);
 
   const { containerRef, size } = useCanvasSize();
 
@@ -126,15 +108,12 @@ export default function CanvasEditor() {
     drawingPointsCount: drawingPoints.length,
     selectedObject: selectedStoreObject,
     selectedVertexRefs,
-    selectedMapPointType,
-    mapPointMapId: mapId,
     setActiveTool,
     clearSelection,
     selectVertex,
     deleteObject,
     deleteVertex,
     deleteVertices,
-    deleteMapPoint: deletePoint,
     cancelDrawing,
   });
 
@@ -172,37 +151,8 @@ export default function CanvasEditor() {
       ? selectedStoreObject
       : null;
 
-  // Suppress vertex handles when the selected object's layer is hidden.
-  const zonesVisible = getLayerParam(layerSettings, LAYER_ID.MOWING_ZONES, LAYER_PARAM_KEY.VISIBLE) !== "false";
-  const noGoZonesVisible = getLayerParam(layerSettings, LAYER_ID.NO_GO_ZONES, LAYER_PARAM_KEY.VISIBLE) !== "false";
-  const gridZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.GRID, LAYER_PARAM_KEY.Z_INDEX) ?? "10", 10);
-  const zoneZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.MOWING_ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "20", 10);
-  const shrunkenZonesZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.SHRUNKEN_MOWING_ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "25", 10);
-  const noGoZoneZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.NO_GO_ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "30", 10);
-  const expandedNoGoZonesZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.EXPANDED_NO_GO_ZONES, LAYER_PARAM_KEY.Z_INDEX) ?? "35", 10);
-  const mapPointsZIndex = parseInt(getLayerParam(layerSettings, LAYER_ID.MAP_POINTS, LAYER_PARAM_KEY.Z_INDEX) ?? "40", 10);
-
-  const headlandWidth = useMemo(() => parseHeadlandWidth(headlandWidthRaw), [headlandWidthRaw]);
-
-  const { shrunkenZones, expandedNoGoZones } = useMemo(
-    () => computeHeadlandDerivedGeometry({ objects, headlandEnabled, headlandWidth }),
-    [objects, headlandEnabled, headlandWidth],
-  );
-
-  // Layer order by Z-Index ascending.
-  const allLayerOrder = [
-    { kind: "system" as const, id: "grid" as const, zIndex: gridZIndex },
-    { kind: "system" as const, id: "mowingZones" as const, zIndex: zoneZIndex },
-    { kind: "system" as const, id: "shrunkenMowingZones" as const, zIndex: shrunkenZonesZIndex },
-    { kind: "system" as const, id: "noGoZones" as const, zIndex: noGoZoneZIndex },
-    { kind: "system" as const, id: "expandedNoGoZones" as const, zIndex: expandedNoGoZonesZIndex },
-    { kind: "system" as const, id: "mapPoints" as const, zIndex: mapPointsZIndex },
-  ].sort((a, b) => a.zIndex - b.zIndex);
-
   const selectedObjectForHandles =
-    selectedObject === null ? null :
-      selectedObject.category === ZONE_CATEGORY.MOWING ? (zonesVisible ? selectedObject : null) :
-        noGoZonesVisible ? selectedObject : null;
+    selectedObject;
 
   const selectedObjectVertices = useMemo(() => {
     if (!selectedObjectForHandles) return [];
@@ -211,7 +161,6 @@ export default function CanvasEditor() {
   }, [selectedObjectForHandles, objects]);
 
   const isDrawing = activeTool === "addMowingZone" || activeTool === "addNoGoZone";
-  const isPlacingPoint = activeTool === "addStartPoint" || activeTool === "addEndPoint" || activeTool === "addStartEndPoint";
 
   const handleDeleteObject = useCallback(
     (obj: Zone) => {
@@ -289,7 +238,7 @@ export default function CanvasEditor() {
   function resolveCursor() {
     if (isPanning) return "grabbing";
     if (movingObject !== null) return "grabbing";
-    if (isMidpointDragging || isHoveringHandle || isHoveringMapPoint || draggingVertexRef !== null || isDrawing || isPlacingPoint) return "crosshair";
+    if (isMidpointDragging || isHoveringHandle  || draggingVertexRef !== null || isDrawing) return "crosshair";
     if (isHoveringObject !== null && activeTool === "select") return "move";
     if (isHoveringObject && activeTool === "delete") return "crosshair";
     return "default";
@@ -325,71 +274,24 @@ export default function CanvasEditor() {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       >
-        {allLayerOrder.map((entry) => {
-          if (entry.id === "grid") {
-            return <CanvasGridLayer key="grid" width={size.width} height={size.height} />;
-          }
-          if (entry.id === "mowingZones") {
-            return (
-              <CanvasPolygonObjectsLayer
-                key="mowingZones"
-                category={ZONE_CATEGORY.MOWING}
-                objects={objects}
-                selectedObject={selectedStoreObject}
-                movingObject={movingObject}
-                activeTool={activeTool}
-                scale={scale}
-                isPanningRef={isPanningRef}
-                onSelectObject={selectObject}
-                onDeleteObject={handleDeleteObject}
-                onObjectHoverChange={setIsHoveringObject}
-                onObjectDragStart={handleObjectDragStart}
-                onObjectDragEnd={handleObjectDragEnd}
-              />
-            );
-          }
-          if (entry.id === "shrunkenMowingZones") {
-            return (
-              <CanvasSystemPolygonResultLayer
-                key="shrunkenMowingZones"
-                layerId={LAYER_ID.SHRUNKEN_MOWING_ZONES}
-                items={shrunkenZones}
-              />
-            );
-          }
-          if (entry.id === "noGoZones") {
-            return (
-              <CanvasPolygonObjectsLayer
-                key="noGoZones"
-                category={ZONE_CATEGORY.NO_GO}
-                objects={objects}
-                selectedObject={selectedStoreObject}
-                movingObject={movingObject}
-                activeTool={activeTool}
-                scale={scale}
-                isPanningRef={isPanningRef}
-                onSelectObject={selectObject}
-                onDeleteObject={handleDeleteObject}
-                onObjectHoverChange={setIsHoveringObject}
-                onObjectDragStart={handleObjectDragStart}
-                onObjectDragEnd={handleObjectDragEnd}
-              />
-            );
-          }
-          if (entry.id === "expandedNoGoZones") {
-            return (
-              <CanvasSystemPolygonResultLayer
-                key="expandedNoGoZones"
-                layerId={LAYER_ID.EXPANDED_NO_GO_ZONES}
-                items={expandedNoGoZones}
-              />
-            );
-          }
-          if (entry.id === "mapPoints") {
-            return <CanvasMapPointsLayer key="mapPoints" onMapPointHoverChange={setIsHoveringMapPoint} />;
-          }
-          return null;
-        })}
+        <CanvasGridLayer width={size.width} height={size.height} />
+        {[ZONE_CATEGORY.MOWING, ZONE_CATEGORY.NO_GO].map((category) => (
+          <CanvasPolygonObjectsLayer
+            key={category}
+            category={category}
+            objects={objects}
+            selectedObject={selectedStoreObject}
+            movingObject={movingObject}
+            activeTool={activeTool}
+            scale={scale}
+            isPanningRef={isPanningRef}
+            onSelectObject={selectObject}
+            onDeleteObject={handleDeleteObject}
+            onObjectHoverChange={setIsHoveringObject}
+            onObjectDragStart={handleObjectDragStart}
+            onObjectDragEnd={handleObjectDragEnd}
+          />
+        ))}
 
         <CanvasVertexHandlesLayer
           selectedObject={selectedObjectForHandles}

@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { useMapStore } from "@/model/mapStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
 import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
-import { useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { useMapPointStore } from "@/model/mapPointStore";
 import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
@@ -25,13 +23,11 @@ interface SaveStatusState {
 function computeStatus(): SaveStatus {
     const { isMapDirty } = useMapStore.getState();
     const isCanvasDirty = selectIsDirty(useCanvasObjectStore.getState());
-    const { isLayerSettingsDirty } = useLayerSettingsStore.getState();
     const { mode } = useSaveModeStore.getState();
 
-    const { isMapPointsDirty } = useMapPointStore.getState();
     const { isSystemGeoAnchorDirty, isMapGeoAnchorDirty } = useGeoAnchorStore.getState();
 
-    const isDirty = isMapDirty || isCanvasDirty || isLayerSettingsDirty || isMapPointsDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty;
+    const isDirty = isMapDirty || isCanvasDirty || isSystemGeoAnchorDirty || isMapGeoAnchorDirty;
 
     if (isDirty && mode !== "autosave") return "unsaved";
     if (mode === "autosave" || (mode === "manual" && !isDirty)) return "saved";
@@ -66,6 +62,4 @@ function syncStatus(): void {
 useMapStore.subscribe(syncStatus);
 useCanvasObjectStore.subscribe(syncStatus);
 useSaveModeStore.subscribe(syncStatus);
-useLayerSettingsStore.subscribe(syncStatus);
-useMapPointStore.subscribe(syncStatus);
 useGeoAnchorStore.subscribe(syncStatus);

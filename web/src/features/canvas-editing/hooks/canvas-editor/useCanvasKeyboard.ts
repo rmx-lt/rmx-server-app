@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import type { Zone } from "@/data/planning/schemaTypes";
-import type { MapPointType } from "@/data/planning/schemaTypes";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
 
 interface UseCanvasKeyboardOptions {
@@ -8,15 +7,12 @@ interface UseCanvasKeyboardOptions {
     drawingPointsCount: number;
     selectedObject: Zone | null;
     selectedVertexRefs: VertexRef[];
-    selectedMapPointType: MapPointType | null;
-    mapPointMapId: number | null;
     setActiveTool: (tool: ActiveTool | null) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
     deleteObject: (obj: Zone) => void;
     deleteVertex: (obj: Zone, index: number) => void;
     deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
-    deleteMapPoint: (mapId: number, type: MapPointType) => void;
     cancelDrawing: () => void;
 }
 
@@ -25,15 +21,12 @@ export function useCanvasKeyboard({
     drawingPointsCount,
     selectedObject,
     selectedVertexRefs,
-    selectedMapPointType,
-    mapPointMapId,
     setActiveTool,
     clearSelection,
     selectVertex,
     deleteObject,
     deleteVertex,
     deleteVertices,
-    deleteMapPoint,
     cancelDrawing,
 }: UseCanvasKeyboardOptions) {
     const handleKeyDown = useCallback(
@@ -51,8 +44,6 @@ export function useCanvasKeyboard({
                         selectVertex(null); // deselect vertices, keep object selected
                     } else if (selectedObject !== null) {
                         clearSelection();
-                    } else if (selectedMapPointType !== null) {
-                        clearSelection();
                     } else {
                         setActiveTool(null);
                     }
@@ -69,9 +60,6 @@ export function useCanvasKeyboard({
                 } else if (selectedObject !== null) {
                     deleteObject(selectedObject);
                     clearSelection();
-                } else if (selectedMapPointType !== null && mapPointMapId !== null) {
-                    deleteMapPoint(mapPointMapId, selectedMapPointType);
-                    clearSelection();
                 }
             }
         },
@@ -80,16 +68,13 @@ export function useCanvasKeyboard({
             drawingPointsCount,
             selectedObject,
             selectedVertexRefs,
-            selectedMapPointType,
-            mapPointMapId,
-            setActiveTool,
+                            setActiveTool,
             clearSelection,
             selectVertex,
             deleteObject,
             deleteVertex,
             deleteVertices,
-            deleteMapPoint,
-            cancelDrawing,
+                    cancelDrawing,
         ],
     );
 

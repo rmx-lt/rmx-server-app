@@ -1,7 +1,6 @@
 import CanvasResetViewButton from "@/features/canvas-editing/components/menu-bar/CanvasResetViewButton";
 import CanvasZoomInButton from "@/features/canvas-editing/components/menu-bar/CanvasZoomInButton";
 import CanvasZoomOutButton from "@/features/canvas-editing/components/menu-bar/CanvasZoomOutButton";
-import CanvasToggleGridButton from "@/features/canvas-editing/components/menu-bar/CanvasToggleGridButton";
 import MenuSeparator from "@/components/menu-bar/MenuBarSeparator";
 import UiInspectorButton from "@/features/ui-manager/components/menu-bar/UiInspectorButton";
 import UiControlsButton from "@/features/ui-manager/components/menu-bar/UiControlsButton";
@@ -18,10 +17,6 @@ export default function MenuBarViewSubmenu() {
 
       <CanvasZoomInButton />
       <CanvasZoomOutButton />
-
-      <MenuSeparator />
-
-      <CanvasToggleGridButton />
 
       <MenuSeparator />
 

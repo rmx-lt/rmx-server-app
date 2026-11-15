@@ -9,7 +9,6 @@ import { useWorkbenchShortcuts } from "@/layouts/workbench-window/useWorkbenchSh
 import MapPickerModal from "@/features/map-manager/components/map-picker-modal/MapPickerModal";
 import SaveAsModal from "@/features/map-manager/components/save-as-modal/SaveAsModal";
 import CopyMapModal from "@/features/map-manager/components/copy-map-modal/CopyMapModal";
-import ImportModal from "@/features/map-manager/components/import-modal/ImportModal";
 import GeoAnchorModal from "@/features/geo-anchor/components/GeoAnchorModal";
 
 export default function WorkbenchWindow() {
@@ -32,7 +31,6 @@ export default function WorkbenchWindow() {
       <ConfirmationModal />
       <SaveAsModal />
       <CopyMapModal />
-      <ImportModal />
       <GeoAnchorModal />
     </div>
   );
