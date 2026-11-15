@@ -2,7 +2,7 @@ import { memo } from "react";
 import { useLayerSettingsStore } from "@/model/layerSettingsStore";
 import { resolvePolygonResultLayerStyle } from "@/features/canvas-editing/utils/resolveLayerStyle";
 import { CanvasPolygonResultLayer } from "@/features/canvas-editing/components/canvas-editor/layers/CanvasPolygonResultLayer";
-import type { CanvasPolygonItem } from "@/data/local/serviceTypes";
+import type { CanvasPolygonItem } from "@/data/planning/serviceTypes";
 
 interface CanvasSystemPolygonResultLayerProps {
     layerId: number;

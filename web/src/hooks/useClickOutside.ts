@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /**
  * Attaches a mousedown listener and calls `onClickOutside` whenever a click
@@ -9,8 +9,11 @@ export function useClickOutside<T extends HTMLElement>(
     onClickOutside: () => void,
 ): React.RefObject<T | null> {
     const ref = useRef<T>(null);
+    // The latest callback, updated after each render (not during it).
     const callbackRef = useRef(onClickOutside);
-    callbackRef.current = onClickOutside;
+    useLayoutEffect(() => {
+        callbackRef.current = onClickOutside;
+    });
 
     useEffect(() => {
         if (!isActive) return;

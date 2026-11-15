@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useState, type MouseEvent } from "react";
 
 interface UseInternalListModalInteractionsOptions {
     isOpen: boolean;
@@ -16,12 +16,15 @@ export default function useInternalListModalInteractions({
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
     const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
-    useEffect(() => {
+    // Closing the modal closes its menu (adjusted during render, not in an effect).
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
         if (!isOpen) {
             setOpenMenuId(null);
             setMenuPos(null);
         }
-    }, [isOpen]);
+    }
 
     const closeMenu = useCallback(() => {
         setOpenMenuId(null);

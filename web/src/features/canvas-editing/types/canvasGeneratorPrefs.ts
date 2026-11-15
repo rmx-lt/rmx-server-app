@@ -9,6 +9,7 @@ export interface CanvasGeneratorFloatingControlPrefs {
         width: string;
         height: string;
         cellSize: string;
+        /** The no-go zone ratio; the stored name predates the rename to no-go zones. */
         obstacleRatio: string;
         clusteringProb: string;
         seed: string;

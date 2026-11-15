@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
     computeResolvedClusteringPct,
-    computeResolvedObstacleRatioPct,
-    generateEnvironment,
+    computeResolvedNoGoZoneRatioPct,
+    generateMap,
     pickWeightedClusteringPriority,
-    traceMergedObstaclePolygons,
-} from "@/features/canvas-editing/utils/envGenerator";
-import { computeActualObstacleRatioPct, computePolygonArea, isPointInPolygon, mulberry32 } from "./testUtils";
+    traceMergedNoGoZonePolygons,
+} from "@/features/canvas-editing/utils/mapGenerator";
+import { computeActualNoGoZoneRatioPct, computePolygonArea, isPointInPolygon, mulberry32 } from "./testUtils";
 
-function countFreeComponentsFromEnv(
-    env: ReturnType<typeof generateEnvironment>,
+function countFreeComponentsFromMap(
+    map: ReturnType<typeof generateMap>,
     cols: number,
     rows: number,
     cellSize: number,
@@ -23,7 +23,7 @@ function countFreeComponentsFromEnv(
                 y: (y + 0.5) * cellSize,
             };
 
-            if (env.obstacles.some((polygon) => isPointInPolygon(point, polygon))) {
+            if (map.noGoZones.some((polygon) => isPointInPolygon(point, polygon))) {
                 grid[y * cols + x] = 1;
             }
         }
@@ -69,8 +69,8 @@ function countFreeComponentsFromEnv(
     return components;
 }
 
-describe("generateEnvironment - obstacle ratio calibration", () => {
-    test("keeps specified and actual obstacle ratio within one cell for 10 random env", () => {
+describe("generateMap - no-go zone ratio calibration", () => {
+    test("keeps specified and actual no-go zone ratio within one cell for 10 random maps", () => {
         const rand = mulberry32(0xC0FFEE);
 
         for (let i = 0; i < 10; i++) {
@@ -79,35 +79,35 @@ describe("generateEnvironment - obstacle ratio calibration", () => {
             const cellSize = 10;
             const cols = width / cellSize;
             const rows = height / cellSize;
-            const obstacleRatio = Math.floor(rand() * 101);
+            const noGoZoneRatio = Math.floor(rand() * 101);
             const clusteringProb = Math.floor(rand() * 101);
             const seed = "";
 
-            const env = generateEnvironment({
+            const map = generateMap({
                 width,
                 height,
                 cellSize,
-                obstacleRatio,
+                noGoZoneRatio,
                 clusteringProb,
                 seed,
             });
 
-            const actualRatio = computeActualObstacleRatioPct(env.boundary, env.obstacles, cellSize, cols, rows);
+            const actualRatio = computeActualNoGoZoneRatioPct(map.boundary, map.noGoZones, cellSize, cols, rows);
             const oneCellTolerancePct = 100 / Math.min(cols, rows);
 
             // The actual measured ratio should match what the generator claims it used,
             // within ±1 cell size tolerance
-            expect(Math.abs(actualRatio - env.usedObstacleRatioPct)).toBeLessThanOrEqual(oneCellTolerancePct + 1e-9);
+            expect(Math.abs(actualRatio - map.usedNoGoZoneRatioPct)).toBeLessThanOrEqual(oneCellTolerancePct + 1e-9);
         }
     });
 });
 
 describe("resolved random ratios are whole numbers", () => {
-    test("auto and range obstacle ratio picks are integers", () => {
+    test("auto and range no-go zone ratio picks are integers", () => {
         for (let i = 0; i < 100; i++) {
             const seed = `seed-obs-${i}`;
-            const auto = computeResolvedObstacleRatioPct(seed);
-            const range = computeResolvedObstacleRatioPct(seed, [17, 43]);
+            const auto = computeResolvedNoGoZoneRatioPct(seed);
+            const range = computeResolvedNoGoZoneRatioPct(seed, [17, 43]);
             expect(auto).not.toBeNull();
             expect(range).not.toBeNull();
             expect(Number.isInteger(auto!)).toBeTrue();
@@ -128,7 +128,7 @@ describe("resolved random ratios are whole numbers", () => {
     });
 });
 
-describe("generateEnvironment - pocket prevention", () => {
+describe("generateMap - pocket prevention", () => {
     test("keeps free space connected under high clustering across deterministic seeds", () => {
         const width = 200;
         const height = 200;
@@ -138,16 +138,16 @@ describe("generateEnvironment - pocket prevention", () => {
 
         for (let i = 0; i < 100; i++) {
             const seed = `pocket-regression-${i}`;
-            const env = generateEnvironment({
+            const map = generateMap({
                 width,
                 height,
                 cellSize,
-                obstacleRatio: 45,
+                noGoZoneRatio: 45,
                 clusteringProb: 100,
                 seed,
             });
 
-            const freeComponents = countFreeComponentsFromEnv(env, cols, rows, cellSize);
+            const freeComponents = countFreeComponentsFromMap(map, cols, rows, cellSize);
             expect(freeComponents).toBeLessThanOrEqual(1);
         }
     });
@@ -201,7 +201,7 @@ describe("clustering priority weighted distribution", () => {
     });
 });
 
-describe("traceMergedObstaclePolygons", () => {
+describe("traceMergedNoGoZonePolygons", () => {
     test("merges orthogonally connected cells into a single polygon", () => {
         const cols = 3;
         const rows = 2;
@@ -211,7 +211,7 @@ describe("traceMergedObstaclePolygons", () => {
             1, 0, 0,
         ]);
 
-        const polygons = traceMergedObstaclePolygons(grid, cols, rows, cellSize, cols * cellSize, rows * cellSize);
+        const polygons = traceMergedNoGoZonePolygons(grid, cols, rows, cellSize, cols * cellSize, rows * cellSize);
 
         expect(polygons).toHaveLength(1);
         expect(computePolygonArea(polygons[0]!)).toBe(300);
@@ -231,7 +231,7 @@ describe("traceMergedObstaclePolygons", () => {
             0, 1,
         ]);
 
-        const polygons = traceMergedObstaclePolygons(grid, cols, rows, cellSize, cols * cellSize, rows * cellSize);
+        const polygons = traceMergedNoGoZonePolygons(grid, cols, rows, cellSize, cols * cellSize, rows * cellSize);
 
         expect(polygons).toHaveLength(2);
         expect(polygons.map((polygon) => computePolygonArea(polygon)).sort((a, b) => a - b)).toEqual([100, 100]);

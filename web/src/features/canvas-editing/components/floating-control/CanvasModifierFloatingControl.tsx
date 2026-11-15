@@ -9,8 +9,8 @@ import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvas
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { unitLabel } from "@/utils/unitOfMeasure";
-import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
-import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { getUiPreference, setUiPreference } from "@/data/planning/uiPreferences";
 
 const UI_PREF_KEY = "floatingControl.canvas-modifier";
 
@@ -83,8 +83,8 @@ function CanvasModifierFloatingControl() {
 
     const isValidSelection =
         !!selectedObject &&
-        (selectedObjectCategory === OBJECT_CATEGORY.ZONE ||
-            selectedObjectCategory === OBJECT_CATEGORY.OBSTACLE);
+        (selectedObjectCategory === ZONE_CATEGORY.MOWING ||
+            selectedObjectCategory === ZONE_CATEGORY.NO_GO);
 
     const parsedMultiplier = parseFloat(multiplier);
     const parsedOffset = parseFloat(maxOffset);

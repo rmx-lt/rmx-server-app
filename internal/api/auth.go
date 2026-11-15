@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-// LoginRequest is the body of POST /app/api/auth/login.
+// LoginRequest is the body of POST /api/auth/login.
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -22,7 +22,7 @@ func (r LoginRequest) LogValue() slog.Value {
 	return slog.GroupValue(slog.String("username", r.Username))
 }
 
-// Me is the logged-in user: the answer to a login and to GET /app/api/auth/me.
+// Me is the logged-in user: the answer to a login and to GET /api/auth/me.
 type Me struct {
 	Username string `json:"username"`
 }

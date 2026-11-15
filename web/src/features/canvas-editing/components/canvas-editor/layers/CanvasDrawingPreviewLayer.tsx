@@ -2,7 +2,7 @@ import { Layer, Line, Circle } from "react-konva";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 
 interface CanvasDrawingPreviewLayerProps {
     activeTool: ActiveTool | null;
@@ -18,14 +18,14 @@ export function CanvasDrawingPreviewLayer({
     scale,
 }: CanvasDrawingPreviewLayerProps) {
     const layers = useLayerSettingsStore((s) => s.layers);
-    const isDrawing = activeTool === "addZone" || activeTool === "addObstacle";
+    const isDrawing = activeTool === "addMowingZone" || activeTool === "addNoGoZone";
 
     if (!isDrawing || drawingPoints.length === 0) return null;
 
-    const drawLayerId = activeTool === "addZone" ? LAYER_ID.ZONES : LAYER_ID.OBSTACLES;
-    const drawColor = drawLayerId === LAYER_ID.ZONES
-        ? (getLayerParam(layers, LAYER_ID.ZONES, LAYER_PARAM_KEY.POLYGON_EDGE_COLOR) ?? "#22c55e")
-        : (getLayerParam(layers, LAYER_ID.OBSTACLES, LAYER_PARAM_KEY.POLYGON_EDGE_COLOR) ?? "#ef4444");
+    const drawLayerId = activeTool === "addMowingZone" ? LAYER_ID.MOWING_ZONES : LAYER_ID.NO_GO_ZONES;
+    const drawColor = drawLayerId === LAYER_ID.MOWING_ZONES
+        ? (getLayerParam(layers, LAYER_ID.MOWING_ZONES, LAYER_PARAM_KEY.POLYGON_EDGE_COLOR) ?? "#22c55e")
+        : (getLayerParam(layers, LAYER_ID.NO_GO_ZONES, LAYER_PARAM_KEY.POLYGON_EDGE_COLOR) ?? "#ef4444");
     const previewEdgeColor = drawColor;
     const drawEdgeWidth = parseFloat(getLayerParam(layers, drawLayerId, LAYER_PARAM_KEY.POLYGON_EDGE_WIDTH) ?? "1.5");
     const previewDotRadius = Math.max(4, drawEdgeWidth) / scale;

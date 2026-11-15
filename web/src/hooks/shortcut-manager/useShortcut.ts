@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { parseShortcut, type ParsedShortcut } from "@/utils/parseShortcut";
 
 export interface ShortcutEntry {
@@ -62,8 +62,11 @@ export function useShortcut(
     keys: string,
     handler: () => void,
 ) {
+    // The latest handler, updated after each render (not during it).
     const handlerRef = useRef(handler);
-    handlerRef.current = handler;
+    useLayoutEffect(() => {
+        handlerRef.current = handler;
+    });
 
     useEffect(() => {
         shortcutRegistry.set(id, {

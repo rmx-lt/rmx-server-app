@@ -23,6 +23,8 @@ const (
 	CodeForbidden ErrorCode = "forbidden"
 	// CodeTooManyRequests: too many failed logins; wait Retry-After seconds (REST: 429).
 	CodeTooManyRequests ErrorCode = "too_many_requests"
+	// CodeConflict: the thing changed since the client read it, e.g. a stale revision (REST: 409).
+	CodeConflict ErrorCode = "conflict"
 )
 
 // ApiError is the error body, used by REST (with a matching HTTP status) and

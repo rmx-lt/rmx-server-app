@@ -163,13 +163,13 @@ function distanceToLineSegment(point: Point, p1: Point, p2: Point): number {
 }
 
 /**
- * Validates that obstacles don't overlap with the boundary.
+ * Validates that no-go zones don't overlap with the boundary.
  * (Basic check; doesn't handle all edge cases.)
  */
-export function validateNoOverlap(boundary: Point[], obstacles: Point[][]): boolean {
-    for (const obstacle of obstacles) {
-        // Check if any obstacle vertex is inside or on the boundary
-        for (const vertex of obstacle) {
+export function validateNoOverlap(boundary: Point[], noGoZones: Point[][]): boolean {
+    for (const noGoZone of noGoZones) {
+        // Check if any no-go zone vertex is inside or on the boundary
+        for (const vertex of noGoZone) {
             if (isPointInPolygon(vertex, boundary)) {
                 return false; // Vertex inside boundary = potential issue
             }
@@ -199,17 +199,17 @@ export function toHexSeed(value: number): string {
 }
 
 /**
- * Computes the actual obstacle ratio percentage by sampling cell centers.
- * A cell is counted as obstacle if it's outside the boundary or inside an obstacle polygon.
+ * Computes the actual no-go zone ratio percentage by sampling cell centers.
+ * A cell is counted as no-go zone if it's outside the boundary or inside a no-go zone polygon.
  */
-export function computeActualObstacleRatioPct(
+export function computeActualNoGoZoneRatioPct(
     boundary: Point[],
-    obstacles: Point[][],
+    noGoZones: Point[][],
     cellSize: number,
     cols: number,
     rows: number,
 ): number {
-    let obstacleCells = 0;
+    let noGoZoneCells = 0;
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -219,10 +219,10 @@ export function computeActualObstacleRatioPct(
             };
 
             const insideBoundary = isPointInPolygon(point, boundary);
-            const insideObstacle = obstacles.some((polygon) => isPointInPolygon(point, polygon));
-            if (!insideBoundary || insideObstacle) obstacleCells++;
+            const insideNoGoZone = noGoZones.some((polygon) => isPointInPolygon(point, polygon));
+            if (!insideBoundary || insideNoGoZone) noGoZoneCells++;
         }
     }
 
-    return (obstacleCells / (cols * rows)) * 100;
+    return (noGoZoneCells / (cols * rows)) * 100;
 }

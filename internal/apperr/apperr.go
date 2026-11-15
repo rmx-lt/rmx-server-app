@@ -70,6 +70,16 @@ func TooManyRequests(retryAfter int) *Error {
 	}
 }
 
+// NotFound: the thing does not exist, or belongs to someone else.
+func NotFound(format string, args ...any) *Error {
+	return &Error{Code: api.CodeNotFound, Message: fmt.Sprintf(format, args...)}
+}
+
+// Conflict: the thing changed since the client read it.
+func Conflict(format string, args ...any) *Error {
+	return &Error{Code: api.CodeConflict, Message: fmt.Sprintf(format, args...)}
+}
+
 // From turns any error into an *Error: other errors are internal ones.
 func From(err error) *Error {
 	if e, ok := err.(*Error); ok {
@@ -96,6 +106,8 @@ func (e *Error) Status() int {
 		return http.StatusForbidden
 	case api.CodeTooManyRequests:
 		return http.StatusTooManyRequests
+	case api.CodeConflict:
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}

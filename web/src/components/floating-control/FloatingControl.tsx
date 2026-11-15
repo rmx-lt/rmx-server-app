@@ -36,8 +36,9 @@ export default function FloatingControl({
     // Tracks the current pos value across renders without causing re-renders.
     // Used by Effect 1 to detect whether setPos would be a no-op (same reference),
     // preventing posFromPropRef from being set when the effect would bail out.
+    // Updated in an effect declared before Effect 1, so it is current when Effect 1 runs.
     const posRef = useRef(pos);
-    posRef.current = pos;
+    useEffect(() => { posRef.current = pos; }, [pos]);
 
     // When true, the most recent pos change came from syncing the defaultPosition prop
     // (Effect 1) rather than from a user interaction (drag / clamp). Effect 2 checks

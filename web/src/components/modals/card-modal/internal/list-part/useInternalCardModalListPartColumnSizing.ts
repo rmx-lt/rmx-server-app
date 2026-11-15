@@ -68,9 +68,12 @@ export default function useInternalCardModalListPartColumnSizing({
     const [resizingColumnId, setResizingColumnId] = useState<string | null>(null);
     const dragCleanupRef = useRef<(() => void) | null>(null);
 
-    useEffect(() => {
+    // New columns get their widths during render, not in an effect.
+    const [prevColumns, setPrevColumns] = useState(columns);
+    if (columns !== prevColumns) {
+        setPrevColumns(columns);
         setColumnWidths((currentWidths) => buildResolvedWidths(columns, currentWidths));
-    }, [columns]);
+    }
 
     useEffect(() => {
         if (!storageKey || typeof window === "undefined") {

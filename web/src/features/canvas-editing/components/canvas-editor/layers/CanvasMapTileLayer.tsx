@@ -3,7 +3,7 @@ import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewS
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/config/layers/layerRegistry";
+import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { convertLinearToBase } from "@/utils/unitOfMeasure";
 import {
     TILE_SIZE,
@@ -50,7 +50,7 @@ function CanvasMapTileLayerInner() {
     const opacityStr = getLayerParam(layers, LAYER_ID.SATELLITE_MAP, LAYER_PARAM_KEY.MAP_OPACITY);
     const opacity = Math.min(100, Math.max(0, Number(opacityStr ?? "100"))) / 100;
 
-    const geoAnchor = useGeoAnchorStore((s) => s.environmentGeoAnchor);
+    const geoAnchor = useGeoAnchorStore((s) => s.mapGeoAnchor);
     const unitOfMeasure = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
     const position = useCanvasViewStore((s) => s.position);

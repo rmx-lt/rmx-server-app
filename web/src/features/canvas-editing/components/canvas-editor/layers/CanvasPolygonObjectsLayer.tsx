@@ -2,9 +2,9 @@ import { memo, useMemo, useRef } from "react";
 import { Layer, Line } from "react-konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import type React from "react";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Zone } from "@/data/planning/schemaTypes";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import { OBJECT_TYPE, type ObjectCategory } from "@/config/db-ops/enums";
+import { ZONE_TYPE, type ZoneCategory } from "@/config/db-ops/enums";
 import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";
 
 function createStripePatternCanvas(bgColor: string, stripeColor: string): HTMLCanvasElement {
@@ -23,17 +23,17 @@ function createStripePatternCanvas(bgColor: string, stripeColor: string): HTMLCa
 }
 
 interface CanvasPolygonObjectsLayerProps {
-    category: ObjectCategory;
-    objects: Object[];
-    selectedObject: Object | null;
-    movingObject: Object | null;
+    category: ZoneCategory;
+    objects: Zone[];
+    selectedObject: Zone | null;
+    movingObject: Zone | null;
     activeTool: ActiveTool | null;
     scale: number;
-    onSelectObject: (obj: Object) => void;
-    onDeleteObject: (obj: Object) => void;
-    onObjectHoverChange: (obj: Object | null) => void;
-    onObjectDragStart: (obj: Object) => void;
-    onObjectDragEnd: (obj: Object, dx: number, dy: number) => void;
+    onSelectObject: (obj: Zone) => void;
+    onDeleteObject: (obj: Zone) => void;
+    onObjectHoverChange: (obj: Zone | null) => void;
+    onObjectDragStart: (obj: Zone) => void;
+    onObjectDragEnd: (obj: Zone, dx: number, dy: number) => void;
     isPanningRef: React.RefObject<boolean>;
 }
 
@@ -71,7 +71,7 @@ export function CanvasPolygonObjectsLayerInner({
     return (
         <Layer>
             {visibleObjects.map((obj) => {
-                const isOnline = obj.type === OBJECT_TYPE.ONLINE;
+                const isOnline = obj.type === ZONE_TYPE.ONLINE;
                 const isSelected = selectedObject !== null && sameObject(obj, selectedObject) && activeTool === "select";
                 const isMoving = movingObject !== null && sameObject(obj, movingObject);
                 const fillPattern = isOnline ? onlinePattern : undefined;

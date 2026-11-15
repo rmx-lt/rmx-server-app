@@ -123,7 +123,7 @@ func TestCookieAttributes(t *testing.T) {
 	if !strings.HasPrefix(set, CookieName+"="+string(tok)+";") {
 		t.Fatal(set)
 	}
-	for _, attr := range []string{"Path=/app", "Max-Age=60", "HttpOnly", "Secure", "SameSite=Strict"} {
+	for _, attr := range []string{"Path=/", "Max-Age=60", "HttpOnly", "Secure", "SameSite=Strict"} {
 		if !strings.Contains(set, attr) {
 			t.Errorf("%s lacks %s", set, attr)
 		}
@@ -240,7 +240,7 @@ func TestWhichRequestsNeedAnOrigin(t *testing.T) {
 }
 
 func TestOriginMustMatchExactlyOnce(t *testing.T) {
-	allowed := []string{"https://api.rmx.lt"}
+	allowed := []string{"https://app.rmx.lt"}
 	hdr := func(origins ...string) http.Header {
 		h := http.Header{}
 		for _, o := range origins {
@@ -248,18 +248,18 @@ func TestOriginMustMatchExactlyOnce(t *testing.T) {
 		}
 		return h
 	}
-	if !originAllowed(hdr("https://api.rmx.lt"), allowed) || !originAllowed(hdr("https://API.rmx.lt"), allowed) {
+	if !originAllowed(hdr("https://app.rmx.lt"), allowed) || !originAllowed(hdr("https://APP.rmx.lt"), allowed) {
 		t.Error("the allowed origin was refused")
 	}
 	for _, bad := range []string{
-		"https://evil.example", "https://api.rmx.lt.evil.example", "http://api.rmx.lt",
-		"https://rmx.lt", "https://api.rmx.lt:444", "null",
+		"https://evil.example", "https://app.rmx.lt.evil.example", "http://app.rmx.lt",
+		"https://rmx.lt", "https://app.rmx.lt:444", "null",
 	} {
 		if originAllowed(hdr(bad), allowed) {
 			t.Errorf("%s accepted", bad)
 		}
 	}
-	if originAllowed(hdr(), allowed) || originAllowed(hdr("https://api.rmx.lt", "https://api.rmx.lt"), allowed) {
+	if originAllowed(hdr(), allowed) || originAllowed(hdr("https://app.rmx.lt", "https://app.rmx.lt"), allowed) {
 		t.Error("missing or repeated Origin accepted")
 	}
 }

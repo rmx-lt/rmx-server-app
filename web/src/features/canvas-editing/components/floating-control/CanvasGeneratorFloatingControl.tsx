@@ -11,22 +11,22 @@ import {
 import { useCanvasGeneratorFloatingControlStore } from "@/features/canvas-editing/stores/canvasGeneratorFloatingControlStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import {
-    generateCompliantEnvironment,
-    computeResolvedObstacleRatioPct,
+    generateCompliantMap,
+    computeResolvedNoGoZoneRatioPct,
     computeResolvedClusteringPct,
     validateGeneratorSystemParams,
-} from "@/features/canvas-editing/utils/envGenerator";
-import { validateCanvasGeneratorInputs } from "@/features/canvas-editing/utils/environmentInputValidation";
+} from "@/features/canvas-editing/utils/mapGenerator";
+import { validateCanvasGeneratorInputs } from "@/features/canvas-editing/utils/mapInputValidation";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { useEnvPointStore } from "@/model/envPointStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapPointStore } from "@/model/mapPointStore";
+import { useMapStore } from "@/model/mapStore";
 import {
-    OBJECT_CATEGORY,
-    ENV_FORMAT_OPTIONS,
+    ZONE_CATEGORY,
+    MAP_FORMAT_OPTIONS,
     COORD_SYSTEM_OPTIONS,
 } from "@/config/db-ops/enums";
 import { unitLabel } from "@/utils/unitOfMeasure";
-import { getUiPreference, setUiPreference } from "@/data/local/uiPreferences";
+import { getUiPreference, setUiPreference } from "@/data/planning/uiPreferences";
 import type { CanvasGeneratorFloatingControlPrefs } from "@/features/canvas-editing/types/canvasGeneratorPrefs";
 
 const UI_PREF_KEY = "floatingControl.canvas-generator";
@@ -36,10 +36,10 @@ function CanvasGeneratorFloatingControl() {
     const width = useCanvasGeneratorFloatingControlStore((s) => s.width);
     const height = useCanvasGeneratorFloatingControlStore((s) => s.height);
     const cellSize = useCanvasGeneratorFloatingControlStore((s) => s.cellSize);
-    const obstacleRatio = useCanvasGeneratorFloatingControlStore((s) => s.obstacleRatio);
+    const noGoZoneRatio = useCanvasGeneratorFloatingControlStore((s) => s.noGoZoneRatio);
     const clusteringProb = useCanvasGeneratorFloatingControlStore((s) => s.clusteringProb);
     const seed = useCanvasGeneratorFloatingControlStore((s) => s.seed);
-    const autoObstacleRatioHint = useCanvasGeneratorFloatingControlStore((s) => s.autoObstacleRatioHint);
+    const autoNoGoZoneRatioHint = useCanvasGeneratorFloatingControlStore((s) => s.autoNoGoZoneRatioHint);
     const autoClusteringHint = useCanvasGeneratorFloatingControlStore((s) => s.autoClusteringHint);
     const lastSeedHex = useCanvasGeneratorFloatingControlStore((s) => s.lastSeedHex);
     const controlPosition = useCanvasGeneratorFloatingControlStore((s) => s.controlPosition);
@@ -51,10 +51,10 @@ function CanvasGeneratorFloatingControl() {
     const setWidth = useCanvasGeneratorFloatingControlStore((s) => s.setWidth);
     const setHeight = useCanvasGeneratorFloatingControlStore((s) => s.setHeight);
     const setCellSize = useCanvasGeneratorFloatingControlStore((s) => s.setCellSize);
-    const setObstacleRatio = useCanvasGeneratorFloatingControlStore((s) => s.setObstacleRatio);
+    const setNoGoZoneRatio = useCanvasGeneratorFloatingControlStore((s) => s.setNoGoZoneRatio);
     const setClusteringProb = useCanvasGeneratorFloatingControlStore((s) => s.setClusteringProb);
     const setSeed = useCanvasGeneratorFloatingControlStore((s) => s.setSeed);
-    const setAutoObstacleRatioHint = useCanvasGeneratorFloatingControlStore((s) => s.setAutoObstacleRatioHint);
+    const setAutoNoGoZoneRatioHint = useCanvasGeneratorFloatingControlStore((s) => s.setAutoNoGoZoneRatioHint);
     const setAutoClusteringHint = useCanvasGeneratorFloatingControlStore((s) => s.setAutoClusteringHint);
     const setLastSeedHex = useCanvasGeneratorFloatingControlStore((s) => s.setLastSeedHex);
     const setControlPosition = useCanvasGeneratorFloatingControlStore((s) => s.setControlPosition);
@@ -66,10 +66,10 @@ function CanvasGeneratorFloatingControl() {
     const objects = useCanvasObjectStore((s) => s.objects);
     const deleteObject = useCanvasObjectStore((s) => s.deleteObject);
     const addObject = useCanvasObjectStore((s) => s.addObject);
-    const upsertPoint = useEnvPointStore((s) => s.upsertPoint);
-    const deletePoint = useEnvPointStore((s) => s.deletePoint);
-    const envId = useEnvStore((s) => s.env.id);
-    const env = useEnvStore((s) => s.env);
+    const upsertPoint = useMapPointStore((s) => s.upsertPoint);
+    const deletePoint = useMapPointStore((s) => s.deletePoint);
+    const mapId = useMapStore((s) => s.map.id);
+    const map = useMapStore((s) => s.map);
     const uom = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
     const isHydratedRef = useRef(false);
@@ -81,10 +81,10 @@ function CanvasGeneratorFloatingControl() {
 
     // Seed-derived previews; recomputed when seed or field value changes
     const seedDerivedObsRatio = useMemo(() => {
-        const parsed = parseRangeFieldValue(obstacleRatio);
+        const parsed = parseRangeFieldValue(noGoZoneRatio);
         const range = Array.isArray(parsed) ? parsed : undefined;
-        return computeResolvedObstacleRatioPct(seed, range);
-    }, [seed, obstacleRatio]);
+        return computeResolvedNoGoZoneRatioPct(seed, range);
+    }, [seed, noGoZoneRatio]);
 
     const seedDerivedClust = useMemo(() => {
         const parsed = parseRangeFieldValue(clusteringProb);
@@ -92,10 +92,10 @@ function CanvasGeneratorFloatingControl() {
         return computeResolvedClusteringPct(seed, range);
     }, [seed, clusteringProb]);
 
-    const obsIsAuto = obstacleRatio === "";
+    const obsIsAuto = noGoZoneRatio === "";
     const obsHintStr = seedDerivedObsRatio !== null
         ? String(seedDerivedObsRatio)
-        : autoObstacleRatioHint !== null ? String(autoObstacleRatioHint) : "auto";
+        : autoNoGoZoneRatioHint !== null ? String(autoNoGoZoneRatioHint) : "auto";
     // Blank → show auto hint as placeholder; after Generate, replace hint with the actual picked value
     const obsPlaceholder = obsIsAuto
         ? (lastPickedObsValue !== null ? String(lastPickedObsValue) : obsHintStr)
@@ -113,7 +113,7 @@ function CanvasGeneratorFloatingControl() {
     const {
         isRequiredFieldsValid,
         cellSizeFitError,
-        obstacleRatioError,
+        noGoZoneRatioError,
         clusteringError,
         hasAnyRangeFieldError,
         canGenerate,
@@ -121,7 +121,7 @@ function CanvasGeneratorFloatingControl() {
         width,
         height,
         cellSize,
-        obstacleRatio,
+        noGoZoneRatio,
         clusteringProb,
         hasObsLeftField,
         hasClustLeftField,
@@ -129,16 +129,16 @@ function CanvasGeneratorFloatingControl() {
         width,
         height,
         cellSize,
-        obstacleRatio,
+        noGoZoneRatio,
         clusteringProb,
         hasObsLeftField,
         hasClustLeftField,
     ]);
 
     const generatorSystemValidation = useMemo(() => validateGeneratorSystemParams({
-        format: env.format,
-        coordSystem: env.coordSystem,
-    }), [env.format, env.coordSystem]);
+        format: map.format,
+        coordSystem: map.coordSystem,
+    }), [map.format, map.coordSystem]);
 
     const systemParamsError = generatorSystemValidation.error;
     const isSystemParamsCompatible = generatorSystemValidation.ok;
@@ -169,7 +169,7 @@ function CanvasGeneratorFloatingControl() {
             setWidth(saved.values.width);
             setHeight(saved.values.height);
             setCellSize(saved.values.cellSize);
-            setObstacleRatio(saved.values.obstacleRatio);
+            setNoGoZoneRatio(saved.values.obstacleRatio);
             setClusteringProb(saved.values.clusteringProb);
             setSeed(saved.values.seed);
             setLastSeedHex(saved.values.lastSeedHex);
@@ -193,7 +193,7 @@ function CanvasGeneratorFloatingControl() {
                     width,
                     height,
                     cellSize,
-                    obstacleRatio,
+                    obstacleRatio: noGoZoneRatio,
                     clusteringProb,
                     seed,
                     lastSeedHex,
@@ -209,18 +209,18 @@ function CanvasGeneratorFloatingControl() {
         width,
         height,
         cellSize,
-        obstacleRatio,
+        noGoZoneRatio,
         clusteringProb,
         seed,
         lastSeedHex,
     ]);
 
-    function handleClearEnvironment() {
+    function handleClearMap() {
         const snapshot = [...objects];
         snapshot.forEach((o) => deleteObject(o));
-        deletePoint(envId, "start_end");
-        deletePoint(envId, "start");
-        deletePoint(envId, "end");
+        deletePoint(mapId, "start_end");
+        deletePoint(mapId, "start");
+        deletePoint(mapId, "end");
     }
 
     async function handleGenerate(): Promise<boolean> {
@@ -232,67 +232,67 @@ function CanvasGeneratorFloatingControl() {
         const w = parseFloat(width);
         const h = parseFloat(height);
         const cs = parseFloat(cellSize);
-        const obRatio = parseRangeFieldValue(obstacleRatio);
+        const obRatio = parseRangeFieldValue(noGoZoneRatio);
         const clusteringProbVal = parseRangeFieldValue(clusteringProb);
 
         const snapshot = [...objects];
         snapshot.forEach((o) => deleteObject(o));
 
-        const compliantResult = generateCompliantEnvironment({
+        const compliantResult = generateCompliantMap({
             width: w,
             height: h,
             cellSize: cs,
-            obstacleRatio: obRatio,
+            noGoZoneRatio: obRatio,
             clusteringProb: clusteringProbVal,
             seed,
             systemParams: {
-                format: env.format,
-                type: env.type,
-                coordSystem: env.coordSystem,
+                format: map.format,
+                type: map.type,
+                coordSystem: map.coordSystem,
             },
         });
 
         if (!compliantResult.ok) return false;
 
-        const generatedEnv = compliantResult.value.environment;
+        const generatedMap = compliantResult.value.map;
         const generatedObjectType = compliantResult.value.objectType;
 
         // Update auto-hints so placeholders reflect the values actually used
-        if (obRatio === undefined) setAutoObstacleRatioHint(generatedEnv.usedObstacleRatioPct);
-        if (clusteringProbVal === undefined) setAutoClusteringHint(generatedEnv.usedClusteringPct);
-        setLastSeedHex(generatedEnv.usedSeedHex);
+        if (obRatio === undefined) setAutoNoGoZoneRatioHint(generatedMap.usedNoGoZoneRatioPct);
+        if (clusteringProbVal === undefined) setAutoClusteringHint(generatedMap.usedClusteringPct);
+        setLastSeedHex(generatedMap.usedSeedHex);
 
         // Capture the randomly picked values for inline display.
-        // Use env.pickedObstacleRatioPct / env.pickedClusteringPct (the value actually selected
+        // Use generatedMap.pickedNoGoZoneRatioPct / generatedMap.pickedClusteringPct (the value actually selected
         // from the user's range) rather than the final achieved ratio, which can diverge from the
         // requested range due to the percolation staircase behaviour.
         const seedWasRandomlyGenerated = !seed.trim();
 
-        if (generatedEnv.pickedObstacleRatioPct !== null) {
+        if (generatedMap.pickedNoGoZoneRatioPct !== null) {
             // Range mode: show the value picked from the range
-            setLastPickedObsValue(generatedEnv.pickedObstacleRatioPct);
+            setLastPickedObsValue(generatedMap.pickedNoGoZoneRatioPct);
         } else if (seedWasRandomlyGenerated && obRatio === undefined) {
             // Auto mode with random seed: show the actual achieved ratio
-            setLastPickedObsValue(generatedEnv.usedObstacleRatioPct);
+            setLastPickedObsValue(generatedMap.usedNoGoZoneRatioPct);
         } else {
             setLastPickedObsValue(null);
         }
 
-        if (generatedEnv.pickedClusteringPct !== null) {
+        if (generatedMap.pickedClusteringPct !== null) {
             // Range mode: show the value picked from the range
-            setLastPickedClustValue(generatedEnv.pickedClusteringPct);
+            setLastPickedClustValue(generatedMap.pickedClusteringPct);
         } else if (seedWasRandomlyGenerated && clusteringProbVal === undefined) {
             // Auto mode with random seed: show the actual achieved ratio
-            setLastPickedClustValue(generatedEnv.usedClusteringPct);
+            setLastPickedClustValue(generatedMap.usedClusteringPct);
         } else {
             setLastPickedClustValue(null);
         }
 
-        addObject(OBJECT_CATEGORY.ZONE, generatedEnv.boundary, generatedObjectType);
-        for (const obs of generatedEnv.obstacles) {
-            addObject(OBJECT_CATEGORY.OBSTACLE, obs, generatedObjectType);
+        addObject(ZONE_CATEGORY.MOWING, generatedMap.boundary, generatedObjectType);
+        for (const obs of generatedMap.noGoZones) {
+            addObject(ZONE_CATEGORY.NO_GO, obs, generatedObjectType);
         }
-        await upsertPoint(envId, "start_end", generatedEnv.startEndPoint);
+        await upsertPoint(mapId, "start_end", generatedMap.startEndPoint);
         return true;
     }
 
@@ -347,10 +347,10 @@ function CanvasGeneratorFloatingControl() {
                 </div>
             </div>
             <FloatingControlRangeField
-                label="Obstacle ratio (%)"
-                value={obstacleRatio}
+                label="No-go zone ratio (%)"
+                value={noGoZoneRatio}
                 onChange={(v) => {
-                    setObstacleRatio(v);
+                    setNoGoZoneRatio(v);
                     setLastPickedObsValue(null);
                 }}
                 onFocus={() => setHasObsLeftField(false)}
@@ -359,7 +359,7 @@ function CanvasGeneratorFloatingControl() {
                 max={100}
                 placeholder={obsPlaceholder}
                 pickedValue={obsIsAuto ? null : lastPickedObsValue}
-                error={obstacleRatioError}
+                error={noGoZoneRatioError}
             />
             <FloatingControlRangeField
                 label="Clustering prob. (%)"
@@ -385,12 +385,12 @@ function CanvasGeneratorFloatingControl() {
             <div className="mx-3 my-1 border-t border-gray-300" />
             {systemParamsError && (
                 <div className="mx-3 mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-700">
-                    {systemParamsError} Current values: Format = {ENV_FORMAT_OPTIONS.find((opt) => opt.value === env.format)?.label ?? env.format}, Coordinate System = {COORD_SYSTEM_OPTIONS.find((opt) => opt.value === env.coordSystem)?.label ?? env.coordSystem}.
+                    {systemParamsError} Current values: Format = {MAP_FORMAT_OPTIONS.find((opt) => opt.value === map.format)?.label ?? map.format}, Coordinate System = {COORD_SYSTEM_OPTIONS.find((opt) => opt.value === map.coordSystem)?.label ?? map.coordSystem}.
                 </div>
             )}
             <FloatingControlButton
-                label="Clear Environment"
-                onClick={handleClearEnvironment}
+                label="Clear Map"
+                onClick={handleClearMap}
             />
             <FloatingControlMainButton
                 label="Generate"

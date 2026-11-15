@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Object } from "@/data/local/schemaTypes";
+import type { Zone } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore } from "./canvasObjectStore";
 
 // ---------------------------------------------------------------------------
@@ -7,7 +7,7 @@ import { useCanvasObjectStore } from "./canvasObjectStore";
 // ---------------------------------------------------------------------------
 
 interface CanvasSnapshot {
-    objects: Object[];
+    objects: Zone[];
 }
 
 // ---------------------------------------------------------------------------
@@ -19,8 +19,8 @@ function diffSnapshots(
     from: CanvasSnapshot,
     to: CanvasSnapshot,
 ): {
-    dirtyObjects: Object[];
-    deletedObjects: Object[];
+    dirtyObjects: Zone[];
+    deletedObjects: Zone[];
 } {
     const fromObjectMap = new Map(from.objects.map((o) => [o.id, o]));
     const toObjectIds = new Set(to.objects.map((o) => o.id));
@@ -63,7 +63,7 @@ interface CanvasHistoryState {
     beginBatch: () => void;
     /** Commits the batched changes as a single history entry. No-op if nothing changed. */
     endBatch: () => void;
-    /** Clears all undo/redo history. Call after loading or resetting a workspace. */
+    /** Clears all undo/redo history. Call after loading or resetting a map. */
     resetHistory: () => void;
 }
 

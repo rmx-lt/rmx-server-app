@@ -3,7 +3,7 @@
 //   - Users live in the users table, with an Argon2id password hash. There is
 //     no sign-up: users are created on the server with
 //     `rmx-server create-user <name>` (see CreateUser).
-//   - Login (POST /app/api/auth/login) checks the password and creates a row
+//   - Login (POST /api/auth/login) checks the password and creates a row
 //     in sessions. The browser gets a random 256-bit token in an HttpOnly
 //     cookie; the database keeps only its SHA-256.
 //   - Every protected request (REST and the WebSocket handshake) sends the

@@ -1,20 +1,37 @@
 import { useEffect } from "react";
-import { useCanvasObjectStore, selectIsDirty } from "@/features/canvas-editing/stores/canvasObjectStore";
-import { saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
-import { getSaveMode } from "@/model/saveModeStore";
+import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
+import { requestAutosave } from "@/features/canvas-editing/data/canvasBridge";
+import { useMapStore } from "@/model/mapStore";
+import { useLayerSettingsStore } from "@/model/layerSettingsStore";
+import { useMapPointStore } from "@/model/mapPointStore";
+import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 
 /**
- * Subscribes to canvas object changes and triggers an autosave whenever the
- * canvas becomes dirty and the save mode is "autosave".
+ * Asks for an autosave whenever the open map changes (canvas objects, map
+ * fields, layer settings, route points, its geo anchor). The save itself is
+ * debounced and runs only while the save mode is "autosave".
  *
  * Mount once inside `CanvasEditor` or a similar root canvas component.
  */
 export function useCanvasAutosave(): void {
     useEffect(() => {
-        return useCanvasObjectStore.subscribe((state, prev) => {
-            if (selectIsDirty(state) && !selectIsDirty(prev) && getSaveMode() === "autosave") {
-                saveCanvas().catch(console.error);
-            }
-        });
+        const unsubscribes = [
+            useCanvasObjectStore.subscribe((s, prev) => {
+                if (s.dirtyObjects !== prev.dirtyObjects || s.deletedObjects !== prev.deletedObjects) requestAutosave();
+            }),
+            useMapStore.subscribe((s, prev) => {
+                if (s.isMapDirty && s.map !== prev.map) requestAutosave();
+            }),
+            useLayerSettingsStore.subscribe((s, prev) => {
+                if (s.isLayerSettingsDirty && s.layers !== prev.layers) requestAutosave();
+            }),
+            useMapPointStore.subscribe((s, prev) => {
+                if (s.isMapPointsDirty && s !== prev) requestAutosave();
+            }),
+            useGeoAnchorStore.subscribe((s, prev) => {
+                if (s.isMapGeoAnchorDirty && s.mapDraft !== prev.mapDraft) requestAutosave();
+            }),
+        ];
+        return () => unsubscribes.forEach((u) => u());
     }, []);
 }

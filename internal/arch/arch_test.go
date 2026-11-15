@@ -47,12 +47,14 @@ var layers = map[string]layer{
 
 	"internal/auth":     domain,
 	"internal/firmware": domain,
+	"internal/planning": domain,
 
 	"internal/app":         root,
 	"internal/integration": root,
 
 	"cmd/rmx-server": command,
 	"cmd/gen-ts":     command,
+	"cmd/devsim":     command,
 
 	"internal/arch": meta,
 }
@@ -61,6 +63,7 @@ var layers = map[string]layer{
 var commandImports = map[string]string{
 	"cmd/rmx-server": "internal/app",
 	"cmd/gen-ts":     "internal/api",
+	"cmd/devsim":     "internal/config", // only LoadDotenv
 }
 
 // allowed reports whether a package in from may import a package in to.
@@ -83,13 +86,14 @@ func allowed(fromPkg string, from, to layer, toPkg string) bool {
 // fences: third-party modules only some packages may import. A file may
 // import a fenced module only if its package is listed, or (for pgx) if the
 // file is a domain's store.go. The integration tests are exempt: they play the
-// browser (WebSocket client) and the devices (MQTT client).
+// browser (WebSocket client) and the devices (MQTT client). cmd/devsim plays a
+// device too, so it may use paho.
 var fences = []struct {
 	module    string
 	packages  []string
 	storeFile bool
 }{
-	{"github.com/eclipse/paho.golang", []string{"internal/mqtt"}, false},
+	{"github.com/eclipse/paho.golang", []string{"internal/mqtt", "cmd/devsim"}, false},
 	{"github.com/coder/websocket", []string{"internal/ws"}, false},
 	{"github.com/jackc/pgx", []string{"internal/db"}, true},
 	{"github.com/pressly/goose", []string{"internal/db"}, false},

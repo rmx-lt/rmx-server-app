@@ -82,8 +82,8 @@ export default defineConfig(
   },
 
   // ---- Who may import what -------------------------------------------------
-  // dexie only in data/local; the generated wire types only in data/ (the
-  // rest of the app imports the types data/api exports).
+  // The generated wire types only in data/ (the rest of the app imports the
+  // types data/api exports).
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/data/**"],
@@ -91,7 +91,6 @@ export default defineConfig(
       "no-restricted-imports": [
         "error",
         {
-          paths: [{ name: "dexie", message: "Only src/data/local imports Dexie; use its queries." }],
           patterns: [
             {
               group: ["@/data/api/generated", "@/data/api/generated/*", "**/data/api/generated", "**/data/api/generated/*"],
@@ -99,16 +98,6 @@ export default defineConfig(
             },
           ],
         },
-      ],
-    },
-  },
-  {
-    files: ["src/data/**/*.{ts,tsx}"],
-    ignores: ["src/data/local/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        { paths: [{ name: "dexie", message: "Only src/data/local imports Dexie; use its queries." }] },
       ],
     },
   },

@@ -3,19 +3,19 @@ import type { ShortcutBindingConfig, ShortcutDisplayConfig } from "@/config/shor
 export type { ShortcutBindingConfig, ShortcutDisplayConfig };
 
 export const WORKBENCH_SHORTCUTS = {
-    "workspace.new": {
+    "map.new": {
         keys: "Ctrl+Alt+N",
         shortcut: ["Ctrl", "Alt", "N"],
     } satisfies ShortcutBindingConfig,
-    "workspace.save-as": {
+    "map.save-as": {
         keys: "Ctrl+Shift+S",
         shortcut: ["Ctrl", "Shift", "S"],
     } satisfies ShortcutBindingConfig,
-    "workspace.open": {
+    "map.open": {
         keys: "Ctrl+O",
         shortcut: ["Ctrl", "O"],
     } satisfies ShortcutBindingConfig,
-    "workspace.save": {
+    "map.save": {
         keys: "Ctrl+S",
         shortcut: ["Ctrl", "S"],
     } satisfies ShortcutBindingConfig,
@@ -41,11 +41,11 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "S",
         shortcut: ["S"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-zone": {
+    "canvas.tool-add-mowing-zone": {
         keys: "Z",
         shortcut: ["Z"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-obstacle": {
+    "canvas.tool-add-no-go-zone": {
         keys: "O",
         shortcut: ["O"],
     } satisfies ShortcutBindingConfig,

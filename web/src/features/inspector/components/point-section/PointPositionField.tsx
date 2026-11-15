@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { useEnvPointStore } from "@/model/envPointStore";
-import { useEnvStore } from "@/model/envStore";
+import { useMapPointStore } from "@/model/mapPointStore";
+import { useMapStore } from "@/model/mapStore";
 import {
     formatNumber,
     unitLabel,
@@ -20,12 +20,10 @@ function CoordInput({
     unit: UnitOfMeasure;
     onCommit: (v: number) => void;
 }) {
-    const [local, setLocal] = useState(formatNumber(baseValue, 2));
-    const [isFocused, setIsFocused] = useState(false);
-
-    useEffect(() => {
-        if (!isFocused) setLocal(formatNumber(baseValue, 2));
-    }, [baseValue, isFocused]);
+    // The text being edited while the input has focus; null shows `baseValue`.
+    const [draft, setDraft] = useState<string | null>(null);
+    const isFocused = draft !== null;
+    const local = draft ?? formatNumber(baseValue, 2);
 
     const isFloated = local !== "" || isFocused;
 
@@ -49,10 +47,10 @@ function CoordInput({
             <input
                 type="number"
                 value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                onFocus={() => setIsFocused(true)}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={() => setDraft(formatNumber(baseValue, 2))}
                 onBlur={() => {
-                    setIsFocused(false);
+                    setDraft(null);
                     commit();
                 }}
                 onKeyDown={(e) => {
@@ -68,26 +66,26 @@ function CoordInput({
 export default function PointPositionField() {
     const selectedObject = useCanvasSelectionStore((s) => s.selectedObject);
     const selectedVertexRefs = useCanvasSelectionStore((s) => s.selectedVertexRefs);
-    const selectedEnvPointType = useCanvasSelectionStore((s) => s.selectedEnvPointType);
-    const startPoint = useEnvPointStore((s) => s.startPoint);
-    const endPoint = useEnvPointStore((s) => s.endPoint);
-    const startEndPoint = useEnvPointStore((s) => s.startEndPoint);
-    const upsertPoint = useEnvPointStore((s) => s.upsertPoint);
+    const selectedMapPointType = useCanvasSelectionStore((s) => s.selectedMapPointType);
+    const startPoint = useMapPointStore((s) => s.startPoint);
+    const endPoint = useMapPointStore((s) => s.endPoint);
+    const startEndPoint = useMapPointStore((s) => s.startEndPoint);
+    const upsertPoint = useMapPointStore((s) => s.upsertPoint);
     const objects = useCanvasObjectStore((s) => s.objects);
     const moveVertexAt = useCanvasObjectStore((s) => s.moveVertexAt);
     const finalizeVertexMoveAt = useCanvasObjectStore((s) => s.finalizeVertexMoveAt);
-    const envId = useEnvStore((s) => s.env.id);
+    const mapId = useMapStore((s) => s.map.id);
     const selectedUnit = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
     const xLabel = unitLabel(selectedUnit) ? `X (${unitLabel(selectedUnit)})` : "X";
     const yLabel = unitLabel(selectedUnit) ? `Y (${unitLabel(selectedUnit)})` : "Y";
 
-    if (selectedEnvPointType) {
-        const envPointType = selectedEnvPointType;
+    if (selectedMapPointType) {
+        const mapPointType = selectedMapPointType;
         const currentPoint =
-            envPointType === "start"
+            mapPointType === "start"
                 ? startPoint
-                : envPointType === "end"
+                : mapPointType === "end"
                     ? endPoint
                     : startEndPoint;
         if (!currentPoint) return null;
@@ -95,11 +93,11 @@ export default function PointPositionField() {
         const { x, y } = currentPoint.point;
 
         function commitX(newX: number) {
-            upsertPoint(envId, envPointType, { x: newX, y });
+            upsertPoint(mapId, mapPointType, { x: newX, y });
         }
 
         function commitY(newY: number) {
-            upsertPoint(envId, envPointType, { x, y: newY });
+            upsertPoint(mapId, mapPointType, { x, y: newY });
         }
 
         return (

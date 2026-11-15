@@ -51,7 +51,7 @@ const (
 	origin   = "http://app.test"
 	user     = "tester"
 	password = "correct horse battery staple"
-	cookie   = "__Secure-app_session"
+	cookie   = "__Host-app_session"
 )
 
 func TestMain(m *testing.M) {
@@ -212,7 +212,7 @@ func (a *testApp) shutdown() {
 	}
 }
 
-func (a *testApp) url(path string) string { return a.base + "/app" + path }
+func (a *testApp) url(path string) string { return a.base + path }
 
 func (a *testApp) waitHealthy() {
 	deadline := time.Now().Add(wait)
@@ -230,7 +230,7 @@ func (a *testApp) waitHealthy() {
 	}
 }
 
-// login does POST /app/api/auth/login from an allowed origin, without a cookie.
+// login does POST /api/auth/login from an allowed origin, without a cookie.
 func (a *testApp) login(username, pw string) *http.Response {
 	a.t.Helper()
 	return a.loginAs(a.anon, username, pw)

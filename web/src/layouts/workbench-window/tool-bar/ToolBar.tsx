@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import UiControlsButton from "@/features/ui-manager/components/tool-bar/UiControlsButton";
-import AddZoneButton from "@/features/canvas-editing/components/tool-bar/AddZoneButton";
-import AddObstacleButton from "@/features/canvas-editing/components/tool-bar/AddObstacleButton";
+import AddMowingZoneButton from "@/features/canvas-editing/components/tool-bar/AddMowingZoneButton";
+import AddNoGoZoneButton from "@/features/canvas-editing/components/tool-bar/AddNoGoZoneButton";
 import AddStartPointButton from "@/features/canvas-editing/components/tool-bar/AddStartPointButton";
 import AddEndPointButton from "@/features/canvas-editing/components/tool-bar/AddEndPointButton";
 import AddStartEndPointButton from "@/features/canvas-editing/components/tool-bar/AddStartEndPointButton";
@@ -52,8 +52,8 @@ export default function ToolBar() {
 
   // derived
   const isSelectActive = activeTool === "select";
-  const isAddZoneActive = activeTool === "addZone";
-  const isAddObstacleActive = activeTool === "addObstacle";
+  const isAddMowingZoneActive = activeTool === "addMowingZone";
+  const isAddNoGoZoneActive = activeTool === "addNoGoZone";
   const isAddStartPointActive = activeTool === "addStartPoint";
   const isAddEndPointActive = activeTool === "addEndPoint";
   const isAddStartEndPointActive = activeTool === "addStartEndPoint";
@@ -66,14 +66,14 @@ export default function ToolBar() {
     setActiveTool(isSelectActive ? null : "select");
   }
 
-  function handleAddZone() {
+  function handleAddMowingZone() {
     cancelDrawing();
-    setActiveTool(isAddZoneActive ? null : "addZone");
+    setActiveTool(isAddMowingZoneActive ? null : "addMowingZone");
   }
 
-  function handleAddObstacle() {
+  function handleAddNoGoZone() {
     cancelDrawing();
-    setActiveTool(isAddObstacleActive ? null : "addObstacle");
+    setActiveTool(isAddNoGoZoneActive ? null : "addNoGoZone");
   }
 
   function handleAddStartPoint() {
@@ -176,25 +176,25 @@ export default function ToolBar() {
       buttonCount: 2,
       buttons: (
         <>
-          <AddZoneButton />
-          <AddObstacleButton />
+          <AddMowingZoneButton />
+          <AddNoGoZoneButton />
         </>
       ),
       trailingSeparator: "thin",
       overflowItems: [
         {
-          id: "add-zone",
+          id: "add-mowing-zone",
           icon: "rectangle_add",
-          label: "Add Zone",
-          isActive: isAddZoneActive,
-          onClick: handleAddZone,
+          label: "Add Mowing Zone",
+          isActive: isAddMowingZoneActive,
+          onClick: handleAddMowingZone,
         },
         {
-          id: "add-obstacle",
+          id: "add-no-go-zone",
           icon: "add_triangle",
-          label: "Add Obstacle",
-          isActive: isAddObstacleActive,
-          onClick: handleAddObstacle,
+          label: "Add No-Go Zone",
+          isActive: isAddNoGoZoneActive,
+          onClick: handleAddNoGoZone,
         },
       ],
     },

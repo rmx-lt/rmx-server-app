@@ -6,6 +6,10 @@
 # Local settings with passwords (copy .env.example)
 .env
 
+# dev/run.ps1: built binaries and local firmware images
+/.dev/
+/dev/firmware/
+
 # Editors / OS
 .idea
 .DS_Store

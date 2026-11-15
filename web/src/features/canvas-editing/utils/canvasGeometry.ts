@@ -1,12 +1,9 @@
 import polygonClipping from "polygon-clipping";
-import type { Object } from "@/data/local/schemaTypes";
-import { OBJECT_CATEGORY } from "@/config/db-ops/enums";
-import { computePolygonArea } from "@/utils/geometry";
+import type { Zone } from "@/data/planning/schemaTypes";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { computePolygonArea, type Point } from "@/utils/geometry";
 
-export interface Point {
-    x: number;
-    y: number;
-}
+export type { Point };
 
 export interface EdgeMidpoint extends Point {
     /** Index of the edge's start vertex (edge goes from vertices[afterIndex] to vertices[afterIndex+1]) */
@@ -42,25 +39,25 @@ function toRing(vertices: Array<{ x: number; y: number }>): [number, number][] {
 
 /**
  * Computes the net area of a zone object: gross area minus the total area of all
- * obstacle polygons that overlap with it (clipped to the zone boundary).
+ * no-go zone polygons that overlap with it (clipped to the zone boundary).
  *
  * Uses the Martinez-Rueda-Feito algorithm (polygon-clipping library) which correctly
  * handles arbitrary concave polygons. Sutherland-Hodgman was replaced because it only
  * works with convex clip polygons.
  *
- * For obstacle objects the concept of "net area" doesn't apply — returns `null`.
+ * For no-go zone objects the concept of "net area" doesn't apply — returns `null`.
  */
 export function computeNetArea(
-    obj: Object,
-    objects: Object[],
+    obj: Zone,
+    objects: Zone[],
 ): number | null {
-    if (obj.category !== OBJECT_CATEGORY.ZONE) return null;
+    if (obj.category !== ZONE_CATEGORY.MOWING) return null;
 
     const zoneRing = toRing(obj.vertices);
 
     let overlapArea = 0;
     for (const o of objects) {
-        if (o.category !== OBJECT_CATEGORY.OBSTACLE) continue;
+        if (o.category !== ZONE_CATEGORY.NO_GO) continue;
         const obstRing = toRing(o.vertices);
 
         const intersection = polygonClipping.intersection([[zoneRing]], [[obstRing]]);

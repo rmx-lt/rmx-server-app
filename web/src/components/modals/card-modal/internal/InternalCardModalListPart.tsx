@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type {
     CardModalListPartColumn,
     CardModalListPartRow,
@@ -91,11 +91,12 @@ export default function InternalCardModalListPart({
         onClearSelection: () => onSelectedRowIdsChange?.([]),
     });
 
-    useEffect(() => {
-        if (!editable) {
-            setEditingCell(null);
-        }
-    }, [editable]);
+    // Leaving edit mode drops the cell being edited (adjusted during render, not in an effect).
+    const [prevEditable, setPrevEditable] = useState(editable);
+    if (editable !== prevEditable) {
+        setPrevEditable(editable);
+        if (!editable) setEditingCell(null);
+    }
 
     const recordActions = useMemo(
         () => getRecordActionsForRow(rows ?? [], openMenuRowId),

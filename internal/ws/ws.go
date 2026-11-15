@@ -1,4 +1,4 @@
-// Package ws is the WebSocket transport at /app/ws: the connections
+// Package ws is the WebSocket transport at /ws: the connections
 // (keep-alive, session re-check, close codes, shutdown), the routing of each
 // request op to its handler, and the push of server events to every open
 // socket. It is the only package that imports coder/websocket.

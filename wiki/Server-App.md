@@ -17,6 +17,7 @@ and ported to Go in November 2026, when the backend language was decided
 - [How it works](#how-it-works)
 - [Firmware over MQTT](#firmware-over-mqtt)
 - [Login and sessions](#login-and-sessions)
+- [Planning API](#planning-api)
 - [Web app](#web-app)
 - [Repository layout](#repository-layout)
 - [Local development](#local-development)
@@ -29,7 +30,7 @@ and ported to Go in November 2026, when the backend language was decided
 
 ```
 browser ──HTTPS/WSS :443──▶ Caddy ──▶ rmx-server :8080 ──▶ TimescaleDB
-          /app/api, /app/ws                 ▲
+          /api, /ws                         ▲
                                             │ mqtt:1883 (plain, internal)
 device ──MQTT over TLS :8883──────────▶ Mosquitto
 ```
@@ -39,9 +40,10 @@ This is the production layout: **browsers never speak MQTT**. Only devices
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **HTTPS**: login and logout under `/app/api/auth`, `/app/health`, and
-  the built client under `/app/`.
-- **WSS**: `/app/ws`, JSON request/response with a `request_id`. The only
+- **HTTPS**: login and logout under `/api/auth`, the user's maps
+  and settings under `/api/maps` and `/api/settings` (see [Planning API](#planning-api)), `/health`,
+  and the built client at `/`.
+- **WSS**: `/ws`, JSON request/response with a `request_id`. The only
   request today is `ping`; the connection (session check, keep-alive, close
   codes) is what later features build on.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
@@ -62,6 +64,8 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
+| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, points, layer settings and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 
 The first migrations still create the old `records` and `record_events`
 tables; a later one drops them, so every database runs the same sequence.
@@ -86,16 +90,16 @@ REST:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/app/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
-| GET | `/app/api/auth/me` | | 200 `{"username"}` / 401 |
-| POST | `/app/api/auth/logout` | | 204, clears the cookie (also without a session) |
-| POST | `/app/api/auth/logout-all` | | 204: ends every session of the user |
+| POST | `/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
+| GET | `/api/auth/me` | | 200 `{"username"}` / 401 |
+| POST | `/api/auth/logout` | | 204, clears the cookie (also without a session) |
+| POST | `/api/auth/logout-all` | | 204: ends every session of the user |
 
-Everything except login, logout and `/app/health` needs the session cookie
+Everything except login, logout and `/health` needs the session cookie
 (else 401). Every request that changes something, and the WebSocket handshake,
 needs an allowed `Origin` (else 403).
 
-Errors: `{"code": "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests", "message": "..."}`.
+Errors: `{"code": "bad_request" | "not_found" | "internal" | "unauthorized" | "forbidden" | "too_many_requests" | "conflict", "message": "..."}`.
 
 The WebSocket carries one envelope:
 
@@ -296,17 +300,17 @@ How the app logs people in. Code: `internal/auth/` and
 
 ```
 browser                                   rmx-server                       TimescaleDB
-  │ POST /app/api/auth/login {user,pw}       │                                 │
+  │ POST /api/auth/login {user,pw}           │                                 │
   │ ───────────────────────────────────────▶ │ Argon2id check (slow, 19 MiB)   │
   │                                          │ token = 32 random bytes         │
   │                                          │ INSERT sessions(sha256(token))  │──▶
-  │ ◀── Set-Cookie: __Secure-app_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/app
+  │ ◀── Set-Cookie: __Host-app_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/
   │                                          │                                 │
-  │ GET /app/api/auth/me  (the browser adds the cookie)                        │
-  │ GET /app/ws + Upgrade (the cookie too)   │ look up sha256(cookie):         │
+  │ GET /api/auth/me  (the browser adds the cookie)                            │
+  │ GET /ws + Upgrade (the cookie too)       │ look up sha256(cookie):         │
   │ ───────────────────────────────────────▶ │ exists, not idle, not expired?  │──▶
   │ ◀── 200 / 101 Switching Protocols, or 401                                  │
-  │ POST /app/api/auth/logout                │ DELETE the row                  │──▶
+  │ POST /api/auth/logout                    │ DELETE the row                  │──▶
 ```
 
 **Why a session cookie, and not basic auth or a token in JavaScript**
@@ -338,14 +342,14 @@ browser                                   rmx-server                       Times
 | `HttpOnly` | yes | Scripts can't read the cookie. |
 | `Secure` | yes | HTTPS only. (Browsers treat `http://localhost` as secure, so local development works.) |
 | `SameSite` | **Strict** | The cookie is never sent on requests that another site starts, so a foreign page can't use it (CSRF). Lax would also send it when someone follows a link here from another site; we don't need that, because the page (static files) is public and only its own same-site API calls need the cookie. |
-| `Path` | `/app` | The app shares `api.rmx.lt` with other services; its cookie stays under `/app`. |
-| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. If the app ever gets an origin of its own, it should use `__Host-session; Path=/`. |
+| `Path` | `/` | The app has its own host, `app.rmx.lt`, so the whole host is the app. The `__Host-` prefix requires `Path=/`. |
+| Prefix | `__Host-` (`__Host-app_session`) | Browsers accept such a cookie only with `Secure`, from an HTTPS page, with `Path=/` and without `Domain=`. So plain HTTP can't set or overwrite it, and another host under `rmx.lt` can't plant a cookie with the same name that would be sent here. If a request still carries our cookie name twice, the server treats it as logged out rather than guess which one is real. |
 | CSRF | SameSite **plus** an `Origin` check | SameSite works per *site* (all of `rmx.lt`), and not every browser enforces it. Every request that isn't GET/HEAD/OPTIONS, and every WebSocket handshake, must have an `Origin` from `ALLOWED_ORIGINS`, or it gets 403. The login too (no "log the victim into the attacker's account"). WebSockets matter most: CORS doesn't cover them, so without this any website could open one with the user's cookie ("cross-site WebSocket hijacking"). |
 | Password guessing | in-memory backoff per username and per IP | 5 free failures per username (20 per IP), then 1 s, 2 s, 4 s … up to 15 min; while waiting, even the right password gets 429. Unknown usernames are checked against a dummy hash, so they take as long and get the same answer. A restart forgets the counters; several instances would need a shared store. |
 | Client IP | last `X-Forwarded-For` entry, else the TCP peer | Caddy sets that header; the app's port is not published, so only Caddy reaches it. |
 | Caching | `Cache-Control: no-store` behind the login | No copy of user data in a shared cache, or in the back button after logout. |
 
-**What's public:** `/app/health` (only up/down and the version, for the
+**What's public:** `/health` (only up/down and the version, for the
 deploy script and monitoring), login and logout, and the web app's static files
 (the same code as in this repository, no data). The router (`internal/httpx`)
 has only two ways to add a route, `Public()` and `Protected()`, and every
@@ -384,30 +388,107 @@ docker compose exec -T app /app/rmx-server create-user admin < password-file
 Usernames: 1–32 characters `a-z 0-9 . _ -`, case-insensitive. Passwords:
 12–256 characters. There is no default user and no default password.
 
+## Planning API
+
+Where the web app keeps what users plan: their maps and their settings, per
+user. Code: `internal/planning/`, wire types in `internal/api/planning.go`
+(generated to `web/src/data/api/generated/`). All routes need a session;
+another user's map answers 404, as if it did not exist.
+
+**Names.** A **map** is one garden or site, drawn on the canvas. Its
+polygons are **zones**, each with a category:
+
+| Category | Meaning |
+|---|---|
+| `mowing` | mow it |
+| `no_go` | never enter: trees, beds, ponds, anything fixed the mower must avoid |
+| `navigation` | drive through without mowing: paths between lawns, the way to the dock |
+
+These follow other robot mower apps (Husqvarna: work area, stay-out zone,
+transport path; Mammotion: task area, no-go zone, channel; OpenMowerNext:
+operation, exclusion and navigation areas). In those apps a drawn no-go zone
+is how a fixed obstacle is mapped; "obstacle" means what the mower's sensors
+find while driving.
+
+| Route | Body → answer |
+|---|---|
+| `GET /api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
+| `POST /api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
+| `GET /api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
+| `PUT /api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
+| `DELETE /api/maps/{id}` | → 204 |
+| `GET /api/settings` | → `SettingList` {settings: [{key, value}]}, sorted by key |
+| `PUT /api/settings/{key}` | `SettingValue` {value: any JSON but null} → 204 |
+| `DELETE /api/settings/{key}` | → 204, also when the key was not set |
+
+The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
+shadow JavaScript's `Map`.
+
+**One document per map.** The client loads and saves a map as a whole, so
+its content is one JSON document (`MapDoc`): format, type, coordinate
+system, headland, `zones` (id, category, type, vertices), `points` (at most
+one each of `start`, `end`, `start_end`), `layer_settings` (layer id,
+setting id, value) and `geo_anchor` (WGS-84 of the canvas origin, or null).
+Missing lists come back as empty arrays.
+
+**Revisions instead of last-write-wins.** Every save names the revision it
+started from. If another browser saved in between, the save is refused with
+409 and the client has to reload; nothing is overwritten silently.
+
+**Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
+spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
+1000 layer settings of at most 4096 characters each, a geo anchor inside
+±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
+at most 16 KiB of JSON, at most 100 settings per user.
+
 ## Web app
 
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
-`65d23b7` (rmx-server-app#51): draw an environment (zones, obstacles, start and
+`65d23b7` (rmx-server-app#51): draw a map (mowing zones, no-go zones, start and
 end points) on a canvas, inspect it, and save it. It opens on the login form
 when there is no session; after login the workbench loads, with the user menu
 (log out, log out everywhere) at the right of its header. While logged in the
-app keeps the WebSocket open; when it closes, the app asks `/app/api/auth/me`
+app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
 whether the session still exists and shows the login form if not.
 
-- **Data stays in the browser.** Environments, objects, layers and settings are
-  stored in IndexedDB through Dexie (database name `blade-terminal`, code in
-  `web/src/data/local/`), per browser profile, not on the server. Moving them
-  to the server is rmx-server-app#53.
-- **Saving.** The status bar shows the save state; File → Save (Ctrl+S) or a
-  click on "Unsaved changes" saves. A page load starts a new blank environment;
-  saved ones open with File → Open (Ctrl+O).
+- **Data lives on the server.** Each user's maps and settings are stored by the
+  [Planning API](#planning-api), so they follow the user to any browser. Code:
+  `web/src/data/planning/` (the API client is `web/src/data/api/planning.ts`).
+  The browser keeps no planning data; the IndexedDB database `blade-terminal`
+  of earlier versions is deleted at login, without import. The UI and the code
+  use the server's names: map, mowing zone, no-go zone, and the zone
+  categories `mowing` and `no_go` as they are, with no translation
+  ([rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82)).
+  The web app can't draw navigation zones yet
+  ([rmx-server-app#81](https://github.com/rmx-lt/rmx-server-app/issues/81)), so
+  `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
+  and writes them back unchanged on every save (renumbered if a drawn zone took
+  their id).
+- **XML files.** File → Export writes the open map as XML, File → Import reads
+  one into a new map. The root `<map>` holds `<info>` (name, format, type,
+  coordinate system, headland), `<zones>` (one `<zone>` each, categories
+  `mowing` and `no_go`), `<points>` and `<geoAnchor>`. Files of earlier
+  versions (root `<workspace>`, categories `zone` and `obstacle`) are not
+  read: the import says which element or value it expected.
+- **Saving.** A save sends the whole map. The status bar shows the save state;
+  File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
+  starts a new blank map, which gets its id from the server on its first save;
+  saved ones open with File → Open (Ctrl+O), which can also reopen the open map
+  to get the server's version. With File → Autosave on, the map is saved one
+  second after the last change. When the map was saved elsewhere in between,
+  the save is refused (409) and a message says to use Save As or reopen it;
+  nothing is overwritten. The browser warns before leaving while a change is
+  not on the server yet.
+- **Settings.** UI preferences (unit of measure, floating panels) and the
+  default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
+  read once per login. The layers and the setup of their settings are
+  constants in `web/src/data/planning/layerRegistry.ts`; each map stores only
+  its layer setting values.
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
-  monitor feature, and the only `fetch` calls go to the app's own `/app/`
-  API. Schema changes in `web/src/data/local/db.ts` add a `db.version(n)`
-  block (with `upgrade()` where rows change) because browsers hold real data;
-  version 1 is never edited.
+  monitor feature, and the only `fetch` calls go to the app's own
+  API.
 
 ## Repository layout
 
@@ -420,6 +501,8 @@ new domains and the ported blade-terminal client fit without a later move.
 go.mod, go.sum          Go module (go 1.26), staticcheck pinned as a tool
 cmd/rmx-server/         main: serve, healthcheck, user commands (imports app only)
 cmd/gen-ts/             TypeScript generator; reads internal/api only
+cmd/devsim/             simulated gateway for local development (config for .env, paho)
+dev/                    local broker config; run.ps1 starts the whole local environment
 internal/
   app/                  composition root: construct, wire, start/stop, health, static files, CLI
   buildinfo/            Version (the -ldflags target)
@@ -431,7 +514,7 @@ internal/
   httpx/                Router with Public() / Protected() only, JSON helpers
   mqtt/                 broker client, topic grammar <prefix>/<device>/<suffix>, suffix → handler
   ws/                   connections, op → handler routing, event push
-  auth/ firmware/       domains (later: devices, telemetry, commands, planning), files:
+  auth/ firmware/       domains (planning/ too; later: devices, telemetry, commands), files:
                           service.go, store.go (all SQL, takes db.DBTX), http.go, ws.go,
                           mqtt.go (device payloads + topic suffixes), as far as the domain needs them
   integration/          harness (fresh database, own topic prefix, logged-in client)
@@ -451,7 +534,7 @@ with its layer, from `go list`; a package that is not listed fails the test):
   cross-domain need is a small interface declared by the consumer (e.g.
   `commands.DeviceLookup`), satisfied by the other domain and injected by `app`.
 - Only `app` and `integration` import everything. `cmd/rmx-server` imports
-  only `app`, `cmd/gen-ts` only `api`.
+  only `app`, `cmd/gen-ts` only `api`, `cmd/devsim` only `config` (for `.env`).
 - Each table has one owning domain; foreign keys to `devices` / `users` are
   fine, cross-domain queries are not. A cross-domain write uses `db.InTx`
   and passes the transaction to both stores. Events are published after the
@@ -459,7 +542,8 @@ with its layer, from `go list`; a package that is not listed fails the test):
   in the database, not on the bus.
 - Third-party fences: paho only in `mqtt`, coder/websocket only in `ws`, pgx
   (and goose) only in `db` and in the domains' `store.go` files. The
-  integration tests are exempt: they play the browser and the devices.
+  integration tests are exempt: they play the browser and the devices. `cmd/devsim`
+  may use paho too: it plays a device.
 
 Not used, on purpose: several Go modules, `pkg/`, an interface around every
 store, an outbox or external bus, an ORM, OpenAPI, sqlc (for now),
@@ -479,7 +563,7 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
     model/              state several features share
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
-      local/            Dexie schema, row types, queries (the only importer of dexie)
+      planning/         maps (load, save, conversion to the wire format), settings, layer registry
     components/         generic widgets only
     hooks/ utils/ config/ styles/ assets/ testing/
 ```
@@ -495,17 +579,14 @@ eslint-plugin-boundaries):
 - Features don't import other features, except into an allow-list
   (`canvas-editing`, `ui-manager`); anything else they share moves to `model/`.
 - Only `src/data/` imports the generated wire types (`@/data/api/generated`);
-  the rest imports the types `data/api` exports. Only `src/data/local/`
-  imports `dexie`.
+  the rest imports the types `data/api` exports.
 - No `index.ts` re-export files; imports use the `@/` alias; tests sit in
   `__tests__/` next to the code.
 - When data moves between the browser and the server, only `data/` changes.
 
-Lint errors that blade-terminal brought along (layer boundaries and React
-Compiler rules of eslint-plugin-react-hooks) are recorded in
-`web/eslint-suppressions.json` (ESLint bulk suppressions): `bun run lint`
-fails only on new ones. They are burned down in rmx-server-app#66; after
-fixing some, run `bun --bun eslint . --prune-suppressions`.
+The React Compiler rules of eslint-plugin-react-hooks are errors too: derive
+state instead of syncing it in an effect (or adjust it during render when a
+prop changes), and write `ref.current` in an effect, never during render.
 
 ### Other files
 
@@ -518,6 +599,61 @@ Dockerfile                        multi-stage: bun build + go build → distrole
 ## Local development
 
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
+
+**One command** (PowerShell, from the repo):
+
+```powershell
+dev\run.ps1             # stack + Go server + web dev server + simulated device
+dev\run.ps1 -NoSim      # without the simulated device
+dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
+```
+
+Then open <http://localhost:3000/> and log in as `DEV_USER` / `DEV_PASSWORD`
+from `.env` (default `dev` / `dev-password-123`). The script:
+
+- creates `.env` from `.env.example` when it is missing;
+- refuses to start when port 8080 or 3000 is taken (a leftover server would
+  answer instead), and names the process;
+- starts TimescaleDB + Mosquitto (`compose.dev.yaml`; they keep running after
+  Ctrl+C, stop them with `docker compose -f compose.dev.yaml down`);
+- builds `rmx-server` and `devsim` into `.dev/` (gitignored), creates the dev
+  login or resets its password to `DEV_PASSWORD`;
+- runs the web dev server (hot reload), the server and the simulator in one
+  terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
+  `.env` it rebuilds and restarts the server and the simulator; a build error
+  waits for the next save. Ctrl+C stops all three;
+- sets `FIRMWARE_DIR=dev/firmware` (gitignored) when `.env` sets none, so the
+  simulator's `ota` works: drop any `<version>.bin` there.
+
+**Simulated device** (`cmd/devsim`). It behaves like rmx-mower-gateway on the
+local broker, written from the firmware's contract (`remote_cmd.h`, `ota.c`)
+and from [Firmware over MQTT](#firmware-over-mqtt), not from the server code:
+
+- logs in as `test-device` with the client id `<name>` (default `mower-sim`,
+  `DEVSIM_NAME` or `-name`); retained `online` on `mower/<name>/status`, last
+  will `offline`;
+- answers `ping`, `status`, `gps` (a fixed position), `ota` and `restart` on
+  `mower/<name>/cmd` with the firmware's replies and error codes on
+  `mower/<name>/cmd/ack` (`expires_at`, duplicate ids, `busy`, `same_version`,
+  `unknown_cmd`, ...);
+- `ota` downloads the file from the local server chunk by chunk, checks size,
+  SHA-256 and (for a real ESP-IDF image) the version, acks `done`, then
+  "restarts": `offline`, 3 s, `online` with the new version on the other
+  partition, and a retained report on `mower/<name>/firmware`. A test file of
+  any content works; there is no signature check;
+- `go run ./cmd/devsim send <cmd> [key=value ...]` publishes a command as the
+  `app` login and prints the ack(s), like the gateway's `tools/mqtt_cmd.ps1`:
+
+```powershell
+go run ./cmd/devsim send status
+go run ./cmd/devsim send ota version=0.4.0 size=9000   # dev/firmware/0.4.0.bin
+go run ./cmd/devsim -name mower-02                     # a second device
+```
+
+The real board connects only to the VPS broker (port 8884, client
+certificate), so testing with it means a production deploy.
+
+**By hand**, the same steps one by one:
 
 ```powershell
 # 1. Settings: dev-only passwords for the local stack.
@@ -536,7 +672,7 @@ bun run dev
 ```
 
 Create a login once (the dev database keeps it), then open
-<http://localhost:3000/app/> and log in; the workbench loads:
+<http://localhost:3000/> and log in; the workbench loads:
 
 ```powershell
 go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
@@ -560,8 +696,8 @@ installed on the PC):
 **How the dev server works.** `bun run dev` runs `web/dev/server.ts`:
 `Bun.serve` with an HTML import of `public/index.html`, so Bun bundles the app
 on the fly with hot module reloading and Tailwind (`bun-plugin-tailwind` in
-`bunfig.toml`). The same server proxies `/app/api/*`, `/app/health`,
-and the `/app/ws` WebSocket to rmx-server (passing
+`bunfig.toml`). The same server proxies `/api/*`, `/health`,
+and the `/ws` WebSocket to rmx-server (passing
 on the session cookie and `Origin`, which rmx-server checks)
 (`BACKEND_URL`, default `http://127.0.0.1:8080`). The browser sees a
 single origin with the same paths as production, so there is no CORS and no
@@ -582,7 +718,7 @@ docker run --rm -p 8080:8080 `
   rmx-server-app:local
 ```
 
-Then open <http://localhost:8080/app/>.
+Then open <http://localhost:8080/>.
 
 ## Tests and checks
 
@@ -599,7 +735,7 @@ Then open <http://localhost:8080/app/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `firmware_test.go`) start the real
+`app_test.go`, `auth_test.go`, `firmware_test.go`, `planning_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
 ping, a firmware download (every chunk, including a resume from the middle,
@@ -609,7 +745,10 @@ login: wrong
 password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
-fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit.
+fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
+the planning API: a map's create/read/update/delete, zone counts per
+category, the revision conflict, invalid input, that users can't see each
+other's maps, and settings.
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
@@ -650,7 +789,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
   unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
-- `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /app/health`).
+- `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
   a time). `mem_limit: 64m` is enough: the image sets `GOMEMLIMIT=40MiB` so the
@@ -667,7 +806,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `MQTT_PORT` | no | `1883` | default 1883 |
 | `MQTT_USERNAME` | yes | `app` | ACL: readwrite `mower/#` |
 | `MQTT_PASSWORD` | yes | (secret, server-side `.env`) | never logged |
-| `ALLOWED_ORIGINS` | **yes** | `https://api.rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
+| `ALLOWED_ORIGINS` | **yes** | `https://app.rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`. The Rust version's `RUST_LOG` is ignored |
 | `BIND_ADDR` | no | `0.0.0.0:8080` | already set in the image |
 | `MQTT_CLIENT_ID` | no | `rmx-server` | must be unique on the broker |
@@ -682,18 +821,19 @@ or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS
 timescaledb`, so the database user must own the database and either be a
 superuser (the image's `POSTGRES_USER` is) or the extension must already exist.
 
-**Routes the app serves itself** (Caddy proxies `api.rmx.lt/app` and `api.rmx.lt/app/*` as-is and
-must **not** strip the `/app` prefix). The app does its own login, so Caddy
+**Routes the app serves itself.** The app has its own host, `https://app.rmx.lt/`,
+and its routes start at the root: Caddy proxies every path of that host as-is,
+with no prefix to add or strip. The app does its own login, so Caddy
 needs no `basic_auth` in front of it:
 
 | Path | Login | What |
 |---|---|---|
-| `/app` | public | 308 redirect to `/app/` |
-| `/app/` and other unknown `/app/*` | public | the client (static files, `index.html` fallback); it shows the login form |
-| `/app/api/auth/login`, `/app/api/auth/logout` | public | login, logout |
-| `/app/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
-| `/app/api/auth/me`, `/app/api/auth/logout-all` | session | REST |
-| `/app/ws` | session | WebSocket (Caddy proxies upgrades by default) |
+| `/` and every path not listed below | public | the client (static files, `index.html` fallback); it shows the login form |
+| `/api/auth/login`, `/api/auth/logout` | public | login, logout |
+| `/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
+| `/api/auth/me`, `/api/auth/logout-all`, `/api/maps…`, `/api/settings…` | session | REST |
+| other `/api/…` | public | 404 |
+| `/ws` | session | WebSocket (Caddy proxies upgrades by default) |
 
 **Proxy requirements:** pass on `Host`, `Origin` and `Cookie` unchanged (Caddy
 does by default) and set `X-Forwarded-For` (Caddy does; the login rate limit
@@ -713,8 +853,8 @@ and sends only the tag `sha-<short>`. That user's key is restricted to one
 forced command, the deploy script in `rmx-server-infra` (it moves from the old
 probe stack to `services/app/` in
 [rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)).
-It checks the tag, pulls the image, restarts `app`, waits for
-`/app/health`, and rolls back to the previous tag if the new one isn't
+It checks the tag, pulls the image, restarts `app`, waits until the container
+is healthy (the image's `healthcheck`, `GET /health`), and rolls back to the previous tag if the new one isn't
 healthy (the job then fails).
 
 Repository secrets: `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (the private key),

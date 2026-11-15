@@ -1,11 +1,15 @@
-import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
-import { OBJECT_CATEGORY, type ObjectCategory } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
+
+export interface Point {
+    x: number;
+    y: number;
+}
 
 /**
  * Computes the signed area of a closed polygon using the Shoelace (Gauss) formula.
  * In screen coordinates (Y increases downward):
  *   - Positive → clockwise winding (zone convention)
- *   - Negative → counter-clockwise winding (obstacle convention)
+ *   - Negative → counter-clockwise winding (no-go zone convention)
  * Returns 0 for fewer than 3 points.
  */
 export function computeSignedPolygonArea(vertices: Point[]): number {
@@ -51,17 +55,17 @@ export function computePolygonPerimeter(vertices: Point[]): number {
 /**
  * Returns vertices in the required winding order for the given category.
  * In screen coordinates (Y↓): zones must be CW (signed area > 0),
- * obstacles must be CCW (signed area < 0).
+ * no-go zones must be CCW (signed area < 0).
  * Returns the same array reference when winding is already correct.
  * Unknown categories are returned unchanged.
  */
 export function ensureWinding(
     vertices: Array<{ x: number; y: number }>,
-    category: ObjectCategory,
+    category: ZoneCategory,
 ): Array<{ x: number; y: number }> {
     if (vertices.length < 3) return vertices;
     const signed = computeSignedPolygonArea(vertices);
-    if (category === OBJECT_CATEGORY.ZONE) return signed > 0 ? vertices : [...vertices].reverse();
-    if (category === OBJECT_CATEGORY.OBSTACLE) return signed < 0 ? vertices : [...vertices].reverse();
+    if (category === ZONE_CATEGORY.MOWING) return signed > 0 ? vertices : [...vertices].reverse();
+    if (category === ZONE_CATEGORY.NO_GO) return signed < 0 ? vertices : [...vertices].reverse();
     return vertices;
 }

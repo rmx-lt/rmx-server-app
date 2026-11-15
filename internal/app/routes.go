@@ -21,8 +21,8 @@ func (a *app) handler() http.Handler {
 	return auth.CheckOrigin(a.cfg.AllowedOrigins, a.router())
 }
 
-// router registers every route. Everything lives under /app, because Caddy
-// forwards api.rmx.lt/app/* without stripping the prefix.
+// router registers every route. The app has its own host (app.rmx.lt), so
+// the routes start at the root: /health, /ws, /api/..., and the web app at /.
 //
 // Fail closed: data and live connections go in the Protected group, where
 // every route needs a valid session. Only the Public routes work without one:
@@ -32,22 +32,20 @@ func (a *app) handler() http.Handler {
 func (a *app) router() *httpx.Router {
 	r := httpx.NewRouter(a.auth.RequireSession)
 
-	r.Public().HandleFunc("GET /app/health", a.health)
+	r.Public().HandleFunc("GET /health", a.health)
 	a.auth.Routes(r)
+	a.planning.Routes(r)
 	// The handshake is a normal GET with the cookie, checked before the
 	// upgrade. That's what fixes iPhones: WebKit sends cookies on WebSocket
 	// handshakes (but not basic-auth credentials).
-	r.Protected().Handle("GET /app/ws", a.ws)
+	r.Protected().Handle("GET /ws", a.ws)
 
 	// Unknown API paths are a plain 404, not the app's index.html.
-	r.Public().HandleFunc("/app/api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
-	r.Public().HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/app/", http.StatusPermanentRedirect)
-	})
+	r.Public().HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNotFound) })
 	// The built web app (production only). Unknown paths fall back to
 	// index.html so client-side routes still load the app.
 	if a.static != nil {
-		r.Public().Handle("/app/", a.static)
+		r.Public().Handle("/", a.static)
 	}
 	return r
 }
@@ -85,7 +83,7 @@ func openStatic(dir string) (http.Handler, func()) {
 	return staticFiles(root), func() { _ = root.Close() }
 }
 
-// staticFiles serves the built web app from root under /app/. A path that is
+// staticFiles serves the built web app from root at /. A path that is
 // not a file gets index.html, so client-side routes load the app.
 func staticFiles(root *os.Root) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +92,7 @@ func staticFiles(root *os.Root) http.Handler {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		name := path.Clean("/" + r.URL.Path[len("/app/"):])[1:]
+		name := path.Clean("/" + r.URL.Path)[1:]
 		if name == "" {
 			name = "index.html"
 		}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -97,7 +98,7 @@ func TestMQTTServerStatus(t *testing.T) {
 	eq(t, string(dev.nextOn(mqtt.StatusTopic(app.prefix))), "offline")
 }
 
-func TestServesClientFilesUnderPrefix(t *testing.T) {
+func TestServesClientFilesAtRoot(t *testing.T) {
 	dir := t.TempDir()
 	must := func(err error) {
 		if err != nil {
@@ -118,26 +119,27 @@ func TestServesClientFilesUnderPrefix(t *testing.T) {
 		b, _ := io.ReadAll(res.Body)
 		return res, string(b)
 	}
-	res, _ := get("/app")
-	eq(t, res.StatusCode, 308)
-	eq(t, res.Header.Get("Location"), "/app/")
-
-	for _, path := range []string{"/app/", "/app/some/client/route", "/app/assets"} {
+	for _, path := range []string{"/", "/some/client/route", "/assets", "/deep/client/route/"} {
 		res, body := get(path)
 		if res.StatusCode != 200 || body != "<!doctype html>index" {
 			t.Errorf("%s: %d %q", path, res.StatusCode, body)
 		}
 	}
-	// Path traversal: the mux cleans the path and redirects, nothing is read outside the directory.
-	res, body := get("/app/../../etc/passwd")
-	if res.StatusCode == 200 || strings.Contains(body, "root:") {
-		t.Errorf("traversal: %d %q", res.StatusCode, body)
+	// Path traversal: the mux cleans the path and redirects, and the files are
+	// opened through an os.Root, so nothing is read outside the directory.
+	// A file next to the served directory (inside the test's own temp root).
+	const secretName = "secret.txt"
+	must(os.WriteFile(filepath.Join(filepath.Dir(dir), secretName), []byte("outside-the-root"), 0o644))
+	for _, path := range []string{"/../" + secretName, "/assets/../../" + secretName, "/..%2f" + secretName, "/../../etc/passwd"} {
+		_, body := get(path)
+		if strings.Contains(body, "outside-the-root") || strings.Contains(body, "root:") {
+			t.Errorf("traversal %s: %q", path, body)
+		}
 	}
-	_, body = get("/app/app.js")
+	_, body := get("/app.js")
 	eq(t, body, "console.log(1)")
-	res, _ = get("/app/api/nope")
-	eq(t, res.StatusCode, 404)
-	res, _ = get("/elsewhere")
+	// Unknown API paths are a plain 404, not the client.
+	res, _ := get("/api/nope")
 	eq(t, res.StatusCode, 404)
 }
 
@@ -148,6 +150,9 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 	ctx := context.Background()
 	for _, stmt := range []string{
 		`DROP TABLE goose_db_version`,
+		// Back to the schema sqlx left behind: undo what the migrations after
+		// its three created (20261113000000_records_drop only drops, with IF EXISTS).
+		`DROP TABLE maps, user_settings`,
 		`CREATE TABLE _sqlx_migrations (version bigint PRIMARY KEY, description text NOT NULL,
 		   installed_on timestamptz NOT NULL DEFAULT now(), success boolean NOT NULL,
 		   checksum bytea NOT NULL, execution_time bigint NOT NULL)`,
@@ -167,7 +172,7 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The three it adopted, plus the ones after them.
-	eq(t, applied, 4)
+	eq(t, applied, 5)
 	// Running again does nothing, and the old table is still there.
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)

@@ -5,10 +5,10 @@ interface CanvasGeneratorFloatingControlState {
     width: string;
     height: string;
     cellSize: string;
-    obstacleRatio: string;
+    noGoZoneRatio: string;
     clusteringProb: string;
     seed: string;
-    autoObstacleRatioHint: number | null;
+    autoNoGoZoneRatioHint: number | null;
     autoClusteringHint: number | null;
     lastSeedHex: string | null;
     controlPosition: { x: number; y: number };
@@ -20,10 +20,10 @@ interface CanvasGeneratorFloatingControlState {
     setWidth: (width: string) => void;
     setHeight: (height: string) => void;
     setCellSize: (cellSize: string) => void;
-    setObstacleRatio: (obstacleRatio: string) => void;
+    setNoGoZoneRatio: (noGoZoneRatio: string) => void;
     setClusteringProb: (clusteringProb: string) => void;
     setSeed: (seed: string) => void;
-    setAutoObstacleRatioHint: (autoObstacleRatioHint: number | null) => void;
+    setAutoNoGoZoneRatioHint: (autoNoGoZoneRatioHint: number | null) => void;
     setAutoClusteringHint: (autoClusteringHint: number | null) => void;
     setLastSeedHex: (lastSeedHex: string | null) => void;
     setControlPosition: (controlPosition: { x: number; y: number }) => void;
@@ -38,10 +38,10 @@ export const useCanvasGeneratorFloatingControlStore = create<CanvasGeneratorFloa
     width: "1000",
     height: "1000",
     cellSize: "30",
-    obstacleRatio: "",
+    noGoZoneRatio: "",
     clusteringProb: "",
     seed: "",
-    autoObstacleRatioHint: null,
+    autoNoGoZoneRatioHint: null,
     autoClusteringHint: null,
     lastSeedHex: null,
     controlPosition: { x: 16, y: 16 },
@@ -53,10 +53,10 @@ export const useCanvasGeneratorFloatingControlStore = create<CanvasGeneratorFloa
     setWidth: (width) => set({ width }),
     setHeight: (height) => set({ height }),
     setCellSize: (cellSize) => set({ cellSize }),
-    setObstacleRatio: (obstacleRatio) => set({ obstacleRatio }),
+    setNoGoZoneRatio: (noGoZoneRatio) => set({ noGoZoneRatio }),
     setClusteringProb: (clusteringProb) => set({ clusteringProb }),
     setSeed: (seed) => set({ seed }),
-    setAutoObstacleRatioHint: (autoObstacleRatioHint) => set({ autoObstacleRatioHint }),
+    setAutoNoGoZoneRatioHint: (autoNoGoZoneRatioHint) => set({ autoNoGoZoneRatioHint }),
     setAutoClusteringHint: (autoClusteringHint) => set({ autoClusteringHint }),
     setLastSeedHex: (lastSeedHex) => set({ lastSeedHex }),
     setControlPosition: (controlPosition) => set({ controlPosition }),
