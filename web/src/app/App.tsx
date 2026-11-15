@@ -9,7 +9,6 @@ import { useBeforeUnload } from "@/app/useBeforeUnload";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
 import { startConnections } from "./connections";
 import { resetSettings } from "@/data/planning/settings";
-import { forgetBrowserData } from "@/data/planning/browserData";
 
 /** Login form or the workbench, depending on whether the server knows our session. */
 export function App() {
@@ -41,9 +40,8 @@ function Workbench() {
 
   useEffect(() => {
     const stopConnections = startConnections();
-    // A new login: read this user's settings, and drop what older versions kept in the browser.
+    // A new login: read this user's settings.
     resetSettings();
-    forgetBrowserData();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
     initializeMap().catch(console.error);
     return () => {

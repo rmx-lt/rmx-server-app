@@ -1,8 +1,6 @@
 import { memo } from "react";
 import { Layer, Line } from "react-konva";
-import { GRID_SPACING, pickGridLevel } from "@/config/canvas-editing/canvasConfig";
-import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
+import { GRID_SPACING, LAYER_STYLE, pickGridLevel } from "@/config/canvas-editing/canvasConfig";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 
 interface CanvasGridLayerProps {
@@ -22,13 +20,9 @@ interface CanvasGridLayerProps {
  * strokeWidth={1/scale} keeps lines at exactly 1 CSS pixel regardless of zoom.
  */
 function CanvasGridLayerInner({ width, height }: CanvasGridLayerProps) {
-    const layers = useLayerSettingsStore((s) => s.layers);
-    const gridVisible = getLayerParam(layers, LAYER_ID.GRID, LAYER_PARAM_KEY.VISIBLE) !== "false";
-    const strokeColor = getLayerParam(layers, LAYER_ID.GRID, LAYER_PARAM_KEY.GRID_LINE_COLOR) ?? "#e2e8f0";
+    const strokeColor = LAYER_STYLE.grid.lineColor;
     const position = useCanvasViewStore((s) => s.position);
     const scale = useCanvasViewStore((s) => s.scale);
-
-    if (!gridVisible) return null;
 
     const level = pickGridLevel(scale);
     const cellWorld = GRID_SPACING * level;

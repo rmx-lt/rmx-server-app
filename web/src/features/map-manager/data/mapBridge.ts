@@ -1,14 +1,10 @@
 import { createMap, loadMap, overwriteMap, type MapContent } from "@/data/planning/maps";
-import { initialLayerSettings } from "@/data/planning/layerSettings";
-import { COORD_SYSTEM, MAP_FORMAT, MAP_TYPE, ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import type { MapInfo } from "@/data/planning/schemaTypes";
-import type { ImportedMapData } from "@/features/map-manager/utils/importMapXml";
 import { useMapStore } from "@/model/mapStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useSaveModeStore } from "@/model/saveModeStore";
-import { loadLayerSettings } from "@/model/layerSettingsStore";
-import { useMapPointStore } from "@/model/mapPointStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { currentMapContent, flushAutosave, saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
 
@@ -19,11 +15,6 @@ import { currentMapContent, flushAutosave, saveCanvas } from "@/features/canvas-
 const BLANK_MAP: MapInfo = {
     id: 0,
     name: "Untitled Map",
-    format: MAP_FORMAT.POLYGON,
-    type: MAP_TYPE.ANY_OFFLINE,
-    coordSystem: COORD_SYSTEM.CARTESIAN,
-    headlandEnabled: true,
-    headlandWidth: "10",
     mowingZoneCount: 0,
     noGoZoneCount: 0,
 };
@@ -47,8 +38,6 @@ function showMap(content: MapContent): void {
     useMapStore.getState().clearDirty();
     useCanvasObjectStore.getState().setObjects(zones);
     useCanvasHistoryStore.getState().resetHistory();
-    loadLayerSettings(content.layerSettings);
-    useMapPointStore.getState().setPoints(content.points);
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
 }
 
@@ -58,9 +47,7 @@ async function showBlankMap(): Promise<void> {
     showMap({
         map: BLANK_MAP,
         zones: [],
-        points: [],
         geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor,
-        layerSettings: initialLayerSettings(0),
     });
 }
 
@@ -98,41 +85,6 @@ export async function saveMapAs(name: string, selectedMapId: number | null): Pro
  */
 export async function copyMap(name: string): Promise<number> {
     return createMap(currentMapContent(), name);
-}
-
-/** Saves a map read from an XML file as a new map, then opens it. */
-export async function importMap(data: ImportedMapData): Promise<void> {
-    await useGeoAnchorStore.getState().loadSystemGeoAnchor();
-    const zones = data.zones.map((z, i) => ({
-        id: z.id > 0 ? z.id : i + 1,
-        mapId: 0,
-        category: z.category,
-        type: z.type,
-        vertexCount: z.vertices.length,
-        area: 0,
-        vertices: z.vertices,
-    }));
-    const id = await createMap(
-        {
-            map: {
-                id: 0,
-                name: data.name,
-                format: data.format,
-                type: data.type,
-                coordSystem: data.coordSystem,
-                headlandEnabled: data.headlandEnabled,
-                headlandWidth: data.headlandWidth,
-                mowingZoneCount: countByCategory(zones, ZONE_CATEGORY.MOWING),
-                noGoZoneCount: countByCategory(zones, ZONE_CATEGORY.NO_GO),
-            },
-            zones,
-            points: data.mapPoints.map((p) => ({ mapId: 0, type: p.type, point: p.point })),
-            geoAnchor: data.geoAnchor ?? useGeoAnchorStore.getState().systemGeoAnchor,
-            layerSettings: initialLayerSettings(0),
-        },
-        data.name,
-    );
-    await openMap(id);
 }
 
 /**

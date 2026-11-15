@@ -4,8 +4,6 @@ import { ZONE_CATEGORY } from "@/config/db-ops/enums";
 import type { Zone } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore, selectIsDirty } from "../stores/canvasObjectStore";
 import { useMapStore } from "@/model/mapStore";
-import { getLayerSettingParameters, useLayerSettingsStore } from "@/model/layerSettingsStore";
-import { getMapPoints, useMapPointStore } from "@/model/mapPointStore";
 import { getSavableMapGeoAnchor, useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { getSaveMode } from "@/model/saveModeStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
@@ -35,9 +33,7 @@ export function currentMapContent(): MapContent {
     return {
         map: useMapStore.getState().map,
         zones: useCanvasObjectStore.getState().objects,
-        points: getMapPoints(useMapPointStore.getState()),
         geoAnchor: getSavableMapGeoAnchor(useGeoAnchorStore.getState()),
-        layerSettings: getLayerSettingParameters(useLayerSettingsStore.getState().layers),
     };
 }
 
@@ -47,8 +43,6 @@ export function isMapDirty(): boolean {
     return (
         useMapStore.getState().isMapDirty ||
         selectIsDirty(useCanvasObjectStore.getState()) ||
-        useLayerSettingsStore.getState().isLayerSettingsDirty ||
-        useMapPointStore.getState().isMapPointsDirty ||
         geo.isSystemGeoAnchorDirty ||
         geo.isMapGeoAnchorDirty
     );
@@ -63,8 +57,6 @@ function adoptMapId(id: number): void {
 function markSaved(): void {
     useCanvasObjectStore.getState().clearDirty();
     useMapStore.getState().clearDirty();
-    useLayerSettingsStore.getState().clearDirty();
-    useMapPointStore.getState().clearDirty();
 }
 
 function reportSaveError(err: unknown): void {

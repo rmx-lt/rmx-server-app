@@ -1,9 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
-import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { convertLinearToBase } from "@/utils/unitOfMeasure";
 import {
     TILE_SIZE,
@@ -45,11 +43,6 @@ interface TileEntry {
 }
 
 function CanvasMapTileLayerInner() {
-    const layers = useLayerSettingsStore((s) => s.layers);
-    const visible = getLayerParam(layers, LAYER_ID.SATELLITE_MAP, LAYER_PARAM_KEY.VISIBLE) !== "false";
-    const opacityStr = getLayerParam(layers, LAYER_ID.SATELLITE_MAP, LAYER_PARAM_KEY.MAP_OPACITY);
-    const opacity = Math.min(100, Math.max(0, Number(opacityStr ?? "100"))) / 100;
-
     const geoAnchor = useGeoAnchorStore((s) => s.mapGeoAnchor);
     const unitOfMeasure = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
 
@@ -62,7 +55,7 @@ function CanvasMapTileLayerInner() {
     const [imageVersion, setImageVersion] = useState(0);
 
     const tiles = useMemo<TileEntry[]>(() => {
-        if (!visible || !geoAnchor) return [];
+        if (!geoAnchor) return [];
 
         const { width, height } = canvasSize;
         if (width <= 0 || height <= 0) return [];
@@ -134,10 +127,10 @@ function CanvasMapTileLayerInner() {
         }
 
         return result;
-    }, [visible, geoAnchor, position, scale, canvasSize, unitOfMeasure]);
+    }, [geoAnchor, position, scale, canvasSize, unitOfMeasure]);
 
     useEffect(() => {
-        if (!visible || tiles.length === 0) return;
+        if (tiles.length === 0) return;
 
         let cancelled = false;
 
@@ -160,7 +153,7 @@ function CanvasMapTileLayerInner() {
         return () => {
             cancelled = true;
         };
-    }, [visible, tiles]);
+    }, [tiles]);
 
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
@@ -179,9 +172,8 @@ function CanvasMapTileLayerInner() {
 
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, width, height);
-        if (!visible || !geoAnchor || tiles.length === 0) return;
+        if (!geoAnchor || tiles.length === 0) return;
 
-        ctx.globalAlpha = opacity;
         ctx.imageSmoothingEnabled = true;
 
         for (const tile of tiles) {
@@ -195,9 +187,9 @@ function CanvasMapTileLayerInner() {
                 tile.screenSize + TILE_OVERLAP_PX,
             );
         }
-    }, [visible, geoAnchor, tiles, canvasSize, opacity, imageVersion]);
+    }, [geoAnchor, tiles, canvasSize, imageVersion]);
 
-    if (!visible || !geoAnchor) return null;
+    if (!geoAnchor) return null;
 
     return (
         <canvas

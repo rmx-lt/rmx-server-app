@@ -2,11 +2,7 @@ import { type ReactNode } from "react";
 import UiControlsButton from "@/features/ui-manager/components/tool-bar/UiControlsButton";
 import AddMowingZoneButton from "@/features/canvas-editing/components/tool-bar/AddMowingZoneButton";
 import AddNoGoZoneButton from "@/features/canvas-editing/components/tool-bar/AddNoGoZoneButton";
-import AddStartPointButton from "@/features/canvas-editing/components/tool-bar/AddStartPointButton";
-import AddEndPointButton from "@/features/canvas-editing/components/tool-bar/AddEndPointButton";
-import AddStartEndPointButton from "@/features/canvas-editing/components/tool-bar/AddStartEndPointButton";
 import DeleteButton from "@/features/canvas-editing/components/tool-bar/DeleteButton";
-import OpenJobListButton from "@/features/job-runner/components/tool-bar/OpenJobListButton";
 import UiInspectorButton from "@/features/ui-manager/components/tool-bar/UiInspectorButton";
 import ToolSeparator from "@/components/tool-bar/ToolBarSeparator";
 import SelectButton from "@/features/canvas-editing/components/tool-bar/SelectButton";
@@ -54,9 +50,6 @@ export default function ToolBar() {
   const isSelectActive = activeTool === "select";
   const isAddMowingZoneActive = activeTool === "addMowingZone";
   const isAddNoGoZoneActive = activeTool === "addNoGoZone";
-  const isAddStartPointActive = activeTool === "addStartPoint";
-  const isAddEndPointActive = activeTool === "addEndPoint";
-  const isAddStartEndPointActive = activeTool === "addStartEndPoint";
   const isDeleteActive = activeTool === "delete";
   const hasSelection = selectedObject !== null;
   const hasVertexSelection = selectedVertexRefs.length > 0;
@@ -74,21 +67,6 @@ export default function ToolBar() {
   function handleAddNoGoZone() {
     cancelDrawing();
     setActiveTool(isAddNoGoZoneActive ? null : "addNoGoZone");
-  }
-
-  function handleAddStartPoint() {
-    cancelDrawing();
-    setActiveTool(isAddStartPointActive ? null : "addStartPoint");
-  }
-
-  function handleAddEndPoint() {
-    cancelDrawing();
-    setActiveTool(isAddEndPointActive ? null : "addEndPoint");
-  }
-
-  function handleAddStartEndPoint() {
-    cancelDrawing();
-    setActiveTool(isAddStartEndPointActive ? null : "addStartEndPoint");
   }
 
   function handleDelete() {
@@ -199,45 +177,9 @@ export default function ToolBar() {
       ],
     },
     {
-      id: "points",
-      buttonCount: 3,
-      buttons: (
-        <>
-          <AddStartPointButton />
-          <AddEndPointButton />
-          <AddStartEndPointButton />
-        </>
-      ),
-      trailingSeparator: "thin",
-      overflowItems: [
-        {
-          id: "add-start-point",
-          icon: "trip_origin",
-          label: "Add Start Point",
-          isActive: isAddStartPointActive,
-          onClick: handleAddStartPoint,
-        },
-        {
-          id: "add-end-point",
-          icon: "flag",
-          label: "Add End Point",
-          isActive: isAddEndPointActive,
-          onClick: handleAddEndPoint,
-        },
-        {
-          id: "add-start-end-point",
-          icon: "loop",
-          label: "Add Start & End Point",
-          isActive: isAddStartEndPointActive,
-          onClick: handleAddStartEndPoint,
-        },
-      ],
-    },
-    {
       id: "delete",
       buttonCount: 1,
       buttons: <DeleteButton />,
-      trailingSeparator: "thick",
       overflowItems: [
         {
           id: "delete",
@@ -245,19 +187,6 @@ export default function ToolBar() {
           label: "Delete",
           isActive: isDeleteActive,
           onClick: handleDelete,
-        },
-      ],
-    },
-    {
-      id: "jobs",
-      buttonCount: 1,
-      buttons: <OpenJobListButton />,
-      overflowItems: [
-        {
-          id: "jobs",
-          icon: "assignment",
-          label: "Open jobs...",
-          onClick: () => { },
         },
       ],
     },

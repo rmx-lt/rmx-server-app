@@ -29,18 +29,11 @@ afterEach(() => {
 });
 
 const DOC: MapDoc = {
-    format: "polygon",
-    type: "any_offline",
-    coord_system: "Cartesian",
-    headland_enabled: true,
-    headland_width: "10",
     zones: [
-        { id: 1, category: "mowing", type: "", vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] },
-        { id: 2, category: "no_go", type: "offline", vertices: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }] },
-        { id: 3, category: "navigation", type: "", vertices: [{ x: 10, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 2 }] },
+        { id: 1, category: "mowing", vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] },
+        { id: 2, category: "no_go", vertices: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }] },
+        { id: 3, category: "navigation", vertices: [{ x: 10, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 2 }] },
     ],
-    points: [{ type: "start_end", point: { x: 5, y: 5 } }],
-    layer_settings: [{ id: 1, layer_id: 2, value: "false" }],
     geo_anchor: { lat: 54.68, lon: 25.28 },
 };
 
@@ -53,18 +46,14 @@ describe("loadMap", () => {
         answers.push({ status: 200, body: detail(7, 3) });
         const content = await loadMap(7);
         expect(calls[0]).toMatchObject({ method: "GET", url: "/api/maps/7" });
-        expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingZoneCount: 1, noGoZoneCount: 1, headlandWidth: "10" });
+        expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingZoneCount: 1, noGoZoneCount: 1 });
         expect(content.zones.map((z) => [z.id, z.category, z.mapId])).toEqual([
             [1, "mowing", 7],
             [2, "no_go", 7],
         ]);
         expect(content.zones[0]!.vertexCount).toBe(3);
         expect(content.zones[0]!.area).toBeGreaterThan(0);
-        expect(content.points).toEqual([{ mapId: 7, type: "start_end", point: { x: 5, y: 5 } }]);
         expect(content.geoAnchor).toEqual({ lat: 54.68, lon: 25.28 });
-        // The stored value wins; every other setting gets its default.
-        expect(content.layerSettings.find((s) => s.id === 1 && s.layerId === 2)?.value).toBe("false");
-        expect(content.layerSettings.length).toBeGreaterThan(1);
     });
 });
 
@@ -90,7 +79,6 @@ describe("saveMap", () => {
             [3, "navigation"],
         ]);
         expect(body.doc.geo_anchor).toEqual({ lat: 54.68, lon: 25.28 });
-        expect(body.doc.layer_settings).toContainEqual({ id: 1, layer_id: 2, value: "false" });
 
         // The next save names the new revision.
         answers.push({ status: 200, body: detail(7, 5) });

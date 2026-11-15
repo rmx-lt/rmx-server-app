@@ -1,10 +1,6 @@
 import UiControlsPanel from "@/features/ui-manager/components/side-panels/UiControlsPanel";
-import CoveragePlanningControlsPanel from "@/features/coverage-planning/components/controls-panel/CoveragePlanningControlsPanel";
 
+// Empty on purpose: it had only the settings that are gone; the shell issue redefines it.
 export default function ControlsPanel() {
-  return (
-    <UiControlsPanel>
-      <CoveragePlanningControlsPanel />
-    </UiControlsPanel>
-  );
+  return <UiControlsPanel />;
 }

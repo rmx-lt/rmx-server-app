@@ -1,31 +1,27 @@
 import { create } from "zustand";
 import type { Zone } from "@/data/planning/schemaTypes";
-import type { MapPointType } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 
 interface CanvasSelectionState {
     selectedObject: Zone | null;
     selectedVertexRefs: VertexRef[];
-    selectedMapPointType: MapPointType | null;
 
     selectObject: (obj: Zone) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
     toggleVertexSelection: (ref: VertexRef, ctrl: boolean) => void;
-    selectMapPoint: (type: MapPointType) => void;
 }
 
 export const useCanvasSelectionStore = create<CanvasSelectionState>((set) => ({
     selectedObject: null,
     selectedVertexRefs: [],
-    selectedMapPointType: null,
 
     selectObject: (obj) =>
-        set({ selectedObject: obj, selectedVertexRefs: [], selectedMapPointType: null }),
+        set({ selectedObject: obj, selectedVertexRefs: [] }),
 
     clearSelection: () =>
-        set({ selectedObject: null, selectedVertexRefs: [], selectedMapPointType: null }),
+        set({ selectedObject: null, selectedVertexRefs: [] }),
 
     selectVertex: (ref) =>
         set({ selectedVertexRefs: ref !== null ? [ref] : [] }),
@@ -44,7 +40,4 @@ export const useCanvasSelectionStore = create<CanvasSelectionState>((set) => ({
                     : [...state.selectedVertexRefs, ref],
             };
         }),
-
-    selectMapPoint: (type) =>
-        set({ selectedMapPointType: type, selectedObject: null, selectedVertexRefs: [] }),
 }));

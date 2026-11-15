@@ -1,6 +1,5 @@
 // Package planning stores what users plan in the web app: their maps (each
-// one JSON document: mowing, no-go and navigation zones, route points, geo
-// anchor, layer settings) and their per-user settings. Every call is scoped
+// one JSON document: mowing, no-go and navigation zones, geo anchor) and their per-user settings. Every call is scoped
 // to one user; another user's map answers as if it did not exist.
 package planning
 
@@ -28,11 +27,9 @@ const (
 	MaxSettingBytes = 16 << 10
 	// MaxSettings is the most settings one user can have.
 	MaxSettings = 100
-	// maxZones, maxVertices, maxLayerSettings and maxValueLength bound one document.
-	maxZones         = 5000
-	maxVertices      = 100_000
-	maxLayerSettings = 1000
-	maxValueLength   = 4096
+	// maxZones and maxVertices bound one document.
+	maxZones    = 5000
+	maxVertices = 100_000
 )
 
 var settingKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
@@ -199,26 +196,6 @@ func checkDoc(doc *api.MapDoc) error {
 	if vertices > maxVertices {
 		return apperr.BadRequest("too many vertices (at most %d)", maxVertices)
 	}
-	seen := map[api.RoutePointType]bool{}
-	for _, p := range doc.Points {
-		switch p.Type {
-		case "start", "end", "start_end":
-		default:
-			return apperr.BadRequest("point type must be start, end or start_end")
-		}
-		if seen[p.Type] {
-			return apperr.BadRequest("point %s appears twice", p.Type)
-		}
-		seen[p.Type] = true
-	}
-	if len(doc.LayerSettings) > maxLayerSettings {
-		return apperr.BadRequest("too many layer settings (at most %d)", maxLayerSettings)
-	}
-	for _, ls := range doc.LayerSettings {
-		if len(ls.Value) > maxValueLength {
-			return apperr.BadRequest("layer setting %d/%d: value too long", ls.LayerID, ls.ID)
-		}
-	}
 	if a := doc.GeoAnchor; a != nil && (a.Lat < -90 || a.Lat > 90 || a.Lon < -180 || a.Lon > 180) {
 		return apperr.BadRequest("geo anchor out of range")
 	}
@@ -234,11 +211,5 @@ func normalize(doc *api.MapDoc) {
 		if doc.Zones[i].Vertices == nil {
 			doc.Zones[i].Vertices = []api.Point{}
 		}
-	}
-	if doc.Points == nil {
-		doc.Points = []api.RoutePoint{}
-	}
-	if doc.LayerSettings == nil {
-		doc.LayerSettings = []api.LayerSetting{}
 	}
 }

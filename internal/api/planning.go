@@ -22,51 +22,19 @@ type GeoAnchor struct {
 // without mowing: paths between lawns, the way to the dock).
 type ZoneCategory string
 
-// RoutePointType says which route point a RoutePoint is.
-type RoutePointType string
-
 // Zone is one polygon of a map.
 type Zone struct {
 	// Unique within its map.
 	ID       int64        `json:"id"`
 	Category ZoneCategory `json:"category"`
-	// "", "offline" or "online".
-	Type string `json:"type"`
 	// Vertices in draw order: mowing and navigation zones clockwise, no-go
 	// zones counter-clockwise (screen coordinates, y down).
 	Vertices []Point `json:"vertices"`
 }
 
-// RoutePoint is the start, end, or combined start/end point of a route. A
-// map has at most one of each type.
-type RoutePoint struct {
-	Type  RoutePointType `json:"type"`
-	Point Point          `json:"point"`
-}
-
-// LayerSetting is one style value of a canvas layer, for one map.
-type LayerSetting struct {
-	// The setting's id within its layer (the client's layer registry).
-	ID      int64  `json:"id"`
-	LayerID int64  `json:"layer_id"`
-	Value   string `json:"value"`
-}
-
-// MapDoc is the content of a map: everything the web app draws and
-// configures in it. It is saved and loaded as a whole.
+// MapDoc is the content of a map: its zones and where it lies on the earth. It is saved and loaded as a whole.
 type MapDoc struct {
-	// "polygon" or "grid".
-	Format string `json:"format"`
-	// "offline", "online", "any_offline" or "any_online".
-	Type string `json:"type"`
-	// "Cartesian" or "Geographic".
-	CoordSystem     string `json:"coord_system"`
-	HeadlandEnabled bool   `json:"headland_enabled"`
-	// Headland width as the user typed it, in the unit of measure of the UI.
-	HeadlandWidth string         `json:"headland_width"`
-	Zones         []Zone         `json:"zones"`
-	Points        []RoutePoint   `json:"points"`
-	LayerSettings []LayerSetting `json:"layer_settings"`
+	Zones []Zone `json:"zones"`
 	// Null when the map is not placed on the earth.
 	GeoAnchor *GeoAnchor `json:"geo_anchor"`
 }

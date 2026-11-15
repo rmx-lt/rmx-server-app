@@ -76,7 +76,7 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
-| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, points, layer settings and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
 | `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 | `devices` | plain table | `name` (primary key; the device name from the topics), `first_seen_at`, `last_seen_at`, `gateway_status` (`online` / `offline` / null), `gateway_status_at` |
 | `board_state` | plain table | `device` (→ devices, cascade), `board` (`gateway` / `autopilot`), `boot` and `boot_seen_at` (last boot counter seen in any message of the board), `state` (JSONB: the last state message as published) and `state_received_at`; primary key `device` + `board` |
@@ -734,11 +734,12 @@ The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
 shadow JavaScript's `Map`.
 
 **One document per map.** The client loads and saves a map as a whole, so
-its content is one JSON document (`MapDoc`): format, type, coordinate
-system, headland, `zones` (id, category, type, vertices), `points` (at most
-one each of `start`, `end`, `start_end`), `layer_settings` (layer id,
-setting id, value) and `geo_anchor` (WGS-84 of the canvas origin, or null).
-Missing lists come back as empty arrays.
+its content is one JSON document (`MapDoc`): `zones` (id, category,
+vertices) and `geo_anchor` (WGS-84 of the canvas origin, or null). A missing
+list comes back as an empty array. Members a document stored by an earlier
+version still has (format, type, coordinate system, headland, zone `type`,
+`points`, `layer_settings`) are ignored on read and dropped by the next
+save; there is no migration.
 
 **Revisions instead of last-write-wins.** Every save names the revision it
 started from. If another browser saved in between, the save is refused with
@@ -746,7 +747,7 @@ started from. If another browser saved in between, the save is refused with
 
 **Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
 spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
-1000 layer settings of at most 4096 characters each, a geo anchor inside
+a geo anchor inside
 ±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
 at most 16 KiB of JSON, at most 100 settings per user.
 
@@ -754,8 +755,7 @@ at most 16 KiB of JSON, at most 100 settings per user.
 
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
-`65d23b7` (rmx-server-app#51): draw a map (mowing zones, no-go zones, start and
-end points) on a canvas, inspect it, and save it. It opens on the login form
+`65d23b7` (rmx-server-app#51): draw a map (mowing zones and no-go zones) on a canvas, inspect it, and save it. It opens on the login form
 when there is no session; after login the workbench loads, with the user menu
 (log out, log out everywhere) at the right of its header. While logged in the
 app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
@@ -774,12 +774,6 @@ whether the session still exists and shows the login form if not.
   `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
   and writes them back unchanged on every save (renumbered if a drawn zone took
   their id).
-- **XML files.** File → Export writes the open map as XML, File → Import reads
-  one into a new map. The root `<map>` holds `<info>` (name, format, type,
-  coordinate system, headland), `<zones>` (one `<zone>` each, categories
-  `mowing` and `no_go`), `<points>` and `<geoAnchor>`. Files of earlier
-  versions (root `<workspace>`, categories `zone` and `obstacle`) are not
-  read: the import says which element or value it expected.
 - **Saving.** A save sends the whole map. The status bar shows the save state;
   File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
   starts a new blank map, which gets its id from the server on its first save;
@@ -791,9 +785,18 @@ whether the session still exists and shows the login form if not.
   not on the server yet.
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
-  read once per login. The layers and the setup of their settings are
-  constants in `web/src/data/planning/layerRegistry.ts`; each map stores only
-  its layer setting values.
+  read once per login.
+- **Layers.** Users can't change styles. The colours and widths of the grid and
+  the zone layers are constants (`LAYER_STYLE` in
+  `web/src/config/canvas-editing/canvasConfig.ts`) and the code decides what is
+  visible: the grid always, the satellite map when the map has a geo anchor.
+  The map has no format, type, coordinate system, headland, route points or
+  zone type, and there is no map generator, vertex modifier or XML import and
+  export. The mower owns its dimensions, so the headland comes back when it
+  reports them
+  ([rmx-server-app#100](https://github.com/rmx-lt/rmx-server-app/issues/100));
+  `web/src/features/canvas-editing/utils/headlandGeometry.ts` is kept for that,
+  unused for now.
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
   monitor feature, and the only `fetch` calls go to the app's own
@@ -874,7 +877,7 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
     model/              state several features share
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
-      planning/         maps (load, save, conversion to the wire format), settings, layer registry
+      planning/         maps (load, save, conversion to the wire format), settings
     components/         generic widgets only
     hooks/ utils/ config/ styles/ assets/ testing/
 ```

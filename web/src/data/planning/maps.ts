@@ -8,23 +8,10 @@ import {
     type MapDoc,
     type Zone as ApiZone,
 } from "@/data/api/planning";
-import {
-    COORD_SYSTEM,
-    MAP_FORMAT,
-    MAP_TYPE,
-    ZONE_CATEGORY,
-    ZONE_TYPE,
-    type CoordSystemType,
-    type MapFormat,
-    type MapType,
-    type ZoneCategory,
-    type ZoneType,
-} from "@/config/db-ops/enums";
+import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
 import { MAP_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
 import { computePolygonArea } from "@/utils/geometry";
-import type { GeoAnchor, MapInfo, MapPoint, Zone } from "./schemaTypes";
-import type { LayerSettingParameter } from "./layerTypes";
-import { withMissingLayerSettings } from "./layerSettings";
+import type { GeoAnchor, MapInfo, Zone } from "./schemaTypes";
 
 // The user's maps, stored on the server (wiki Server-App, "Planning API").
 // The web app uses the server's zone categories ("mowing", "no_go") as they
@@ -36,9 +23,7 @@ export interface MapContent {
     /** id 0: not saved yet. */
     map: MapInfo;
     zones: Zone[];
-    points: MapPoint[];
     geoAnchor: GeoAnchor | undefined;
-    layerSettings: LayerSettingParameter[];
 }
 
 /** One entry of the map list. */
@@ -60,10 +45,6 @@ function isDrawn(category: string): category is ZoneCategory {
     return (Object.values(ZONE_CATEGORY) as string[]).includes(category);
 }
 
-function oneOf<T extends string>(values: Record<string, T>, value: string, fallback: T): T {
-    return (Object.values(values) as string[]).includes(value) ? (value as T) : fallback;
-}
-
 function trimName(name: string): string {
     return name.trim().slice(0, MAP_NAME_MAX_LENGTH) || "Untitled";
 }
@@ -83,7 +64,6 @@ function fromWire(detail: MapDetail): MapContent {
             id: z.id,
             mapId: id,
             category: z.category,
-            type: oneOf<ZoneType>(ZONE_TYPE, z.type, ZONE_TYPE.EMPTY),
             vertexCount: z.vertices.length,
             area: z.vertices.length >= 3 ? computePolygonArea(z.vertices) : 0,
             vertices: z.vertices.map((v) => ({ x: v.x, y: v.y })),
@@ -96,28 +76,11 @@ function fromWire(detail: MapDetail): MapContent {
         map: {
             id,
             name: detail.name,
-            format: oneOf<MapFormat>(MAP_FORMAT, doc.format, MAP_FORMAT.POLYGON),
-            type: oneOf<MapType>(MAP_TYPE, doc.type, MAP_TYPE.ANY_OFFLINE),
-            coordSystem: oneOf<CoordSystemType>(COORD_SYSTEM, doc.coord_system, COORD_SYSTEM.CARTESIAN),
-            headlandEnabled: doc.headland_enabled,
-            headlandWidth: doc.headland_width,
             mowingZoneCount: zones.filter((z) => z.category === ZONE_CATEGORY.MOWING).length,
             noGoZoneCount: zones.filter((z) => z.category === ZONE_CATEGORY.NO_GO).length,
         },
         zones,
-        points: doc.points.map((p) => ({ mapId: id, type: p.type, point: { x: p.point.x, y: p.point.y } })),
         geoAnchor: doc.geo_anchor ? { lat: doc.geo_anchor.lat, lon: doc.geo_anchor.lon } : undefined,
-        layerSettings: withMissingLayerSettings(
-            doc.layer_settings.map((s) => ({
-                id: s.id,
-                layerId: s.layer_id,
-                algorithmId: 0,
-                providerId: 0,
-                mapId: id,
-                value: s.value,
-            })),
-            id,
-        ),
     };
 }
 
@@ -132,7 +95,6 @@ function toWire(content: MapContent, keepFrom: number): MapDoc {
     const zones: ApiZone[] = content.zones.map((z) => ({
         id: z.id,
         category: z.category,
-        type: z.type,
         vertices: z.vertices.map((v) => ({ x: v.x, y: v.y })),
     }));
     const used = new Set(zones.map((z) => z.id));
@@ -142,16 +104,8 @@ function toWire(content: MapContent, keepFrom: number): MapDoc {
         used.add(id);
         zones.push({ ...z, id });
     }
-    const { map } = content;
     return {
-        format: map.format,
-        type: map.type,
-        coord_system: map.coordSystem,
-        headland_enabled: map.headlandEnabled,
-        headland_width: map.headlandWidth,
         zones,
-        points: content.points.map((p) => ({ type: p.type, point: { x: p.point.x, y: p.point.y } })),
-        layer_settings: content.layerSettings.map((s) => ({ id: s.id, layer_id: s.layerId, value: s.value })),
         geo_anchor: content.geoAnchor ? { lat: content.geoAnchor.lat, lon: content.geoAnchor.lon } : null,
     };
 }

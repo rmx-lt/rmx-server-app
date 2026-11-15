@@ -1,26 +1,11 @@
-import { memo, useMemo, useRef } from "react";
+import { memo, useRef } from "react";
 import { Layer, Line } from "react-konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import type React from "react";
 import type { Zone } from "@/data/planning/schemaTypes";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import { ZONE_TYPE, type ZoneCategory } from "@/config/db-ops/enums";
-import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";
-
-function createStripePatternCanvas(bgColor: string, stripeColor: string): HTMLCanvasElement {
-    const stripeH = 16;
-    const gap = 16;
-    const tileSize = stripeH + gap;
-    const canvas = document.createElement("canvas");
-    canvas.width = tileSize;
-    canvas.height = tileSize;
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, tileSize, tileSize);
-    ctx.fillStyle = stripeColor;
-    ctx.fillRect(0, 0, tileSize, stripeH);
-    return canvas;
-}
+import type { ZoneCategory } from "@/config/db-ops/enums";
+import { LAYER_STYLE } from "@/config/canvas-editing/canvasConfig";
 
 interface CanvasPolygonObjectsLayerProps {
     category: ZoneCategory;
@@ -57,37 +42,25 @@ export function CanvasPolygonObjectsLayerInner({
     // Coordinates onDragStart/onDragEnd: only true when a left-button drag is active.
     const primaryDragRef = useRef(false);
 
-    const { visible, stroke, fill, edgeWidth } = usePolygonLayerStyle(category);
-
-    const onlinePattern = useMemo(
-        () => createStripePatternCanvas(fill, fill),
-        [fill],
-    );
-
-    const visibleObjects = visible
-        ? objects.filter((obj) => obj.category === category)
-        : [];
+    const { stroke, fill, edgeWidth } = LAYER_STYLE[category];
+    const layerObjects = objects.filter((obj) => obj.category === category);
 
     return (
         <Layer>
-            {visibleObjects.map((obj) => {
-                const isOnline = obj.type === ZONE_TYPE.ONLINE;
+            {layerObjects.map((obj) => {
                 const isSelected = selectedObject !== null && sameObject(obj, selectedObject) && activeTool === "select";
                 const isMoving = movingObject !== null && sameObject(obj, movingObject);
-                const fillPattern = isOnline ? onlinePattern : undefined;
 
                 return (
                     <Line
                         key={obj.id}
                         points={obj.vertices.flatMap((v) => [v.x, v.y])}
                         closed
-                        fill={fillPattern ? undefined : fill}
-                        fillPatternImage={fillPattern as unknown as HTMLImageElement}
-                        fillPatternRotation={fillPattern ? 45 : undefined}
+                        fill={fill}
                         stroke={stroke}
                         strokeWidth={(isSelected || isMoving ? edgeWidth * 1.5 : edgeWidth) / scale}
                         opacity={isMoving ? 0.55 : 1}
-                        dash={isMoving ? [8 / scale, 4 / scale] : isOnline ? [16 / scale, 4 / scale] : undefined}
+                        dash={isMoving ? [8 / scale, 4 / scale] : undefined}
                         listening={canInteract}
                         hitStrokeWidth={8 / scale}
                         draggable={canDrag}
