@@ -2,7 +2,7 @@
 import type { Setting } from "./Setting";
 
 /**
- * SettingList is the body of GET /app/api/settings.
+ * SettingList is the body of GET /api/settings.
  */
 export type SettingList = {
   settings: Array<Setting>,

@@ -27,7 +27,7 @@ import (
 
 const usage = `usage:
   rmx-server                      run the server (settings from the environment)
-  rmx-server healthcheck          exit 0 if GET /app/health answers 200
+  rmx-server healthcheck          exit 0 if GET /health answers 200
   rmx-server create-user <name>   add a login; the password is read from stdin
   rmx-server set-password <name>  new password from stdin; logs the user out everywhere
   rmx-server delete-user <name>   remove a login and all its sessions
@@ -173,14 +173,14 @@ func readNewPassword() (string, error) {
 	return password, nil
 }
 
-// healthcheck does GET /app/health on our own port; the exit code is 0 only on HTTP 200.
+// healthcheck does GET /health on our own port; the exit code is 0 only on HTTP 200.
 func healthcheck() int {
 	port := uint16(8080)
 	if addr, err := netip.ParseAddrPort(os.Getenv("BIND_ADDR")); err == nil {
 		port = addr.Port()
 	}
 	client := http.Client{Timeout: 3 * time.Second}
-	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/app/health", port))
+	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", port))
 	if err != nil {
 		return 1
 	}

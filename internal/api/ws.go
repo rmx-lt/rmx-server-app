@@ -1,6 +1,6 @@
 package api
 
-// The WebSocket (/app/ws): request and response envelopes.
+// The WebSocket (/ws): request and response envelopes.
 
 // ---- Requests (client to server) --------------------------------------------
 

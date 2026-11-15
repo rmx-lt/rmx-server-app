@@ -3,7 +3,7 @@ import type { MapDoc } from "./MapDoc";
 
 /**
  * MapDetail is one map with its content: the answer to GET, POST and PUT
- * on /app/api/maps. (Not "Map", which would shadow JavaScript's Map.)
+ * on /api/maps. (Not "Map", which would shadow JavaScript's Map.)
  */
 export type MapDetail = {
   id: number,

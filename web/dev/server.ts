@@ -2,7 +2,7 @@
  * Development server only (`bun dev`). In production rmx-server serves the
  * built files from `dist/`, and this file is not used.
  *
- * - Serves the app at /app/ with hot module reloading (Bun HTML import).
+ * - Serves the app at / with hot module reloading (Bun HTML import).
  * - Proxies the backend routes to rmx-server, so the browser sees one
  *   origin exactly like in production (no CORS, same relative URLs).
  */
@@ -70,22 +70,20 @@ function sendableCode(code: number): number {
 const server = serve<WsData>({
   port: PORT,
   routes: {
-    "/": Response.redirect("/app/", 302),
-    "/app": Response.redirect("/app/", 302),
-    "/app/api/*": proxy,
-    "/app/health": proxy,
-    "/app/ws": (req: Request, server: Server<WsData>) => {
+    "/api/*": proxy,
+    "/health": proxy,
+    "/ws": (req: Request, server: Server<WsData>) => {
       if (server.upgrade(req, { data: { queue: [], headers: forwardedHeaders(req) } })) return undefined;
       return new Response("WebSocket upgrade expected", { status: 400 });
     },
-    // The app itself, for every other path under /app/.
-    "/app/*": index,
+    // The app itself, for every other path.
+    "/*": index,
   },
 
   // Relays WebSocket frames both ways between the browser and rmx-server.
   websocket: {
     open(ws: ServerWebSocket<WsData>) {
-      const upstream = new BunWebSocket(`${BACKEND_WS}/app/ws`, { headers: ws.data.headers });
+      const upstream = new BunWebSocket(`${BACKEND_WS}/ws`, { headers: ws.data.headers });
       ws.data.upstream = upstream;
       upstream.onopen = () => {
         for (const msg of ws.data.queue) upstream.send(msg);
@@ -115,4 +113,4 @@ const server = serve<WsData>({
   },
 });
 
-console.log(`🚀 Web dev server at ${server.url}app/ (backend: ${BACKEND})`);
+console.log(`🚀 Web dev server at ${server.url} (backend: ${BACKEND})`);

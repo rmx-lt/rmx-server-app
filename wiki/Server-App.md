@@ -30,7 +30,7 @@ and ported to Go in November 2026, when the backend language was decided
 
 ```
 browser ──HTTPS/WSS :443──▶ Caddy ──▶ rmx-server :8080 ──▶ TimescaleDB
-          /app/api, /app/ws                 ▲
+          /api, /ws                         ▲
                                             │ mqtt:1883 (plain, internal)
 device ──MQTT over TLS :8883──────────▶ Mosquitto
 ```
@@ -40,10 +40,10 @@ This is the production layout: **browsers never speak MQTT**. Only devices
 Caddy only renews the certificate Mosquitto uses. Browsers talk to the server
 over HTTPS and its WebSocket, with their session.
 
-- **HTTPS**: login and logout under `/app/api/auth`, the user's maps
-  and settings under `/app/api/maps` and `/app/api/settings` (see [Planning API](#planning-api)), `/app/health`,
-  and the built client under `/app/`.
-- **WSS**: `/app/ws`, JSON request/response with a `request_id`. The only
+- **HTTPS**: login and logout under `/api/auth`, the user's maps
+  and settings under `/api/maps` and `/api/settings` (see [Planning API](#planning-api)), `/health`,
+  and the built client at `/`.
+- **WSS**: `/ws`, JSON request/response with a `request_id`. The only
   request today is `ping`; the connection (session check, keep-alive, close
   codes) is what later features build on.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
@@ -90,12 +90,12 @@ REST:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/app/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
-| GET | `/app/api/auth/me` | | 200 `{"username"}` / 401 |
-| POST | `/app/api/auth/logout` | | 204, clears the cookie (also without a session) |
-| POST | `/app/api/auth/logout-all` | | 204: ends every session of the user |
+| POST | `/api/auth/login` | `{"username", "password"}` | 200 `{"username"}` + `Set-Cookie` / 401 / 429 + `Retry-After` |
+| GET | `/api/auth/me` | | 200 `{"username"}` / 401 |
+| POST | `/api/auth/logout` | | 204, clears the cookie (also without a session) |
+| POST | `/api/auth/logout-all` | | 204: ends every session of the user |
 
-Everything except login, logout and `/app/health` needs the session cookie
+Everything except login, logout and `/health` needs the session cookie
 (else 401). Every request that changes something, and the WebSocket handshake,
 needs an allowed `Origin` (else 403).
 
@@ -300,17 +300,17 @@ How the app logs people in. Code: `internal/auth/` and
 
 ```
 browser                                   rmx-server                       TimescaleDB
-  │ POST /app/api/auth/login {user,pw}       │                                 │
+  │ POST /api/auth/login {user,pw}           │                                 │
   │ ───────────────────────────────────────▶ │ Argon2id check (slow, 19 MiB)   │
   │                                          │ token = 32 random bytes         │
   │                                          │ INSERT sessions(sha256(token))  │──▶
-  │ ◀── Set-Cookie: __Secure-app_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/app
+  │ ◀── Set-Cookie: __Host-app_session=<token>; HttpOnly; Secure; SameSite=Strict; Path=/
   │                                          │                                 │
-  │ GET /app/api/auth/me  (the browser adds the cookie)                        │
-  │ GET /app/ws + Upgrade (the cookie too)   │ look up sha256(cookie):         │
+  │ GET /api/auth/me  (the browser adds the cookie)                            │
+  │ GET /ws + Upgrade (the cookie too)       │ look up sha256(cookie):         │
   │ ───────────────────────────────────────▶ │ exists, not idle, not expired?  │──▶
   │ ◀── 200 / 101 Switching Protocols, or 401                                  │
-  │ POST /app/api/auth/logout                │ DELETE the row                  │──▶
+  │ POST /api/auth/logout                    │ DELETE the row                  │──▶
 ```
 
 **Why a session cookie, and not basic auth or a token in JavaScript**
@@ -342,14 +342,14 @@ browser                                   rmx-server                       Times
 | `HttpOnly` | yes | Scripts can't read the cookie. |
 | `Secure` | yes | HTTPS only. (Browsers treat `http://localhost` as secure, so local development works.) |
 | `SameSite` | **Strict** | The cookie is never sent on requests that another site starts, so a foreign page can't use it (CSRF). Lax would also send it when someone follows a link here from another site; we don't need that, because the page (static files) is public and only its own same-site API calls need the cookie. |
-| `Path` | `/app` | The app shares `rmx.lt` with the static site; its cookie stays under `/app`. |
-| Prefix | `__Secure-`, not `__Host-` | `__Host-` would be stronger (it also forbids `Domain=`, so a sibling like `api.rmx.lt` couldn't plant a cookie with the same name), but it requires `Path=/`. If a request carries our cookie name twice, the server treats it as logged out rather than guess which one is real. If the app ever gets an origin of its own, it should use `__Host-session; Path=/`. |
+| `Path` | `/` | The app has its own host, `app.rmx.lt`, so the whole host is the app. The `__Host-` prefix requires `Path=/`. |
+| Prefix | `__Host-` (`__Host-app_session`) | Browsers accept such a cookie only with `Secure`, from an HTTPS page, with `Path=/` and without `Domain=`. So plain HTTP can't set or overwrite it, and another host under `rmx.lt` can't plant a cookie with the same name that would be sent here. If a request still carries our cookie name twice, the server treats it as logged out rather than guess which one is real. |
 | CSRF | SameSite **plus** an `Origin` check | SameSite works per *site* (all of `rmx.lt`), and not every browser enforces it. Every request that isn't GET/HEAD/OPTIONS, and every WebSocket handshake, must have an `Origin` from `ALLOWED_ORIGINS`, or it gets 403. The login too (no "log the victim into the attacker's account"). WebSockets matter most: CORS doesn't cover them, so without this any website could open one with the user's cookie ("cross-site WebSocket hijacking"). |
 | Password guessing | in-memory backoff per username and per IP | 5 free failures per username (20 per IP), then 1 s, 2 s, 4 s … up to 15 min; while waiting, even the right password gets 429. Unknown usernames are checked against a dummy hash, so they take as long and get the same answer. A restart forgets the counters; several instances would need a shared store. |
 | Client IP | last `X-Forwarded-For` entry, else the TCP peer | Caddy sets that header; the app's port is not published, so only Caddy reaches it. |
 | Caching | `Cache-Control: no-store` behind the login | No copy of user data in a shared cache, or in the back button after logout. |
 
-**What's public:** `/app/health` (only up/down and the version, for the
+**What's public:** `/health` (only up/down and the version, for the
 deploy script and monitoring), login and logout, and the web app's static files
 (the same code as in this repository, no data). The router (`internal/httpx`)
 has only two ways to add a route, `Public()` and `Protected()`, and every
@@ -412,14 +412,14 @@ find while driving.
 
 | Route | Body → answer |
 |---|---|
-| `GET /app/api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
-| `POST /app/api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
-| `GET /app/api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
-| `PUT /app/api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
-| `DELETE /app/api/maps/{id}` | → 204 |
-| `GET /app/api/settings` | → `SettingList` {settings: [{key, value}]}, sorted by key |
-| `PUT /app/api/settings/{key}` | `SettingValue` {value: any JSON but null} → 204 |
-| `DELETE /app/api/settings/{key}` | → 204, also when the key was not set |
+| `GET /api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
+| `POST /api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
+| `GET /api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
+| `PUT /api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
+| `DELETE /api/maps/{id}` | → 204 |
+| `GET /api/settings` | → `SettingList` {settings: [{key, value}]}, sorted by key |
+| `PUT /api/settings/{key}` | `SettingValue` {value: any JSON but null} → 204 |
+| `DELETE /api/settings/{key}` | → 204, also when the key was not set |
 
 The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
 shadow JavaScript's `Map`.
@@ -449,7 +449,7 @@ The web app in `web/` is the blade-terminal workbench, ported from
 end points) on a canvas, inspect it, and save it. It opens on the login form
 when there is no session; after login the workbench loads, with the user menu
 (log out, log out everywhere) at the right of its header. While logged in the
-app keeps the WebSocket open; when it closes, the app asks `/app/api/auth/me`
+app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
 whether the session still exists and shows the login form if not.
 
 - **Data lives on the server.** Each user's maps and settings are stored by the
@@ -487,7 +487,7 @@ whether the session still exists and shows the login form if not.
   its layer setting values.
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
-  monitor feature, and the only `fetch` calls go to the app's own `/app/`
+  monitor feature, and the only `fetch` calls go to the app's own
   API.
 
 ## Repository layout
@@ -608,7 +608,7 @@ dev\run.ps1 -NoSim      # without the simulated device
 dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
-Then open <http://localhost:3000/app/> and log in as `DEV_USER` / `DEV_PASSWORD`
+Then open <http://localhost:3000/> and log in as `DEV_USER` / `DEV_PASSWORD`
 from `.env` (default `dev` / `dev-password-123`). The script:
 
 - creates `.env` from `.env.example` when it is missing;
@@ -672,7 +672,7 @@ bun run dev
 ```
 
 Create a login once (the dev database keeps it), then open
-<http://localhost:3000/app/> and log in; the workbench loads:
+<http://localhost:3000/> and log in; the workbench loads:
 
 ```powershell
 go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
@@ -696,8 +696,8 @@ installed on the PC):
 **How the dev server works.** `bun run dev` runs `web/dev/server.ts`:
 `Bun.serve` with an HTML import of `public/index.html`, so Bun bundles the app
 on the fly with hot module reloading and Tailwind (`bun-plugin-tailwind` in
-`bunfig.toml`). The same server proxies `/app/api/*`, `/app/health`,
-and the `/app/ws` WebSocket to rmx-server (passing
+`bunfig.toml`). The same server proxies `/api/*`, `/health`,
+and the `/ws` WebSocket to rmx-server (passing
 on the session cookie and `Origin`, which rmx-server checks)
 (`BACKEND_URL`, default `http://127.0.0.1:8080`). The browser sees a
 single origin with the same paths as production, so there is no CORS and no
@@ -718,7 +718,7 @@ docker run --rm -p 8080:8080 `
   rmx-server-app:local
 ```
 
-Then open <http://localhost:8080/app/>.
+Then open <http://localhost:8080/>.
 
 ## Tests and checks
 
@@ -789,7 +789,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
   unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
-- `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /app/health`).
+- `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
   a time). `mem_limit: 64m` is enough: the image sets `GOMEMLIMIT=40MiB` so the
@@ -806,7 +806,7 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `MQTT_PORT` | no | `1883` | default 1883 |
 | `MQTT_USERNAME` | yes | `app` | ACL: readwrite `mower/#` |
 | `MQTT_PASSWORD` | yes | (secret, server-side `.env`) | never logged |
-| `ALLOWED_ORIGINS` | **yes** | `https://rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
+| `ALLOWED_ORIGINS` | **yes** | `https://app.rmx.lt` | comma-separated origins of the page. Others can't log in, change data or open the WebSocket (403). The server doesn't start without it |
 | `LOG_LEVEL` | no | `info` | `debug`, `info`, `warn` or `error`. The Rust version's `RUST_LOG` is ignored |
 | `BIND_ADDR` | no | `0.0.0.0:8080` | already set in the image |
 | `MQTT_CLIENT_ID` | no | `rmx-server` | must be unique on the broker |
@@ -821,18 +821,19 @@ or newer 2.x). The first migration runs `CREATE EXTENSION IF NOT EXISTS
 timescaledb`, so the database user must own the database and either be a
 superuser (the image's `POSTGRES_USER` is) or the extension must already exist.
 
-**Routes the app serves itself** (Caddy proxies `rmx.lt/app` and `rmx.lt/app/*` as-is and
-must **not** strip the `/app` prefix). The app does its own login, so Caddy
+**Routes the app serves itself.** The app has its own host, `https://app.rmx.lt/`,
+and its routes start at the root: Caddy proxies every path of that host as-is,
+with no prefix to add or strip. The app does its own login, so Caddy
 needs no `basic_auth` in front of it:
 
 | Path | Login | What |
 |---|---|---|
-| `/app` | public | 308 redirect to `/app/` |
-| `/app/` and other unknown `/app/*` | public | the client (static files, `index.html` fallback); it shows the login form |
-| `/app/api/auth/login`, `/app/api/auth/logout` | public | login, logout |
-| `/app/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
-| `/app/api/auth/me`, `/app/api/auth/logout-all` | session | REST |
-| `/app/ws` | session | WebSocket (Caddy proxies upgrades by default) |
+| `/` and every path not listed below | public | the client (static files, `index.html` fallback); it shows the login form |
+| `/api/auth/login`, `/api/auth/logout` | public | login, logout |
+| `/health` | public | `{"status":"ok","db":true,"mqtt":true,"version":"0.1.0"}`, 200 or 503 |
+| `/api/auth/me`, `/api/auth/logout-all`, `/api/maps…`, `/api/settings…` | session | REST |
+| other `/api/…` | public | 404 |
+| `/ws` | session | WebSocket (Caddy proxies upgrades by default) |
 
 **Proxy requirements:** pass on `Host`, `Origin` and `Cookie` unchanged (Caddy
 does by default) and set `X-Forwarded-For` (Caddy does; the login rate limit
@@ -852,8 +853,8 @@ and sends only the tag `sha-<short>`. That user's key is restricted to one
 forced command, the deploy script in `rmx-server-infra` (it moves from the old
 probe stack to `services/app/` in
 [rmx-server-infra#85](https://github.com/rmx-lt/rmx-server-infra/issues/85)).
-It checks the tag, pulls the image, restarts `app`, waits for
-`/app/health`, and rolls back to the previous tag if the new one isn't
+It checks the tag, pulls the image, restarts `app`, waits until the container
+is healthy (the image's `healthcheck`, `GET /health`), and rolls back to the previous tag if the new one isn't
 healthy (the job then fails).
 
 Repository secrets: `DEPLOY_HOST`, `DEPLOY_SSH_KEY` (the private key),

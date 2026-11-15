@@ -4,7 +4,7 @@
 #   dev\run.ps1 -NoSim      # without the simulated device
 #   dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations, new dev login)
 #
-# Then open http://localhost:3000/app/ and log in with DEV_USER / DEV_PASSWORD
+# Then open http://localhost:3000/ and log in with DEV_USER / DEV_PASSWORD
 # from .env (default dev / dev-password-123). Ctrl+C stops the Go server, the
 # web dev server and the simulator; the compose stack keeps running
 # (docker compose -f compose.dev.yaml down to stop it).
@@ -102,7 +102,7 @@ try {
     while ($true) {
         $srv = Start-Process $server -NoNewWindow -PassThru
         if (-not $NoSim) { $dev = Start-Process $sim -ArgumentList '-name', $SimName -NoNewWindow -PassThru }
-        Say "running: http://localhost:3000/app/  (server pid $($srv.Id); Ctrl+C stops)"
+        Say "running: http://localhost:3000/  (server pid $($srv.Id); Ctrl+C stops)"
         # Wait for a source change, then rebuild and restart the Go side.
         while ($true) {
             Start-Sleep -Milliseconds 800

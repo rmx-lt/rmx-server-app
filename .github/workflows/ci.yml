@@ -165,7 +165,7 @@ jobs:
   # forces one deploy script (source in rmx-server-infra; it moves from the old
   # probe stack to services/app/ in https://github.com/rmx-lt/rmx-server-infra/issues/85),
   # so the only thing this job can send is the tag.
-  # The script pulls the image, restarts the app container, waits for /app/health
+  # The script pulls the image, restarts the app container, waits for /health
   # and rolls back if it isn't healthy (then this job fails).
   # Secrets: DEPLOY_HOST, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS
   # (the VPS host key line, pinned, so no trust-on-first-use).

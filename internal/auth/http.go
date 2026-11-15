@@ -13,22 +13,22 @@ import (
 	"github.com/rmx-lt/rmx-server-app/internal/httpx"
 )
 
-// The HTTP side of the login: the /app/api/auth/* handlers, the session
+// The HTTP side of the login: the /api/auth/* handlers, the session
 // middleware, and the Origin check against cross-site requests.
 
-// Routes registers the /app/api/auth routes. Login and logout work without a
+// Routes registers the /api/auth routes. Login and logout work without a
 // session; me and logout-all need one.
 func (s *Service) Routes(r *httpx.Router) {
-	r.Public().HandleFunc("POST /app/api/auth/login", s.HandleLogin)
-	r.Public().HandleFunc("POST /app/api/auth/logout", s.HandleLogout)
-	r.Protected().HandleFunc("GET /app/api/auth/me", HandleMe)
-	r.Protected().HandleFunc("POST /app/api/auth/logout-all", s.HandleLogoutAll)
+	r.Public().HandleFunc("POST /api/auth/login", s.HandleLogin)
+	r.Public().HandleFunc("POST /api/auth/logout", s.HandleLogout)
+	r.Protected().HandleFunc("GET /api/auth/me", HandleMe)
+	r.Protected().HandleFunc("POST /api/auth/logout-all", s.HandleLogoutAll)
 }
 
 // Responses that carry session data must not be stored by any cache.
 func noStore(w http.ResponseWriter) { w.Header().Set("Cache-Control", "no-store") }
 
-// HandleLogin handles POST /app/api/auth/login with {"username", "password"}:
+// HandleLogin handles POST /api/auth/login with {"username", "password"}:
 // 200 + Set-Cookie + Me; 401 for a wrong username or password (the same
 // answer for both, so it doesn't reveal which names exist); 429 + Retry-After
 // after too many failures.
@@ -60,7 +60,7 @@ func (s *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, api.Me{Username: user.Username})
 }
 
-// HandleLogout handles POST /app/api/auth/logout: ends this session. Always 204
+// HandleLogout handles POST /api/auth/logout: ends this session. Always 204
 // and clears the cookie, even if there was no valid session.
 func (s *Service) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if token, state := SessionCookie(r.Header); state == CookieFound {
@@ -72,7 +72,7 @@ func (s *Service) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	loggedOut(w)
 }
 
-// HandleLogoutAll handles POST /app/api/auth/logout-all: ends every session of this user.
+// HandleLogoutAll handles POST /api/auth/logout-all: ends every session of this user.
 func (s *Service) HandleLogoutAll(w http.ResponseWriter, r *http.Request) {
 	user, _ := core.UserFrom(r.Context())
 	n, err := s.LogoutEverywhere(r.Context(), user.UserID)
@@ -84,7 +84,7 @@ func (s *Service) HandleLogoutAll(w http.ResponseWriter, r *http.Request) {
 	loggedOut(w)
 }
 
-// HandleMe handles GET /app/api/auth/me: who is logged in (401 if nobody). The
+// HandleMe handles GET /api/auth/me: who is logged in (401 if nobody). The
 // client asks this at start to choose between the login form and the app.
 func HandleMe(w http.ResponseWriter, r *http.Request) {
 	user, _ := core.UserFrom(r.Context())
@@ -124,12 +124,12 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 	})
 }
 
-// CheckOrigin is the middleware for everything under /app: requests that
+// CheckOrigin is the middleware for every route: requests that
 // change something (any method but GET/HEAD/OPTIONS) and WebSocket handshakes
 // must come from one of the allowed origins, else 403.
 //
-// Why, on top of SameSite=Strict: SameSite works per site (rmx.lt), so it
-// doesn't stop a page on another rmx.lt subdomain, and older browsers ignore
+// Why, on top of SameSite=Strict: SameSite works per site (all of rmx.lt), so it
+// doesn't stop a page on another rmx.lt host, and older browsers ignore
 // it. Browsers always send Origin on these requests and on WebSocket
 // handshakes, and a page can't fake it. WebSockets matter most: they are not
 // covered by CORS, so without this check any website could open one to us with

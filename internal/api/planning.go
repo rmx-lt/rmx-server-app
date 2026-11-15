@@ -71,7 +71,7 @@ type MapDoc struct {
 	GeoAnchor *GeoAnchor `json:"geo_anchor"`
 }
 
-// MapSummary is one entry of GET /app/api/maps.
+// MapSummary is one entry of GET /api/maps.
 type MapSummary struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
@@ -83,13 +83,13 @@ type MapSummary struct {
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
-// MapList is the body of GET /app/api/maps, newest change first.
+// MapList is the body of GET /api/maps, newest change first.
 type MapList struct {
 	Maps []MapSummary `json:"maps"`
 }
 
 // MapDetail is one map with its content: the answer to GET, POST and PUT
-// on /app/api/maps. (Not "Map", which would shadow JavaScript's Map.)
+// on /api/maps. (Not "Map", which would shadow JavaScript's Map.)
 type MapDetail struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -99,14 +99,14 @@ type MapDetail struct {
 	Doc       MapDoc    `json:"doc"`
 }
 
-// MapCreate is the body of POST /app/api/maps.
+// MapCreate is the body of POST /api/maps.
 type MapCreate struct {
 	// 1 to 100 characters, surrounding spaces removed.
 	Name string `json:"name"`
 	Doc  MapDoc `json:"doc"`
 }
 
-// MapUpdate is the body of PUT /app/api/maps/{id}. A revision other than
+// MapUpdate is the body of PUT /api/maps/{id}. A revision other than
 // the stored one is refused with 409 (code "conflict"): someone else saved
 // in between.
 type MapUpdate struct {
@@ -121,12 +121,12 @@ type Setting struct {
 	Value json.RawMessage `json:"value"`
 }
 
-// SettingList is the body of GET /app/api/settings.
+// SettingList is the body of GET /api/settings.
 type SettingList struct {
 	Settings []Setting `json:"settings"`
 }
 
-// SettingValue is the body of PUT /app/api/settings/{key}.
+// SettingValue is the body of PUT /api/settings/{key}.
 type SettingValue struct {
 	Value json.RawMessage `json:"value"`
 }
