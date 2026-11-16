@@ -55,12 +55,17 @@ interface GeoAnchorState {
     setSystemGeoAnchor: (geoAnchor: GeoAnchor | null) => Promise<void>;
     setMapGeoAnchor: (mapId: number, geoAnchor: GeoAnchor | null) => Promise<void>;
     clearMapGeoAnchor: () => void;
+    /** The "where is this map?" dialog (new map, or on demand). */
+    promptOpen: boolean;
+    setPromptOpen: (open: boolean) => void;
 }
 
 export const useGeoAnchorStore = create<GeoAnchorState>()((set) => ({
     systemGeoAnchor: undefined,
     mapGeoAnchor: undefined,
     systemDraft: toDraft(),
+    promptOpen: false,
+    setPromptOpen: (promptOpen) => set({ promptOpen }),
     mapDraft: toDraft(),
 
     loadSystemGeoAnchor: async () => {
