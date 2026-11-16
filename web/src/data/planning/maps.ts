@@ -73,7 +73,7 @@ function trimName(name: string): string {
 function fromWire(detail: MapDetail): MapContent {
     const id = detail.id;
     const doc = detail.doc;
-    if (doc.zones.length === 0 || doc.zones.some((z) => !Array.isArray(z.areas))) throw new MapFormatError();
+    if (doc.zones.length === 0 || doc.zones.some((z) => !z.name || !Array.isArray(z.areas))) throw new MapFormatError();
     const activeZone = doc.zones[0]!;
     const areas: Area[] = activeZone.areas
         .filter((a) => isDrawn(a.category))

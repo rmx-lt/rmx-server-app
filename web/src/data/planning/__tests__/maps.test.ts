@@ -65,7 +65,7 @@ describe("loadMap", () => {
     });
 
     test("refuses a map in the format from before zones", async () => {
-        const old = { zones: [{ id: 1, category: "mowing", vertices: [] }], geo_anchor: null } as unknown as MapDoc;
+        const old = { zones: [{ id: 1, name: "", areas: null }], geo_anchor: null } as unknown as MapDoc;
         answers.push({ status: 200, body: detail(7, 3, old) });
         expect(loadMap(7)).rejects.toBeInstanceOf(MapFormatError);
     });
