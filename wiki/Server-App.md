@@ -833,6 +833,14 @@ whether the session still exists and shows the login form if not.
   `web/src/config/canvas-editing/canvasConfig.ts`), the colours come from the
   theme (see "Name, logo and theme"), and the code decides what is
   visible: the grid always, the satellite map when the map has a geo anchor.
+  The grid has two levels (a stronger line every 5 minor cells; the cell size
+  follows the zoom through `pickGridLevel`, from 0.04 to 40 000 map
+  units) and fades out towards the edges. The zoom goes up to 200 (a 20 cm
+  line is 40 px wide when the map unit is metres); the wheel (Alt + wheel),
+  the buttons and the shortcuts animate to their target, anchored on the cursor
+  (the canvas centre for buttons and shortcuts), and a new step retargets it.
+  The bottom bar of the workbench shows a scale bar as long as one grid cell,
+  labelled in the map's unit.
   The map has no format, type, coordinate system, headland, route points or
   zone type, and there is no map generator, vertex modifier or XML import and
   export. The mower owns its dimensions, so the headland comes back when it
