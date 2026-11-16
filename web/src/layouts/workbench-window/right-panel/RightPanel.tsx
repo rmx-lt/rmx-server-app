@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { TabGroup, TabPanel, TabPanels } from "@headlessui/react";
 import { ChartLine, X } from "lucide-react";
 import InspectorPanelSection from "@/components/inspector-panel/InspectorPanelSection";
@@ -10,6 +11,7 @@ import MowingAreaField from "@/features/inspector/components/map-section/MowingA
 import MowingAreaCountField from "@/features/inspector/components/map-section/MowingAreaCountField";
 import NoGoAreaCountField from "@/features/inspector/components/map-section/NoGoAreaCountField";
 import PerimeterLengthField from "@/features/inspector/components/map-section/PerimeterLengthField";
+import PanelResizeHandle from "@/layouts/workbench-window/PanelResizeHandle";
 import { useMapStore } from "@/model/mapStore";
 import { useUiShellStore, type RightTab } from "@/features/ui-manager/stores/uiShellStore";
 
@@ -58,6 +60,8 @@ export default function RightPanel() {
     const tab = useUiShellStore((s) => s.rightTab);
     const setTab = useUiShellStore((s) => s.setRightTab);
 
+    const width = useUiShellStore((s) => s.rightWidth);
+
     if (!rightOpen) return null;
 
     return (
@@ -65,8 +69,10 @@ export default function RightPanel() {
             <div aria-hidden className="fixed inset-0 z-30 bg-overlay lg:hidden" onClick={setRightOpen} />
             <aside
                 aria-label="Right panel"
-                className="fixed inset-y-0 right-0 z-40 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-l border-line bg-surface pt-12 lg:static lg:z-auto lg:max-w-none lg:pt-2"
+                style={{ "--panel-w": `${width}px` } as CSSProperties}
+                className="fixed inset-y-0 right-0 z-40 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-l border-line bg-surface pt-12 lg:relative lg:z-auto lg:w-(--panel-w) lg:max-w-none lg:pt-2"
             >
+                <PanelResizeHandle side="right" />
                 <button
                     type="button"
                     aria-label="Close right panel"

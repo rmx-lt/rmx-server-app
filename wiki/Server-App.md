@@ -875,7 +875,8 @@ whether the session still exists and shows the login form if not.
   a side panel on the left and the bottom bar under everything:
   - **Bottom bar** (`layouts/bottom-bar/`): a thin bar across the full width,
     on both pages. It holds the server status, "Server: live" or "Server:
-    offline", and nothing else. There is no "reconnecting": the socket's retry
+    offline" (tooltip: "Connected; changes are saved" / "Offline; changes
+    wait"), and nothing else. There is no "reconnecting": the socket's retry
     cycle would only make it flicker.
   - **Home** (`layouts/home-window/`, modelled on SolidCraft's start page).
     Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
@@ -888,14 +889,19 @@ whether the session still exists and shows the login form if not.
     on Home. The actions are those in `features/map-manager/data/mapBridge.ts`,
     the same code as before the move.
   - **Workbench** (`layouts/workbench-window/`):
-    - **Side panel** (left, collapsible; Ctrl+Alt+C): logo and name, a Home
-      button, the mode switch, then the **Zones** list of the open map (in
+    - **Side panel** (left, collapsible; Ctrl+Alt+C): no logo or name; it
+      starts with the close button at the left, in the place of the top bar's
+      open button, so the toggle does not move. A Home button, the mode switch, then the **Zones** list of the open map (in
       every mode): the active zone is marked, a zone is renamed from its menu
       (Rename) or by double click, in place, and the change is saved by the
       autosave. There is no add, delete or reorder of zones yet. Then a device spot (placeholder until
       [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
       and at the bottom the account menu and the settings button. It has no map
-      list and no New map.
+      list and no New map. **Both panels are resizable** (from 768 px, from
+      1024 px for the right one): drag the inner edge between 224 and 480 px; the
+      width is kept in `localStorage` (`rmx:panel-widths`). At the minimum width,
+      dragging on past half of it closes the panel, and in the same drag,
+      coming back past that point opens it again.
     - **Top bar:** over the canvas and the right panel, up to the right edge,
       with a line under it. The open map's name is at the left (click to
       rename); its edit box is as wide as the name, between a minimum and a
@@ -909,6 +915,8 @@ whether the session still exists and shows the login form if not.
       the active zone's name: its area counts, area to mow and perimeter; for a
       selected area its category and gross and net area; no vertex data) and Monitor (a
       placeholder).
+  - **Modals** (`components/ui/Modal.tsx`) fade the backdrop and scale and fade
+    the panel in step (150 ms), on open and on close.
   - **Settings modal**: a page list on the left, on both pages. Account (user
     name, log out, log out everywhere), Appearance (theme, unit of measure) and
     Map defaults (the default geo anchor of new maps, and the open map's own).
