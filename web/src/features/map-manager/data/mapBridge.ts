@@ -59,7 +59,7 @@ function closeMap(): void {
 
 /** Creates a blank map on the server, without a geo anchor (newMap asks where it is). Returns its id. */
 async function createBlankMap(): Promise<number> {
-    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [] }, BLANK_MAP.name);
+    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [], geoAnchor: undefined }, BLANK_MAP.name);
 }
 
 /** At login: opens the map opened last in this browser; when there is none, it is gone or it can't be opened, shows Home. Nothing is saved first. */
