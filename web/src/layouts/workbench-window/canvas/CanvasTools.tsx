@@ -9,14 +9,14 @@ import { useModeStore } from "@/model/modeStore";
 function DriveTools() {
     return (
         <>
-            <ToolStripButton inert label="Driving control" hint="drives the mower by hand" icon={Gamepad2} />
-            <ToolStripButton inert label="Mower mode" hint="sets the mower's mode" icon={SlidersHorizontal} />
-            <ToolStripButton inert label="Blade" hint="turns the blade on and off" icon={Scissors} />
-            <ToolStripButton inert label="Stop" hint="stops the mower at once" icon={OctagonX} />
+            <ToolStripButton inert label="Driving control" note="drives the mower by hand" icon={Gamepad2} />
+            <ToolStripButton inert label="Mower mode" note="sets the mower's mode" icon={SlidersHorizontal} />
+            <ToolStripButton inert label="Blade" note="turns the blade on and off" icon={Scissors} />
+            <ToolStripButton inert label="Stop" note="stops the mower at once" icon={OctagonX} />
             <ToolStripSeparator />
-            <ToolStripButton inert label="Record border" hint="records a border while you drive" icon={CircleDot} />
-            <ToolStripButton inert label="Rewind" hint="steps back along the recorded border" icon={Rewind} />
-            <ToolStripButton inert label="Save as zone" hint="turns the recorded border into a zone" icon={Save} />
+            <ToolStripButton inert label="Record border" note="records a border while you drive" icon={CircleDot} />
+            <ToolStripButton inert label="Rewind" note="steps back along the recorded border" icon={Rewind} />
+            <ToolStripButton inert label="Save as zone" note="turns the recorded border into a zone" icon={Save} />
         </>
     );
 }
@@ -24,13 +24,13 @@ function DriveTools() {
 function MowTools() {
     return (
         <>
-            <ToolStripButton inert label="Plan job" hint="plans a mowing job for the zones" icon={Route} />
-            <ToolStripButton inert label="Start" hint="starts the job" icon={Play} />
-            <ToolStripButton inert label="Pause" hint="pauses the job" icon={CirclePause} />
-            <ToolStripButton inert label="Resume" hint="resumes the paused job" icon={CirclePlay} />
+            <ToolStripButton inert label="Plan job" note="plans a mowing job for the zones" icon={Route} />
+            <ToolStripButton inert label="Start" note="starts the job" icon={Play} />
+            <ToolStripButton inert label="Pause" note="pauses the job" icon={CirclePause} />
+            <ToolStripButton inert label="Resume" note="resumes the paused job" icon={CirclePlay} />
             <ToolStripSeparator />
-            <ToolStripButton inert label="Go to point" hint="sends the mower to a point on the map" icon={LocateFixed} />
-            <ToolStripButton inert label="Follow path" hint="makes the mower follow a drawn path" icon={Spline} />
+            <ToolStripButton inert label="Go to point" note="sends the mower to a point on the map" icon={LocateFixed} />
+            <ToolStripButton inert label="Follow path" note="makes the mower follow a drawn path" icon={Spline} />
         </>
     );
 }

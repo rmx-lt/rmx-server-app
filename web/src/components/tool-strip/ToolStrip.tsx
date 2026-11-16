@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 
 /** A rounded strip of tools that floats over the canvas, bottom middle. */
 export function ToolStrip({ label, children }: { label: string; children: ReactNode }) {
@@ -20,8 +21,10 @@ export function ToolStripSeparator() {
 interface ToolStripButtonProps {
     label: string;
     icon: ComponentType<{ size?: number; strokeWidth?: number; "aria-hidden"?: boolean }>;
-    /** Shortcut or note, shown after the label in the tooltip. */
-    hint?: string;
+    /** The shortcut, from the shortcut definitions; shown in the tooltip. */
+    shortcut?: readonly string[];
+    /** What the tool does, when it is not there yet; shown after the label. */
+    note?: string;
     active?: boolean;
     disabled?: boolean;
     /** The tool is a placeholder: it stays in the Tab order and says what it will do. */
@@ -29,15 +32,15 @@ interface ToolStripButtonProps {
     onClick?: () => void;
 }
 
-export function ToolStripButton({ label, icon: Icon, hint, active, disabled, inert, onClick }: ToolStripButtonProps) {
+export function ToolStripButton({ label, icon: Icon, shortcut, note, active, disabled, inert, onClick }: ToolStripButtonProps) {
     const off = disabled || inert;
     return (
+        <Tooltip label={note ? `${label}: ${note}` : label} shortcut={shortcut}>
         <button
             type="button"
             aria-label={label}
             aria-pressed={active === undefined ? undefined : active}
             aria-disabled={off || undefined}
-            title={hint ? `${label} (${hint})` : label}
             onClick={off ? undefined : onClick}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
                 off
@@ -49,5 +52,6 @@ export function ToolStripButton({ label, icon: Icon, hint, active, disabled, ine
         >
             <Icon size={18} strokeWidth={1.75} aria-hidden />
         </button>
+        </Tooltip>
     );
 }

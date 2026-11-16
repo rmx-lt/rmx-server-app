@@ -791,11 +791,12 @@ whether the session still exists and shows the login form if not.
   and writes them back unchanged on every save (renumbered if a drawn zone took
   their id).
 - **Saving.** Everything is saved by itself; there is no save status, Save
-  button, autosave switch or leave-page warning. A new map (New map in the
-  side panel, Ctrl+Alt+N) is created on the server at once, and a page load
-  opens the map changed last (or creates one when the user has none). A click
-  in the map list opens another; Duplicate in its menu makes a copy ("name
-  (copy)") and opens it. A change is saved
+  button, autosave switch or leave-page warning. A new map (New map on
+  Home, Ctrl+Alt+N) is created on the server at once. After login the app
+  opens the map opened last in this browser (its id is kept in `localStorage`,
+  key `rmx:last-map`), or shows Home when there is none or it no longer exists;
+  nothing is created by itself. Duplicate in a map's menu on Home makes a copy
+  ("name (copy)") and makes it the open map, and Home stays. A change is saved
   one second after the last one (a burst is one save): the whole map with the
   `revision` it was loaded or saved at (`web/src/data/planning/autosave.ts`,
   wired up in `features/canvas-editing/data/canvasBridge.ts`). A failed save is
@@ -805,8 +806,8 @@ whether the session still exists and shows the login form if not.
   if it fails the switch is refused. When the map was saved elsewhere in
   between (409 `conflict`), the client reads the stored revision and saves its
   own document over it: the user's change is never dropped, the other window's
-  change to the same map is. The only state shown is the connection: "Live"
-  while the WebSocket is open, "Offline" otherwise (top bar, right).
+  change to the same map is. The only state shown is the connection: "Server: live"
+  while the WebSocket is open, "Server: offline" otherwise (bottom bar).
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
   read once per login.
@@ -844,30 +845,61 @@ whether the session still exists and shows the login form if not.
   flash. The choice is made in the settings modal, page
   Appearance.
 - **The shell.** The structure of the Claude desktop app, with the canvas in
-  place of the chat (`web/src/layouts/workbench-window/`):
-  - **Side panel** (left, collapsible; Ctrl+Alt+C): logo and name, New map, the
-    mode switch, the map list, a device spot (placeholder until
-    [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
-    and at the bottom the account menu and the settings button. The list shows
-    the newest change first and marks the open map; its menu per map has
-    Rename, Duplicate and Delete (a confirmation first). Deleting the open map
-    opens the next one, or makes a new one when it was the last.
-  - **Top bar:** the open map's name in the middle (click to rename; the same
-    rename as the list menu), the connection state and the right panel toggle.
-  - **Canvas** in the middle, with the tool strip floating at the bottom
-    middle (a rounded strip) and the view controls (zoom in, zoom out, fit all
-    zones, home) at the bottom right in every mode.
-  - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (the map's
-    zone counts, area to mow and perimeter; for a selected zone its category
-    and gross and net area; no vertex data) and Monitor (a placeholder).
-  - **Settings modal**: a page list on the left. Account (user name, log out,
-    log out everywhere), Appearance (theme, unit of measure) and Map defaults
-    (the default geo anchor of new maps, and the open map's own). Later pages
-    (users, NTRIP, devices, shortcuts) come with their own issues.
-  - Under 768 px the side panel, and under 1024 px the right panel, float over
-    the canvas instead of sitting beside it (a tap outside closes them);
-    opening one closes the other on a narrow screen, and both start closed
-    there.
+  place of the chat. The app shows one of two pages, held by one store value
+  (`model/pageStore.ts`, `home` or `workbench`; there is no router), each with
+  a side panel on the left and the bottom bar under everything:
+  - **Bottom bar** (`layouts/bottom-bar/`): a thin bar across the full width,
+    on both pages. It holds the server status, "Server: live" or "Server:
+    offline", and nothing else. There is no "reconnecting": the socket's retry
+    cycle would only make it flicker.
+  - **Home** (`layouts/home-window/`, modelled on SolidCraft's start page).
+    Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
+    only when a map is open), New map (Ctrl+Alt+N), and at the bottom the
+    account menu and the settings button. Work area: a New map card and the
+    list of maps, newest change first, with the zone counts and the time of
+    the last change; the open map is marked "Open". A click opens a map in the
+    workbench; its menu has Rename (in place), Duplicate and Delete (a
+    confirmation first). Deleting the open map leaves no map open and the user
+    on Home. The actions are those in `features/map-manager/data/mapBridge.ts`,
+    the same code as before the move.
+  - **Workbench** (`layouts/workbench-window/`):
+    - **Side panel** (left, collapsible; Ctrl+Alt+C): logo and name, a Home
+      button, the mode switch, then free space (for the zones of the open map,
+      [rmx-server-app#121](https://github.com/rmx-lt/rmx-server-app/issues/121)),
+      a device spot (placeholder until
+      [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
+      and at the bottom the account menu and the settings button. It has no map
+      list and no New map.
+    - **Top bar:** over the canvas and the right panel, up to the right edge,
+      with a line under it. The open map's name is at the left (click to
+      rename); its edit box is as wide as the name, between a minimum and a
+      maximum width (a hidden copy of the text sets it, because CSS
+      `field-sizing` is missing in Firefox), and a long name is cut with an
+      ellipsis when not edited. The right panel toggle is at the right.
+    - **Canvas** in the middle, with the tool strip floating at the bottom
+      middle (a rounded strip) and the view controls (zoom in, zoom out, fit
+      all zones, home) at the bottom right in every mode.
+    - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (the
+      map's zone counts, area to mow and perimeter; for a selected zone its
+      category and gross and net area; no vertex data) and Monitor (a
+      placeholder).
+  - **Settings modal**: a page list on the left, on both pages. Account (user
+    name, log out, log out everywhere), Appearance (theme, unit of measure) and
+    Map defaults (the default geo anchor of new maps, and the open map's own).
+    Later pages (users, NTRIP, devices, shortcuts) come with their own issues.
+  - **Tooltips** (`components/tooltip/Tooltip.tsx`, no dependency): one
+    component for every control that needs one, a small dark box with the label
+    and, where there is one, the shortcut in a muted tone. It shows after a
+    short hover and at once on keyboard focus, hides on Escape and on press,
+    stays inside the window, and is linked to its control with
+    `aria-describedby`. Shortcuts come from
+    `config/shortcut-manager/workbenchShortcutsConfig.ts`, not typed again. No
+    native `title` attributes are used. The text selection colour is the
+    browser's.
+  - Under 768 px the workbench side panel, and under 1024 px the right panel,
+    float over the canvas instead of sitting beside it (a tap outside closes
+    them); opening one closes the other on a narrow screen, and both start
+    closed there. On Home the side panel stacks above the work area under 768 px.
   - Modals, menus, tabs and selects are Headless UI (focus trap, Escape,
     arrow keys); icons are `lucide-react`. The panel and tool state lives in
     `features/ui-manager/stores/uiShellStore.ts`.
@@ -965,13 +997,13 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
   scripts/build.ts      production build → dist/
   src/
     app/                main, App, login gate, WebSocket keep-alive
-    layouts/            the shell (workbench-window/: side-panel, top-bar, canvas, right-panel, settings); composes features
+    layouts/            the shell: home-window/, workbench-window/ (side-panel, top-bar, canvas, right-panel, settings), bottom-bar/, account/; composes features
     features/<name>/    {components,hooks,stores,data,utils,types}; auth + the blade-terminal features
-    model/              state several features share
+    model/              state several features share (the open map, the map list, the page: Home or workbench, the connection)
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
       planning/         maps (load, save, conversion to the wire format), settings
-    components/         generic widgets only (ui/ Button and Modal, tool-strip/, settings-panel/ rows, inspector-panel/ rows and tabs, confirmation modal)
+    components/         generic widgets only (ui/ Button and Modal, tooltip/, tool-strip/, settings-panel/ rows, inspector-panel/ rows and tabs, confirmation modal)
     hooks/ utils/ config/ styles/ assets/ testing/
 ```
 

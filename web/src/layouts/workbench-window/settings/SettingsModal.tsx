@@ -1,6 +1,7 @@
 import { DialogTitle, Tab, TabGroup, TabList, TabPanel, TabPanels } from "@headlessui/react";
 import { MapPin, Palette, User, X } from "lucide-react";
 import type { ComponentType } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 import Modal from "@/components/ui/Modal";
 import { useUiShellStore, type SettingsPage } from "@/features/ui-manager/stores/uiShellStore";
 import AccountPage from "./AccountPage";
@@ -25,15 +26,16 @@ export default function SettingsModal() {
         <Modal open={open} onClose={close} token="settings-modal" className="h-[34rem] w-full max-w-3xl">
             <div className="flex items-center justify-between px-6 pt-5 pb-2">
                 <DialogTitle className="text-lg font-semibold">Settings</DialogTitle>
-                <button
-                    type="button"
-                    aria-label="Close settings"
-                    title="Close"
-                    onClick={close}
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
-                >
-                    <X size={18} strokeWidth={1.75} />
-                </button>
+                <Tooltip label="Close">
+                    <button
+                        type="button"
+                        aria-label="Close settings"
+                        onClick={close}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
+                    >
+                        <X size={18} strokeWidth={1.75} />
+                    </button>
+                </Tooltip>
             </div>
             <TabGroup
                 vertical

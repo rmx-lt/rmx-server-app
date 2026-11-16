@@ -1,20 +1,22 @@
 import { House, Maximize, ZoomIn, ZoomOut } from "lucide-react";
 import type { ComponentType } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
 import { fitView } from "@/features/canvas-editing/data/canvasActions";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 
-function ViewButton({ label, icon: Icon, onClick }: { label: string; icon: ComponentType<{ size?: number; strokeWidth?: number }>; onClick: () => void }) {
+function ViewButton({ label, icon: Icon, shortcut, onClick }: { label: string; icon: ComponentType<{ size?: number; strokeWidth?: number }>; shortcut?: readonly string[]; onClick: () => void }) {
     return (
+        <Tooltip label={label} shortcut={shortcut}>
         <button
             type="button"
             aria-label={label}
-            title={label}
             onClick={onClick}
             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg transition-colors hover:bg-hover"
         >
             <Icon size={16} strokeWidth={1.75} />
         </button>
+        </Tooltip>
     );
 }
 
@@ -28,7 +30,7 @@ export default function CanvasViewControls() {
             <ViewButton label="Zoom in" icon={ZoomIn} onClick={zoomIn} />
             <ViewButton label="Zoom out" icon={ZoomOut} onClick={zoomOut} />
             <ViewButton label="Fit all zones" icon={Maximize} onClick={fitView} />
-            <ViewButton label={`Home (${S["canvas.reset-view"].shortcut.join("+")})`} icon={House} onClick={resetView} />
+            <ViewButton label="Home" icon={House} shortcut={S["canvas.reset-view"].shortcut} onClick={resetView} />
         </div>
     );
 }

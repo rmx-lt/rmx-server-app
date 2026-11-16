@@ -5,8 +5,10 @@ import { checkSession } from "@/features/auth/data/session";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { openLatestMap } from "@/features/map-manager/data/mapBridge";
+import { openStartMap } from "@/features/map-manager/data/mapBridge";
+import HomeWindow from "@/layouts/home-window/HomeWindow";
 import WorkbenchWindow from "@/layouts/workbench-window/WorkbenchWindow";
+import { usePageStore } from "@/model/pageStore";
 import { startConnections } from "./connections";
 import { resetSettings } from "@/data/planning/settings";
 
@@ -34,15 +36,16 @@ export function App() {
   return <Workbench />;
 }
 
-/** The workbench; mounted only while logged in. */
+/** Home or the workbench; mounted only while logged in. */
 function Workbench() {
+  const page = usePageStore((s) => s.page);
   useEffect(() => {
     const stopConnections = startConnections();
     // A new login: read this user's settings.
     resetSettings();
     useUiUnitOfMeasureStore.getState().initialize().catch(console.error);
     useGeoAnchorStore.getState().loadSystemGeoAnchor().catch(console.error);
-    openLatestMap().catch(console.error);
+    openStartMap().catch(console.error);
     return () => {
       stopConnections();
     };
@@ -51,7 +54,7 @@ function Workbench() {
   return (
     <>
       <ShortcutManager />
-      <WorkbenchWindow />
+      {page === "home" ? <HomeWindow /> : <WorkbenchWindow />}
     </>
   );
 }

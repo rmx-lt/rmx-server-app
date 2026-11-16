@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { logout } from "@/features/auth/data/session";
 
@@ -20,15 +21,11 @@ export function UserMenu() {
       <button type="button" className={button} disabled={busy} onClick={() => run(false)}>
         Log out
       </button>
-      <button
-        type="button"
-        className={button}
-        disabled={busy}
-        onClick={() => run(true)}
-        title="End every session of this user, on all devices"
-      >
-        Log out everywhere
-      </button>
+      <Tooltip label="End every session of this user, on all devices">
+        <button type="button" className={button} disabled={busy} onClick={() => run(true)}>
+          Log out everywhere
+        </button>
+      </Tooltip>
     </div>
   );
 }

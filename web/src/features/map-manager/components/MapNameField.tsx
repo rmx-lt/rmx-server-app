@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 import { useMapStore } from "@/model/mapStore";
 import { MAP_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
 import { useShortcutsBlocked } from "@/hooks/shortcut-manager/useShortcutsBlocked";
 
-/** The open map's name in the middle of the top bar; click to rename. */
+const shared = "rounded-lg px-2.5 py-1 text-sm font-medium text-fg";
+// As wide as the name, between a minimum and a maximum.
+const width = "min-w-32 max-w-[min(28rem,100%)]";
+
+/** The open map's name at the left of the top bar; click to rename. */
 export default function MapNameField() {
     const name = useMapStore((s) => s.map.name);
     const setName = useMapStore((s) => s.setName);
@@ -25,38 +30,43 @@ export default function MapNameField() {
         setIsEditing(false);
     }
 
-    const shared = "min-w-0 rounded-lg px-2.5 py-1 text-center text-sm font-medium text-fg";
-
     if (isEditing) {
+        // A hidden copy of the text sets the width (CSS field-sizing is missing in Firefox); the input fills it.
         return (
-            <input
-                ref={inputRef}
-                type="text"
-                aria-label="Map name"
-                value={draft}
-                maxLength={MAP_NAME_MAX_LENGTH}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") commit();
-                    if (e.key === "Escape") setIsEditing(false);
-                }}
-                className={`${shared} w-64 max-w-full bg-surface outline-none ring-2 ring-accent`}
-            />
+            <span className={`relative inline-grid min-w-0 ${width}`}>
+                <span aria-hidden className={`${shared} invisible col-start-1 row-start-1 overflow-hidden whitespace-pre`}>
+                    {draft || " "}
+                </span>
+                <input
+                    ref={inputRef}
+                    type="text"
+                    aria-label="Map name"
+                    value={draft}
+                    maxLength={MAP_NAME_MAX_LENGTH}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={commit}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") commit();
+                        if (e.key === "Escape") setIsEditing(false);
+                    }}
+                    className={`${shared} col-start-1 row-start-1 w-full min-w-0 bg-surface outline-none ring-2 ring-accent`}
+                />
+            </span>
         );
     }
 
     return (
-        <button
-            type="button"
-            title="Rename map"
-            onClick={() => {
-                setDraft(name);
-                setIsEditing(true);
-            }}
-            className={`${shared} max-w-full cursor-pointer truncate hover:bg-hover`}
-        >
-            {name}
-        </button>
+        <Tooltip label="Rename map">
+            <button
+                type="button"
+                onClick={() => {
+                    setDraft(name);
+                    setIsEditing(true);
+                }}
+                className={`${shared} ${width} min-w-0 cursor-pointer truncate text-left hover:bg-hover`}
+            >
+                {name}
+            </button>
+        </Tooltip>
     );
 }

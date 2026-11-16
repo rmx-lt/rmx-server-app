@@ -27,6 +27,9 @@
     --color-ok: #2f7d46;
     --color-warn: #a86a0c;
     --color-overlay: #1f1e1d66;
+    --color-tooltip: #1f1e1d; /* tooltip box: dark in both themes */
+    --color-on-tooltip: #f0eee6;
+    --color-tooltip-muted: #b0aea5;
 
     /* Canvas (read by Konva through src/utils/theme.ts, so hex only) */
     --color-canvas-grid: #e0ddd0;
@@ -58,6 +61,9 @@
     --color-ok: #6cc384;
     --color-warn: #e3b251;
     --color-overlay: #00000099;
+    --color-tooltip: #141413;
+    --color-on-tooltip: #f0eee6;
+    --color-tooltip-muted: #9c9a92;
 
     --color-canvas-grid: #34332f;
     --color-canvas-mowing: #4fd184;
@@ -79,9 +85,4 @@
 body {
     background-color: var(--color-page);
     color: var(--color-fg);
-}
-
-::selection {
-    background-color: var(--color-accent);
-    color: var(--color-on-accent);
 }
