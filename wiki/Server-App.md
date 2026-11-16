@@ -856,7 +856,9 @@ whether the session still exists and shows the login form if not.
   the buttons and the shortcuts animate to their target, anchored on the cursor
   (the canvas centre for buttons and shortcuts), and a new step retargets it.
   Fit and Home animate the same way (position and scale), and a wheel step or a
-  new action retargets them. In select mode an area brightens its fill on hover
+  new action retargets them. Pan and zoom never run together: a pan drag
+  (`panning` in `canvasViewStore`) stops a running animation, and wheel, buttons,
+  shortcuts, Fit and Home do nothing until it ends. In select mode an area brightens its fill on hover
   and more when selected; the vertices of the selected area are small squares
   (a ring on hover, an accent ring when selected, the hover colour when both),
   and an edge midpoint is a plain ring that shows only when the cursor is near.

@@ -11,6 +11,9 @@ interface CanvasViewState {
     position: Point;
     scale: number;
     canvasSize: { width: number; height: number };
+    /** True during a pan drag: zoom and animations are ignored, and starting a pan stops a running one. */
+    panning: boolean;
+    setPanning: (panning: boolean) => void;
     setPosition: (position: Point) => void;
     setScale: (scale: number) => void;
     setCanvasSize: (width: number, height: number) => void;
@@ -59,6 +62,12 @@ export const useCanvasViewStore = create<CanvasViewState>((set, get) => {
         position: { x: 0, y: 0 },
         scale: 1,
         canvasSize: { width: 0, height: 0 },
+        panning: false,
+
+        setPanning: (panning) => {
+            if (panning) cancelAnim();
+            set({ panning });
+        },
 
         setPosition: (position) => {
             cancelAnim();
@@ -73,6 +82,7 @@ export const useCanvasViewStore = create<CanvasViewState>((set, get) => {
         },
 
         zoomBy: (factor, anchor) => {
+            if (get().panning) return;
             const { scale, position, canvasSize } = get();
             const target = clamp((anim?.target ?? scale) * factor);
             const a = anchor ?? { x: canvasSize.width / 2, y: canvasSize.height / 2 };
@@ -83,6 +93,7 @@ export const useCanvasViewStore = create<CanvasViewState>((set, get) => {
         },
 
         animateTo: (scale, position) => {
+            if (get().panning) return;
             const { scale: from, position: pos, canvasSize } = get();
             const target = clamp(scale);
             const c = { x: canvasSize.width / 2, y: canvasSize.height / 2 };
