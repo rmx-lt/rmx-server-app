@@ -1,3 +1,5 @@
+import Tooltip from "@/components/tooltip/Tooltip";
+
 interface InspectorPanelSectionFieldProps {
   label: string;
   value: string | number;
@@ -11,12 +13,9 @@ export default function InspectorPanelSectionField({
 }: InspectorPanelSectionFieldProps) {
   return (
     <div className="flex items-center gap-2 px-5 py-1.5">
-      <span
-        className="min-w-0 flex-1 truncate text-sm text-fg"
-        title={label}
-      >
-        {label}
-      </span>
+      <Tooltip label={label}>
+        <span className="min-w-0 flex-1 truncate text-sm text-fg">{label}</span>
+      </Tooltip>
       <span className="shrink-0 text-sm text-fg">
         {value}
         {unit && <span className="text-sm text-fg ml-1 text-muted">{unit}</span>}
