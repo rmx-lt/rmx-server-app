@@ -8,10 +8,10 @@ export type MapSummary = {
   name: string,
   revision: number,
   /**
-   * Counted from the document's zones, by category.
+   * Counted from the areas of all the document's zones, by category.
    */
-  mowing_zone_count: number,
-  no_go_zone_count: number,
-  navigation_zone_count: number,
+  mowing_area_count: number,
+  no_go_area_count: number,
+  navigation_area_count: number,
   updated_at: string,
 };

@@ -80,7 +80,7 @@ var Enums = []Enum{
 	{"ErrorCode", reflect.TypeFor[ErrorCode](), []string{
 		"bad_request", "not_found", "internal", "unauthorized", "forbidden", "too_many_requests", "conflict",
 	}},
-	{"ZoneCategory", reflect.TypeFor[ZoneCategory](), []string{"mowing", "no_go", "navigation"}},
+	{"AreaCategory", reflect.TypeFor[AreaCategory](), []string{"mowing", "no_go", "navigation"}},
 	{"Board", reflect.TypeFor[Board](), []string{"gateway", "autopilot"}},
 	{"KeyState", reflect.TypeFor[KeyState](), []string{"linked", "missing", "duplicate", "wrong_type"}},
 	{"CommandState", reflect.TypeFor[CommandState](), []string{"sent", "accepted", "done", "failed", "unknown"}},
@@ -97,6 +97,7 @@ var Structs = []reflect.Type{
 	reflect.TypeFor[Me](),
 	reflect.TypeFor[Point](),
 	reflect.TypeFor[GeoAnchor](),
+	reflect.TypeFor[Area](),
 	reflect.TypeFor[Zone](),
 	reflect.TypeFor[MapDoc](),
 	reflect.TypeFor[MapSummary](),

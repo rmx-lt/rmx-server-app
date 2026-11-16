@@ -26,10 +26,10 @@ var (
 func listMaps(ctx context.Context, q db.DBTX, userID core.UserID) ([]api.MapSummary, error) {
 	rows, err := q.Query(ctx,
 		`SELECT m.id, m.name, m.revision, m.updated_at,
-		        count(*) FILTER (WHERE z->>'category' = 'mowing'),
-		        count(*) FILTER (WHERE z->>'category' = 'no_go'),
-		        count(*) FILTER (WHERE z->>'category' = 'navigation')
-		 FROM maps m LEFT JOIN LATERAL jsonb_array_elements(m.doc->'zones') z ON true
+		        count(*) FILTER (WHERE a->>'category' = 'mowing'),
+		        count(*) FILTER (WHERE a->>'category' = 'no_go'),
+		        count(*) FILTER (WHERE a->>'category' = 'navigation')
+		 FROM maps m LEFT JOIN LATERAL jsonb_path_query(m.doc, '$.zones[*].areas[*]') a ON true
 		 WHERE m.user_id = $1
 		 GROUP BY m.id
 		 ORDER BY m.updated_at DESC, m.id DESC`, userID)
@@ -38,7 +38,7 @@ func listMaps(ctx context.Context, q db.DBTX, userID core.UserID) ([]api.MapSumm
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (api.MapSummary, error) {
 		var s api.MapSummary
-		err := row.Scan(&s.ID, &s.Name, &s.Revision, &s.UpdatedAt, &s.MowingZoneCount, &s.NoGoZoneCount, &s.NavigationZoneCount)
+		err := row.Scan(&s.ID, &s.Name, &s.Revision, &s.UpdatedAt, &s.MowingAreaCount, &s.NoGoAreaCount, &s.NavigationAreaCount)
 		return s, err
 	})
 }
