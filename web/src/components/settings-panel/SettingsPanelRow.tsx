@@ -12,7 +12,7 @@ interface SettingsPanelRowProps extends React.HTMLAttributes<HTMLDivElement> {
 const SettingsPanelRow = forwardRef<HTMLDivElement, SettingsPanelRowProps>(
     ({ label, tooltip, children, ...rest }, ref) => (
         <div ref={ref} {...rest} className="flex min-h-11 items-center gap-3 py-1">
-            <span className="flex w-2/5 shrink-0 items-center gap-1 truncate text-sm text-fg select-none">
+            <span className="flex w-2/5 shrink-0 items-center gap-1 truncate text-sm text-fg">
                 <span className="truncate">{label}</span>
                 {tooltip && (
                     <Tooltip label={tooltip}>
