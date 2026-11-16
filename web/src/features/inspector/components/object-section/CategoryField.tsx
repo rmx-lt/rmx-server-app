@@ -1,7 +1,7 @@
 import InspectorPanelSectionField from "@/components/inspector-panel/InspectorPanelSectionField";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasSelectionStore } from "@/features/canvas-editing/stores/canvasSelectionStore";
-import { ZONE_CATEGORY_OPTIONS } from "@/config/db-ops/enums";
+import { AREA_CATEGORY_OPTIONS } from "@/config/db-ops/enums";
 
 export default function CategoryField() {
   const selectedObjectId = useCanvasSelectionStore((s) => s.selectedObject?.id);
@@ -10,7 +10,7 @@ export default function CategoryField() {
   );
 
   const label =
-    ZONE_CATEGORY_OPTIONS.find((o) => o.value === category)?.label ?? "—";
+    AREA_CATEGORY_OPTIONS.find((o) => o.value === category)?.label ?? "—";
 
   return <InspectorPanelSectionField label="Category" value={label} />;
 }

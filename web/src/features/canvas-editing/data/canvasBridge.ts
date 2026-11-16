@@ -1,7 +1,7 @@
 import { saveMap, type MapContent } from "@/data/planning/maps";
 import { createAutosaver } from "@/data/planning/autosave";
-import { ZONE_CATEGORY } from "@/config/db-ops/enums";
-import type { Zone } from "@/data/planning/schemaTypes";
+import { AREA_CATEGORY } from "@/config/db-ops/enums";
+import type { Area } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore } from "../stores/canvasObjectStore";
 import { useMapStore } from "@/model/mapStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
@@ -12,17 +12,17 @@ import { useCanvasToolStore } from "../stores/canvasToolStore";
 import { useCanvasDrawingStore } from "../stores/canvasDrawingStore";
 
 // ── Count synchronization ──────────────────────────────────────────────────
-// Reactively keeps the mapStore mowing and no-go zone counts derived from the
-// canvas zone list. Lives here (not in either store) to avoid a circular import.
+// Reactively keeps the mapStore mowing and no-go area counts derived from the
+// canvas area list (the active zone's). Lives here (not in either store) to avoid a circular import.
 
-function countByCategory(objects: Zone[], category: string): number {
+function countByCategory(objects: Area[], category: string): number {
     return objects.filter((o) => o.category === category).length;
 }
 
-function syncMapCounts(objects: Zone[]): void {
-    const mowingZoneCount = countByCategory(objects, ZONE_CATEGORY.MOWING);
-    const noGoZoneCount = countByCategory(objects, ZONE_CATEGORY.NO_GO);
-    useMapStore.setState((s) => ({ map: { ...s.map, mowingZoneCount, noGoZoneCount } }));
+function syncMapCounts(objects: Area[]): void {
+    const mowingAreaCount = countByCategory(objects, AREA_CATEGORY.MOWING);
+    const noGoAreaCount = countByCategory(objects, AREA_CATEGORY.NO_GO);
+    useMapStore.setState((s) => ({ map: { ...s.map, mowingAreaCount, noGoAreaCount } }));
 }
 
 useCanvasObjectStore.subscribe((next, prev) => {
@@ -33,9 +33,12 @@ useCanvasObjectStore.subscribe((next, prev) => {
 
 /** Everything the stores hold of the open map, as one map's content. */
 export function currentMapContent(): MapContent {
+    const { map, zones, activeZoneId } = useMapStore.getState();
     return {
-        map: useMapStore.getState().map,
-        zones: useCanvasObjectStore.getState().objects,
+        map,
+        zones,
+        activeZoneId,
+        areas: useCanvasObjectStore.getState().objects,
         geoAnchor: useGeoAnchorStore.getState().mapGeoAnchor,
     };
 }

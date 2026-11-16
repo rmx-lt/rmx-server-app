@@ -18,11 +18,11 @@ export function CanvasDrawingPreviewLayer({
     scale,
 }: CanvasDrawingPreviewLayerProps) {
     const colors = useCanvasColors();
-    const isDrawing = activeTool === "addMowingZone" || activeTool === "addNoGoZone";
+    const isDrawing = activeTool === "addMowingArea" || activeTool === "addNoGoArea";
 
     if (!isDrawing || drawingPoints.length === 0) return null;
 
-    const category = activeTool === "addMowingZone" ? "mowing" : "no_go";
+    const category = activeTool === "addMowingArea" ? "mowing" : "no_go";
     const drawColor = colors[category].stroke;
     const drawEdgeWidth = LAYER_STYLE[category].edgeWidth;
     const previewEdgeColor = drawColor;

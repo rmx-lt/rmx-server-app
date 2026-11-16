@@ -1,7 +1,6 @@
-import { createMap, deleteMap, listMaps, loadMap, renameMap, type MapContent } from "@/data/planning/maps";
-import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { createMap, deleteMap, listMaps, loadMap as fetchContent, renameMap, MapFormatError, type MapContent } from "@/data/planning/maps";
 import type { MapInfo } from "@/data/planning/schemaTypes";
-import { useMapStore } from "@/model/mapStore";
+import { FIRST_ZONE, useMapStore } from "@/model/mapStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
@@ -19,33 +18,36 @@ import { currentMapContent, flushSave, requestSave, resetSave } from "@/features
 const BLANK_MAP: MapInfo = {
     id: 0,
     name: "Untitled Map",
-    mowingZoneCount: 0,
-    noGoZoneCount: 0,
+    mowingAreaCount: 0,
+    noGoAreaCount: 0,
 };
 
-function countByCategory(zones: { category: string }[], category: string): number {
-    return zones.filter((z) => z.category === category).length;
+/** Reads a map from the server; when it can't be opened, says why on Home before failing. */
+async function loadMap(id: number): Promise<MapContent> {
+    try {
+        return await fetchContent(id);
+    } catch (err) {
+        const reason = err instanceof MapFormatError ? err.message : `The map could not be opened (${err instanceof Error ? err.message : "unknown error"}).`;
+        useMapListStore.setState({ error: reason });
+        throw err;
+    }
 }
 
 /** Puts a map into the stores; showing it is not a change to save. */
 function showMap(content: MapContent): void {
-    const { zones } = content;
-    useMapStore.getState().setMap({
-        ...content.map,
-        mowingZoneCount: countByCategory(zones, ZONE_CATEGORY.MOWING),
-        noGoZoneCount: countByCategory(zones, ZONE_CATEGORY.NO_GO),
-    });
-    useCanvasObjectStore.getState().setObjects(zones);
+    useMapStore.getState().setMap(content.map, content.zones, content.activeZoneId);
+    useCanvasObjectStore.getState().setObjects(content.areas);
     useCanvasHistoryStore.getState().resetHistory();
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
     resetSave();
+    useMapListStore.setState({ error: null });
     rememberLastMapId(content.map.id);
     void useMapListStore.getState().refresh();
 }
 
 /** Leaves no map open (the stores hold a blank one) and forgets the last map. */
 function closeMap(): void {
-    useMapStore.getState().setMap(BLANK_MAP);
+    useMapStore.getState().setMap(BLANK_MAP, [FIRST_ZONE], FIRST_ZONE.id);
     useCanvasObjectStore.getState().setObjects([]);
     useCanvasHistoryStore.getState().resetHistory();
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(undefined);
@@ -57,20 +59,24 @@ function closeMap(): void {
 /** Creates a blank map on the server, placed at the user's default geo anchor. Returns its id. */
 async function createBlankMap(): Promise<number> {
     await useGeoAnchorStore.getState().loadSystemGeoAnchor();
-    return createMap({ map: BLANK_MAP, zones: [], geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor }, BLANK_MAP.name);
+    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [], geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor }, BLANK_MAP.name);
 }
 
-/** At login: opens the map opened last in this browser; when there is none or it is gone, shows Home. Nothing is saved first. */
+/** At login: opens the map opened last in this browser; when there is none, it is gone or it can't be opened, shows Home. Nothing is saved first. */
 export async function openStartMap(): Promise<void> {
     const wanted = readLastMapId();
     const maps = await listMaps();
     if (wanted !== null && maps.some((m) => m.id === wanted)) {
-        showMap(await loadMap(wanted));
-        usePageStore.getState().setPage("workbench");
-    } else {
-        closeMap();
-        usePageStore.getState().setPage("home");
+        try {
+            showMap(await loadMap(wanted));
+            usePageStore.getState().setPage("workbench");
+            return;
+        } catch (err) {
+            console.error("the last map could not be opened", err);
+        }
     }
+    closeMap();
+    usePageStore.getState().setPage("home");
 }
 
 /** Opens a map and shows it in the workbench. */

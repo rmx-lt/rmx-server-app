@@ -16,7 +16,7 @@ function DriveTools() {
             <ToolStripSeparator />
             <ToolStripButton inert label="Record border" note="records a border while you drive" icon={CircleDot} />
             <ToolStripButton inert label="Rewind" note="steps back along the recorded border" icon={Rewind} />
-            <ToolStripButton inert label="Save as zone" note="turns the recorded border into a zone" icon={Save} />
+            <ToolStripButton inert label="Save as area" note="turns the recorded border into an area" icon={Save} />
         </>
     );
 }
@@ -24,7 +24,7 @@ function DriveTools() {
 function MowTools() {
     return (
         <>
-            <ToolStripButton inert label="Plan job" note="plans a mowing job for the zones" icon={Route} />
+            <ToolStripButton inert label="Plan job" note="plans a mowing job for the areas" icon={Route} />
             <ToolStripButton inert label="Start" note="starts the job" icon={Play} />
             <ToolStripButton inert label="Pause" note="pauses the job" icon={CirclePause} />
             <ToolStripButton inert label="Resume" note="resumes the paused job" icon={CirclePlay} />

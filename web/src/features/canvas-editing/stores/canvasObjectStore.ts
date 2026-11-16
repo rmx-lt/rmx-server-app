@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
-import { type ZoneCategory } from "@/config/db-ops/enums";
+import { type AreaCategory } from "@/config/db-ops/enums";
 import { useMapStore } from "@/model/mapStore";
 import { syncObject, normalizeObject, markDirty, markDeleted } from "@/features/canvas-editing/utils/canvasObjectUtils";
 
@@ -16,7 +16,7 @@ type MutationState = Pick<CanvasObjectState, "objects" | "dirtyObjects" | "delet
  * Applies syncObject (winding + stats) to the object at objectId, marks it dirty,
  * and returns the updated slice of store state. Used by every mutation that modifies vertices.
  */
-function commitObject(state: MutationState, pending: Zone[], objectId: number): MutationState {
+function commitObject(state: MutationState, pending: Area[], objectId: number): MutationState {
     const objects = syncObject(pending, objectId);
     const obj = objects.find((o) => o.id === objectId)!;
     const { dirty: dirtyObjects, deleted: deletedObjects } = markDirty(state.dirtyObjects, state.deletedObjects, obj);
@@ -28,29 +28,29 @@ function commitObject(state: MutationState, pending: Zone[], objectId: number): 
 // ---------------------------------------------------------------------------
 
 export interface CanvasObjectState {
-    objects: Zone[];
+    objects: Area[];
 
-    dirtyObjects: Zone[];
-    deletedObjects: Zone[];
+    dirtyObjects: Area[];
+    deletedObjects: Area[];
 
     /** Adds a new polygon object with the given vertices. Marks object dirty. */
-    addObject: (category: ZoneCategory, points: Point[]) => void;
+    addObject: (category: AreaCategory, points: Point[]) => void;
     /** Removes an object. Marks it as deleted. */
-    deleteObject: (obj: Zone) => void;
+    deleteObject: (obj: Area) => void;
     /** Updates x,y of a single vertex during drag — no sync, no dirty tracking. Call finalizeVertexMoveAt on drag end. */
     moveVertexAt: (ref: VertexRef, pos: Point) => void;
     /** Runs syncObject + marks dirty once after a vertex drag completes. */
     finalizeVertexMoveAt: (ref: VertexRef) => void;
     /** Translates all vertices of an object by (dx, dy). Marks object dirty. */
-    moveObject: (obj: Zone, dx: number, dy: number) => void;
+    moveObject: (obj: Area, dx: number, dy: number) => void;
     /** Removes a vertex by index from an object. No-op when the object has ≤ 3 vertices. */
-    deleteVertex: (obj: Zone, index: number) => void;
+    deleteVertex: (obj: Area, index: number) => void;
     /** Removes multiple vertices by VertexRef. No-op when the result would have fewer than 3 vertices. */
-    deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
+    deleteVertices: (obj: Area, refs: VertexRef[]) => void;
     /** Inserts a new vertex after afterIndex. Returns the VertexRef for the new vertex. */
     insertVertex: (objectId: number, afterIndex: number, pos: Point) => VertexRef;
     /** Replaces all in-memory objects and resets dirty tracking. Used by the canvas bridge for load and reset. */
-    setObjects: (objects: Zone[]) => void;
+    setObjects: (objects: Area[]) => void;
 }
 
 export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
@@ -64,7 +64,7 @@ export const useCanvasObjectStore = create<CanvasObjectState>()((set, get) => ({
         const inMemoryMax = Math.max(0, ...get().objects.map((o) => o.id));
         const objectId = inMemoryMax + 1;
         set((state) => {
-            const newObj: Zone = {
+            const newObj: Area = {
                 id: objectId,
                 mapId: mapId,
                 category,

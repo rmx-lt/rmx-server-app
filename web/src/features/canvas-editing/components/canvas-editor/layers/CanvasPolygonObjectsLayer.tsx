@@ -2,24 +2,24 @@ import { memo, useRef } from "react";
 import { Layer, Line } from "react-konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import type React from "react";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import { sameObject } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import type { ZoneCategory } from "@/config/db-ops/enums";
+import type { AreaCategory } from "@/config/db-ops/enums";
 import { LAYER_STYLE } from "@/config/canvas-editing/canvasConfig";
 import { useCanvasColors } from "@/hooks/useTheme";
 
 interface CanvasPolygonObjectsLayerProps {
-    category: ZoneCategory;
-    objects: Zone[];
-    selectedObject: Zone | null;
-    movingObject: Zone | null;
+    category: AreaCategory;
+    objects: Area[];
+    selectedObject: Area | null;
+    movingObject: Area | null;
     activeTool: ActiveTool | null;
     scale: number;
-    onSelectObject: (obj: Zone) => void;
-    onDeleteObject: (obj: Zone) => void;
-    onObjectHoverChange: (obj: Zone | null) => void;
-    onObjectDragStart: (obj: Zone) => void;
-    onObjectDragEnd: (obj: Zone, dx: number, dy: number) => void;
+    onSelectObject: (obj: Area) => void;
+    onDeleteObject: (obj: Area) => void;
+    onObjectHoverChange: (obj: Area | null) => void;
+    onObjectDragStart: (obj: Area) => void;
+    onObjectDragEnd: (obj: Area, dx: number, dy: number) => void;
     isPanningRef: React.RefObject<boolean>;
 }
 

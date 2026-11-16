@@ -35,8 +35,8 @@ export function useWorkbenchShortcuts() {
     );
 
     useShortcut("canvas.tool-select", S["canvas.tool-select"].keys, () => toggleTool("select"));
-    useShortcut("canvas.tool-add-mowing-zone", S["canvas.tool-add-mowing-zone"].keys, () => toggleTool("addMowingZone"));
-    useShortcut("canvas.tool-add-no-go-zone", S["canvas.tool-add-no-go-zone"].keys, () => toggleTool("addNoGoZone"));
+    useShortcut("canvas.tool-add-mowing-area", S["canvas.tool-add-mowing-area"].keys, () => toggleTool("addMowingArea"));
+    useShortcut("canvas.tool-add-no-go-area", S["canvas.tool-add-no-go-area"].keys, () => toggleTool("addNoGoArea"));
     useShortcut("canvas.tool-delete", S["canvas.tool-delete"].keys, deleteAction);
     useShortcut("canvas.undo", S["canvas.undo"].keys, undoAction);
     useShortcut("canvas.redo", S["canvas.redo"].keys, redoAction);

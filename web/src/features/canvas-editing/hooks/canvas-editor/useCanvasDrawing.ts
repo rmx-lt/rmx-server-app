@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type Konva from "konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
-import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
+import { AREA_CATEGORY, type AreaCategory } from "@/config/db-ops/enums";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
 
@@ -10,7 +10,7 @@ interface UseCanvasDrawingOptions {
     stageRef: React.RefObject<Konva.Stage | null>;
     clearSelection: () => void;
     addObject: (
-        category: ZoneCategory,
+        category: AreaCategory,
         points: Point[],
     ) => void;
 }
@@ -60,7 +60,7 @@ export function useCanvasDrawing({
             const ptr = stage.getRelativePointerPosition();
             if (!ptr) return;
             pendingPointerPosRef.current = { x: ptr.x, y: ptr.y };
-            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
+            if (activeTool === "addMowingArea" || activeTool === "addNoGoArea") {
                 pendingMousePosRef.current = { x: ptr.x, y: ptr.y };
             }
             if (rafIdRef.current === null) {
@@ -85,7 +85,7 @@ export function useCanvasDrawing({
         (e: Konva.KonvaEventObject<MouseEvent>) => {
             if (e.evt.button !== 0) return;
 
-            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
+            if (activeTool === "addMowingArea" || activeTool === "addNoGoArea") {
                 const stage = stageRef.current;
                 if (!stage) return;
                 if (e.target !== stage) return;
@@ -106,11 +106,11 @@ export function useCanvasDrawing({
         (e: Konva.KonvaEventObject<PointerEvent>) => {
             e.evt.preventDefault();
             if (
-                (activeTool === "addMowingZone" || activeTool === "addNoGoZone") &&
+                (activeTool === "addMowingArea" || activeTool === "addNoGoArea") &&
                 drawingPoints.length >= 3
             ) {
                 addObject(
-                    activeTool === "addMowingZone" ? ZONE_CATEGORY.MOWING : ZONE_CATEGORY.NO_GO,
+                    activeTool === "addMowingArea" ? AREA_CATEGORY.MOWING : AREA_CATEGORY.NO_GO,
                     drawingPoints,
                 );
                 cancelDrawing();
