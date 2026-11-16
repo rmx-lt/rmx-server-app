@@ -62,10 +62,21 @@ const token = (name: string) => getComputedStyle(document.documentElement).getPr
 export function readCanvasColors() {
     return {
         grid: token("canvas-grid"),
+        select: token("accent"),
         handle: token("canvas-handle"),
         midpoint: token("canvas-midpoint"),
         midpointEdge: token("canvas-midpoint-edge"),
-        mowing: { stroke: token("canvas-mowing"), fill: token("canvas-mowing-fill") },
-        no_go: { stroke: token("canvas-no-go"), fill: token("canvas-no-go-fill") },
+        mowing: {
+            stroke: token("canvas-mowing"),
+            fill: token("canvas-mowing-fill"),
+            fillHover: token("canvas-mowing-fill-hover"),
+            fillSelected: token("canvas-mowing-fill-selected"),
+        },
+        no_go: {
+            stroke: token("canvas-no-go"),
+            fill: token("canvas-no-go-fill"),
+            fillHover: token("canvas-no-go-fill-hover"),
+            fillSelected: token("canvas-no-go-fill-selected"),
+        },
     };
 }

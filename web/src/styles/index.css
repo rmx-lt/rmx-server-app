@@ -35,8 +35,12 @@
     --color-canvas-grid: #e0ddd0;
     --color-canvas-mowing: #1f8a4c;
     --color-canvas-mowing-fill: #1f8a4c33;
+    --color-canvas-mowing-fill-hover: #1f8a4c4d;
+    --color-canvas-mowing-fill-selected: #1f8a4c66;
     --color-canvas-no-go: #cf3425;
     --color-canvas-no-go-fill: #cf34253d;
+    --color-canvas-no-go-fill-hover: #cf342555;
+    --color-canvas-no-go-fill-selected: #cf342570;
     --color-canvas-handle: #ffffff;
     --color-canvas-midpoint: #ffffffcc;
     --color-canvas-midpoint-edge: #8f8c80;
@@ -68,8 +72,12 @@
     --color-canvas-grid: #34332f;
     --color-canvas-mowing: #4fd184;
     --color-canvas-mowing-fill: #4fd18438;
+    --color-canvas-mowing-fill-hover: #4fd18452;
+    --color-canvas-mowing-fill-selected: #4fd1846b;
     --color-canvas-no-go: #ff6b5e;
     --color-canvas-no-go-fill: #ff6b5e45;
+    --color-canvas-no-go-fill-hover: #ff6b5e5e;
+    --color-canvas-no-go-fill-selected: #ff6b5e78;
     --color-canvas-handle: #f0eee6;
     --color-canvas-midpoint: #f0eee6cc;
     --color-canvas-midpoint-edge: #8a877e;

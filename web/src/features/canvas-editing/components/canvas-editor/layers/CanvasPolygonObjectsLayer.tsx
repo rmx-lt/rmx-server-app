@@ -1,4 +1,4 @@
-import { memo, useRef } from "react";
+import { memo, useRef, useState } from "react";
 import { Layer, Line } from "react-konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
 import type React from "react";
@@ -43,7 +43,8 @@ export function CanvasPolygonObjectsLayerInner({
     // Coordinates onDragStart/onDragEnd: only true when a left-button drag is active.
     const primaryDragRef = useRef(false);
 
-    const { stroke, fill } = useCanvasColors()[category];
+    const { stroke, fill, fillHover, fillSelected } = useCanvasColors()[category];
+    const [hoveredId, setHoveredId] = useState<number | null>(null);
     const { edgeWidth } = LAYER_STYLE[category];
     const layerObjects = objects.filter((obj) => obj.category === category);
 
@@ -58,7 +59,7 @@ export function CanvasPolygonObjectsLayerInner({
                         key={obj.id}
                         points={obj.vertices.flatMap((v) => [v.x, v.y])}
                         closed
-                        fill={fill}
+                        fill={isSelected ? fillSelected : hoveredId === obj.id ? fillHover : fill}
                         stroke={stroke}
                         strokeWidth={(isSelected || isMoving ? edgeWidth * 1.5 : edgeWidth) / scale}
                         opacity={isMoving ? 0.55 : 1}
@@ -100,8 +101,15 @@ export function CanvasPolygonObjectsLayerInner({
                             node.y(0);
                             onObjectDragEnd(obj, dx, dy);
                         }}
-                        onMouseEnter={() => canInteract && onObjectHoverChange(obj)}
-                        onMouseLeave={() => onObjectHoverChange(null)}
+                        onMouseEnter={() => {
+                            if (!canInteract) return;
+                            setHoveredId(obj.id);
+                            onObjectHoverChange(obj);
+                        }}
+                        onMouseLeave={() => {
+                            setHoveredId(null);
+                            onObjectHoverChange(null);
+                        }}
                     />
                 );
             })}

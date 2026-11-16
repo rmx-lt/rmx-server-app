@@ -51,7 +51,7 @@ export function redoAction(): void {
 /** Zooms and moves the view so that every area is visible. */
 export function fitView(): void {
     const { objects } = useCanvasObjectStore.getState();
-    const { canvasSize, setScale, setPosition } = useCanvasViewStore.getState();
+    const { canvasSize, animateTo } = useCanvasViewStore.getState();
     const vertices = objects.flatMap((o) => o.vertices);
     if (vertices.length === 0 || canvasSize.width === 0) return;
     const xs = vertices.map((v) => v.x);
@@ -63,8 +63,7 @@ export function fitView(): void {
         (canvasSize.height * margin) / Math.max(maxY - minY, 1),
     );
     const scale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fit));
-    setScale(scale);
-    setPosition({
+    animateTo(scale, {
         x: canvasSize.width / 2 - ((minX + maxX) / 2) * scale,
         y: canvasSize.height / 2 - ((minY + maxY) / 2) * scale,
     });
