@@ -26,13 +26,15 @@ interface ToolStripButtonProps {
     /** What the tool does, when it is not there yet; shown after the label. */
     note?: string;
     active?: boolean;
+    /** The tool deletes: red. */
+    danger?: boolean;
     disabled?: boolean;
     /** The tool is a placeholder: it stays in the Tab order and says what it will do. */
     inert?: boolean;
     onClick?: () => void;
 }
 
-export function ToolStripButton({ label, icon: Icon, shortcut, note, active, disabled, inert, onClick }: ToolStripButtonProps) {
+export function ToolStripButton({ label, icon: Icon, shortcut, note, active, danger, disabled, inert, onClick }: ToolStripButtonProps) {
     const off = disabled || inert;
     return (
         <Tooltip label={note ? `${label}: ${note}` : label} shortcut={shortcut}>
@@ -46,8 +48,8 @@ export function ToolStripButton({ label, icon: Icon, shortcut, note, active, dis
                 off
                     ? "cursor-not-allowed text-faint"
                     : active
-                      ? "cursor-pointer bg-accent text-on-accent"
-                      : "cursor-pointer text-fg hover:bg-hover"
+                      ? `cursor-pointer text-on-accent ${danger ? "bg-danger" : "bg-accent"}`
+                      : `cursor-pointer hover:bg-hover ${danger ? "text-danger" : "text-fg"}`
             }`}
         >
             <Icon size={18} strokeWidth={1.75} aria-hidden />
