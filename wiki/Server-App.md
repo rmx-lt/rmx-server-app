@@ -912,8 +912,9 @@ whether the session still exists and shows the login form if not.
     stays inside the window, and is linked to its control with
     `aria-describedby`. Shortcuts come from
     `config/shortcut-manager/workbenchShortcutsConfig.ts`, not typed again. No
-    native `title` attributes are used. The text selection colour is the
-    browser's.
+    native `title` attributes are used. UI text is not selectable (`select-none` on
+    `body` in `index.css`); inputs, text areas and `role="alert"` messages opt back
+    in. The text selection colour is the browser's.
   - Under 768 px the workbench side panel, and under 1024 px the right panel,
     float over the canvas instead of sitting beside it (a tap outside closes
     them); opening one closes the other on a narrow screen, and both start

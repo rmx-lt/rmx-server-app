@@ -83,6 +83,13 @@
 }
 
 body {
+    @apply select-none; /* a tool, not a document; typed text and errors opt back in below */
     background-color: var(--color-page);
     color: var(--color-fg);
+}
+/* Safari inherits user-select: none into inputs and stops them selecting. */
+input,
+textarea,
+[role="alert"] {
+    @apply select-text;
 }
