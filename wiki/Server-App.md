@@ -836,7 +836,7 @@ whether the session still exists and shows the login form if not.
   Empty map type (or when the map has no anchor, so the canvas is never bare).
   The background has three types: Satellite (ArcGIS World Imagery), Map (ArcGIS
   World Street Map), both from `server.arcgisonline.com`, no key, attribution
-  shown on the canvas (the OpenStreetMap tile servers are not used: their usage
+  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Empty) (the OpenStreetMap tile servers are not used: their usage
   policy rules out bulk loading), and Empty (no tiles, no request, only the
   grid). The Layers button in the bottom left corner of the canvas shows the type
   it switches to (a click toggles Satellite and Empty; from Map it goes to

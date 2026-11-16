@@ -267,7 +267,7 @@ function CanvasMapTileLayerInner() {
                 aria-hidden="true"
             />
             {/* The tile terms ask for it on the map. */}
-            <div className="pointer-events-none absolute bottom-0 left-24 right-16 truncate bg-surface/70 px-2 py-0.5 text-right text-[10px] text-muted max-md:hidden">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-surface/70 px-2 py-0.5 text-right text-[10px] text-muted max-md:hidden">
                 {TILE_ATTRIBUTION[layer]}
             </div>
         </>
