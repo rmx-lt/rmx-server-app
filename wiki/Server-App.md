@@ -881,7 +881,8 @@ whether the session still exists and shows the login form if not.
   - **Home** (`layouts/home-window/`, modelled on SolidCraft's start page).
     Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
     only when a map is open), New map (Ctrl+Alt+N), and at the bottom the
-    account menu and the settings button. Work area: a New map card and the
+    account menu and the settings button. Work area: a New map card (map icon with
+    a plus, accent border) and the
     list of maps, newest change first, with the time of the last change; the
     open map is highlighted, and stronger when hovered. A click opens a map in the
     workbench; its menu has Rename (in place), Duplicate and Delete (a
