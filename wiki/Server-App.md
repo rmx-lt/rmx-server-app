@@ -928,7 +928,8 @@ whether the session still exists and shows the login form if not.
       the resize cursor until release, also after the panel closed). Opening,
       closing or resizing a panel only changes the size of the canvas view; the
       canvas keeps what is on screen where it is (the view is shifted back when
-      the left edge moves). The toggle buttons use one icon per panel
+      the left edge moves, in the same frame: `useCanvasSize` commits React and
+      draws the stage synchronously in its `ResizeObserver` callback). The toggle buttons use one icon per panel
       (`PanelLeft`, `PanelRight`) whether it is open or closed.
     - **Top bar:** over the canvas and the right panel, up to the right edge,
       with a line under it. The open map's name is at the left (click to
