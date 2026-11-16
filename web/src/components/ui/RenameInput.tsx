@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useShortcutsBlocked } from "@/hooks/shortcut-manager/useShortcutsBlocked";
 
 /** Classes of one item of a Headless UI menu list. */
-export const menuItem = "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-fg data-focus:bg-hover";
+const menuItemBase = "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm data-focus:bg-hover";
+export const menuItem = `${menuItemBase} text-fg`;
+/** A menu item that deletes. */
+export const menuItemDanger = `${menuItemBase} text-danger`;
 
 /**
  * A name being renamed in a list: Enter or leaving the field hands the text to

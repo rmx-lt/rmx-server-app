@@ -1,7 +1,7 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { Copy, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import RenameInput, { menuItem } from "@/components/ui/RenameInput";
+import RenameInput, { menuItem, menuItemDanger } from "@/components/ui/RenameInput";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MAP_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
 import { duplicateMap, openMap, renameMapById, requestDeleteMap } from "@/features/map-manager/data/mapBridge";
@@ -10,7 +10,7 @@ import { useMapStore } from "@/model/mapStore";
 
 const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; name: string; mowing: number; noGo: number; updatedAt: string; isOpen: boolean }) {
+function MapRow({ id, name, updatedAt, isOpen }: { id: number; name: string; updatedAt: string; isOpen: boolean }) {
     const [renaming, setRenaming] = useState(false);
 
     function finishRename(next?: string) {
@@ -19,7 +19,7 @@ function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; nam
     }
 
     return (
-        <li className={`group flex items-center rounded-xl ${isOpen ? "bg-hover" : "hover:bg-hover"}`}>
+        <li className={`group flex items-center rounded-xl ${isOpen ? "bg-hover hover:bg-pressed" : "hover:bg-hover"}`}>
             {renaming ? (
                 <RenameInput name={name} label="Map name" maxLength={MAP_NAME_MAX_LENGTH} onDone={finishRename} />
             ) : (
@@ -30,15 +30,11 @@ function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; nam
                         onClick={() => openMap(id).catch(console.error)}
                         className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-xl px-3 py-2.5 text-left sm:flex-row sm:items-center sm:gap-4"
                     >
-                        <span className={`min-w-0 flex-1 truncate text-sm ${isOpen ? "font-medium" : ""} text-fg`}>{name}</span>
-                        <span className="shrink-0 text-xs text-muted">
-                            {mowing} mowing · {noGo} no-go
-                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-fg">{name}</span>
                         <span className="shrink-0 text-xs text-muted sm:w-36 sm:text-right">{when.format(new Date(updatedAt))}</span>
                     </button>
                 </Tooltip>
             )}
-            {isOpen && !renaming && <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-on-accent">Open</span>}
             <Menu>
                 <Tooltip label="Map menu">
                     <MenuButton
@@ -60,7 +56,7 @@ function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; nam
                         </button>
                     </MenuItem>
                     <MenuItem>
-                        <button type="button" className={`${menuItem} text-danger`} onClick={() => requestDeleteMap(id, name)}>
+                        <button type="button" className={menuItemDanger} onClick={() => requestDeleteMap(id, name)}>
                             <Trash2 size={15} strokeWidth={1.75} /> Delete
                         </button>
                     </MenuItem>
@@ -70,7 +66,7 @@ function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; nam
     );
 }
 
-/** The user's maps, newest change first, the open one marked; click opens, the menu renames, duplicates, deletes. */
+/** The user's maps, newest change first, the open one highlighted; click opens, the menu renames, duplicates, deletes. */
 export default function MapList() {
     const items = useMapListStore((s) => s.items);
     const refresh = useMapListStore((s) => s.refresh);
@@ -98,8 +94,6 @@ export default function MapList() {
                     key={m.id}
                     id={m.id}
                     name={m.id === openId ? openName : m.name}
-                    mowing={m.mowingAreaCount}
-                    noGo={m.noGoAreaCount}
                     updatedAt={m.updatedAt}
                     isOpen={m.id === openId}
                 />

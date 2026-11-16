@@ -17,7 +17,7 @@ export default function PlanTools() {
             <ToolStripButton label="Mowing area" icon={Pentagon} shortcut={S["canvas.tool-add-mowing-area"].shortcut} active={activeTool === "addMowingArea"} onClick={() => toggleTool("addMowingArea")} />
             <ToolStripButton label="No-go area" icon={Square} shortcut={S["canvas.tool-add-no-go-area"].shortcut} active={activeTool === "addNoGoArea"} onClick={() => toggleTool("addNoGoArea")} />
             <ToolStripSeparator />
-            <ToolStripButton label="Delete" icon={Trash2} shortcut={S["canvas.tool-delete"].shortcut} active={activeTool === "delete"} onClick={deleteAction} />
+            <ToolStripButton label="Delete" icon={Trash2} danger shortcut={S["canvas.tool-delete"].shortcut} active={activeTool === "delete"} onClick={deleteAction} />
             <ToolStripSeparator />
             <ToolStripButton label="Undo" icon={Undo2} shortcut={S["canvas.undo"].shortcut} disabled={!canUndo} onClick={undoAction} />
             <ToolStripButton label="Redo" icon={Redo2} shortcut={S["canvas.redo"].shortcut} disabled={!canRedo} onClick={redoAction} />
