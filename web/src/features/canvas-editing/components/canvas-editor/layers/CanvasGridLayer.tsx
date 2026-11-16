@@ -3,6 +3,8 @@ import { Layer, Line, Rect } from "react-konva";
 import { GRID_MAJOR_EVERY, GRID_SPACING, pickGridLevel } from "@/config/canvas-editing/canvasConfig";
 import { useCanvasColors } from "@/hooks/useTheme";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
+import { useGeoAnchorStore } from "@/model/geoAnchorStore";
+import { useMapLayerStore } from "@/model/mapLayerStore";
 
 /** Minor lines are fainter than the major line every GRID_MAJOR_EVERY cells. */
 const MINOR_OPACITY = 0.45;
@@ -27,6 +29,11 @@ function CanvasGridLayerInner({ width, height }: CanvasGridLayerProps) {
     const strokeColor = useCanvasColors().grid;
     const position = useCanvasViewStore((s) => s.position);
     const scale = useCanvasViewStore((s) => s.scale);
+    // Satellite and Map replace the grid; with no geo anchor there is no background, so the grid stays.
+    const showGrid = useMapLayerStore((s) => s.layer === "empty");
+    const hasAnchor = useGeoAnchorStore((s) => !!s.mapGeoAnchor);
+
+    if (!showGrid && hasAnchor) return null;
 
     const level = pickGridLevel(scale);
     const cellWorld = GRID_SPACING * level;
