@@ -1,13 +1,13 @@
 import { Radio, RadioGroup } from "@headlessui/react";
 import { Bot, Gamepad2, House, PanelLeftClose, PenTool, Sprout } from "lucide-react";
-import type { ComponentType } from "react";
-import AppHeaderLogoBox from "@/components/app-header/AppHeaderLogoBox";
+import type { ComponentType, CSSProperties } from "react";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MODES, type Mode } from "@/config/modes/modes";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
 import ZoneList from "@/features/map-manager/components/ZoneList";
 import { useUiShellStore } from "@/features/ui-manager/stores/uiShellStore";
 import Account, { panelRow } from "@/layouts/account/Account";
+import PanelResizeHandle from "@/layouts/workbench-window/PanelResizeHandle";
 import { useModeStore } from "@/model/modeStore";
 import { usePageStore } from "@/model/pageStore";
 
@@ -51,11 +51,12 @@ function DeviceSpot() {
     );
 }
 
-/** Left panel: logo and name, Home, the mode, the device spot, account and settings. The zone list of the open map fills the space between. */
+/** Left panel: Home, the mode, the device spot, account and settings. The zone list of the open map fills the space between. */
 export default function SidePanel() {
     const sideOpen = useUiShellStore((s) => s.sideOpen);
     const setSideOpen = useUiShellStore((s) => s.setSideOpen);
     const toggleSide = useUiShellStore((s) => s.toggleSide);
+    const width = useUiShellStore((s) => s.sideWidth);
     const setPage = usePageStore((s) => s.setPage);
 
     if (!sideOpen) return null;
@@ -66,11 +67,12 @@ export default function SidePanel() {
             <div aria-hidden className="fixed inset-0 z-30 bg-overlay md:hidden" onClick={() => setSideOpen(false)} />
             <aside
                 aria-label="Side panel"
-                className="fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] flex-col gap-3 border-r border-line bg-surface p-3 md:static md:z-auto md:max-w-none"
+                style={{ "--panel-w": `${width}px` } as CSSProperties}
+                className="fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] flex-col border-r border-line bg-surface md:relative md:z-auto md:w-(--panel-w) md:max-w-none"
             >
-                <div className="flex items-center gap-2.5 px-1">
-                    <AppHeaderLogoBox />
-                    <span className="flex-1 text-base font-semibold tracking-wide text-fg">RMX</span>
+                <PanelResizeHandle side="left" />
+                {/* Same place as the open-panel button in the top bar, so the toggle does not move. */}
+                <div className="flex h-12 shrink-0 items-center px-3">
                     <Tooltip label="Close side panel" shortcut={S["controls.toggle"].shortcut}>
                         <button
                             type="button"
@@ -82,7 +84,7 @@ export default function SidePanel() {
                         </button>
                     </Tooltip>
                 </div>
-
+                <div className="flex min-h-0 flex-1 flex-col gap-3 px-3 pb-3">
                 <button type="button" onClick={() => setPage("home")} className={`${panelRow} font-medium text-fg hover:bg-hover`}>
                     <House size={16} strokeWidth={1.75} aria-hidden /> Home
                 </button>
@@ -94,6 +96,7 @@ export default function SidePanel() {
                 <div className="flex flex-col gap-1 border-t border-line pt-2">
                     <DeviceSpot />
                     <Account />
+                </div>
                 </div>
             </aside>
         </>

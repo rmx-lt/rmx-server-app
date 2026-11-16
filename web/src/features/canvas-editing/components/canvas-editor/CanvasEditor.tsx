@@ -39,7 +39,6 @@ export default function CanvasEditor() {
   const scale = useCanvasViewStore((s) => s.scale);
   const position = useCanvasViewStore((s) => s.position);
   const setPosition = useCanvasViewStore((s) => s.setPosition);
-  const setScale = useCanvasViewStore((s) => s.setScale);
   const setCanvasSize = useCanvasViewStore((s) => s.setCanvasSize);
   const { activeTool, setActiveTool } = useCanvasToolStore();
   const {
@@ -83,7 +82,7 @@ export default function CanvasEditor() {
     handleDragEnd,
   } = useCanvasPanning(stageRef, setPosition);
 
-  const { handleWheel } = useCanvasZoom(stageRef, setScale, setPosition);
+  const { handleWheel } = useCanvasZoom(stageRef);
 
   const {
     drawingPoints,
