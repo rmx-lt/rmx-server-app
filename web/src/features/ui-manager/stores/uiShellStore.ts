@@ -7,7 +7,27 @@ export type SettingsPage = "account" | "appearance" | "map-defaults";
 
 const wide = (px: number) => typeof matchMedia === "function" && matchMedia(`(min-width: ${px}px)`).matches;
 
+export const PANEL_MIN = 224;
+export const PANEL_MAX = 480;
+const PANEL_DEFAULT = 288;
+const WIDTHS_KEY = "rmx:panel-widths";
+
+const clampWidth = (w: unknown) => (typeof w === "number" && Number.isFinite(w) ? Math.min(PANEL_MAX, Math.max(PANEL_MIN, Math.round(w))) : PANEL_DEFAULT);
+
+/** The panel widths of the last session; storage may be blocked or hold junk, then the defaults apply. */
+function readWidths() {
+    try {
+        const v = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? "{}") as { side?: unknown; right?: unknown };
+        return { sideWidth: clampWidth(v.side), rightWidth: clampWidth(v.right) };
+    } catch {
+        return { sideWidth: PANEL_DEFAULT, rightWidth: PANEL_DEFAULT };
+    }
+}
+
 interface UiShellState {
+    sideWidth: number;
+    rightWidth: number;
+    setPanelWidth: (panel: "side" | "right", width: number) => void;
     sideOpen: boolean;
     rightOpen: boolean;
     rightTab: RightTab;
@@ -24,6 +44,16 @@ interface UiShellState {
 
 // The panels start open only where there is room for them next to the canvas.
 export const useUiShellStore = create<UiShellState>()((set) => ({
+    ...readWidths(),
+    setPanelWidth: (panel, width) => {
+        set(panel === "side" ? { sideWidth: clampWidth(width) } : { rightWidth: clampWidth(width) });
+        const { sideWidth, rightWidth } = useUiShellStore.getState();
+        try {
+            localStorage.setItem(WIDTHS_KEY, JSON.stringify({ side: sideWidth, right: rightWidth }));
+        } catch {
+            // Not remembered; the default width applies next time.
+        }
+    },
     sideOpen: wide(768),
     rightOpen: wide(1024),
     rightTab: "details",
