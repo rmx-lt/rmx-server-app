@@ -841,10 +841,12 @@ whether the session still exists and shows the login form if not.
   loading). The choice is the per-user setting `map.layer`. Tiles load smoothly:
   a tile that has not arrived yet is drawn from the cached tiles of the zoom
   levels around it (scaled), the image cache holds at most 600 tiles, and loads
-  nobody needs any more (a fast zoom or pan) are cancelled. A new map asks where
-  it is ("Where is this map?": the browser's location, the user's default anchor
-  or typed coordinates; Done with nothing entered leaves the map without a
-  background); the pin button next to Layers asks again for the open map. Moving
+  nobody needs any more (a fast zoom or pan) are cancelled. A new map gets the
+  user's default anchor (none when unset: no background). The anchor of the open
+  map is set in the Settings modal, Map defaults: "Use my location" (the
+  message names the real reason when the browser refuses: permission blocked,
+  position unavailable, timeout, or a page that is not https), "Use my default"
+  or typed coordinates. Moving
   the anchor keeps the zones at their canvas coordinates: they move with it over
   the earth.
   The grid has two levels (a stronger line every 5 minor cells; the cell size
@@ -889,8 +891,7 @@ whether the session still exists and shows the login form if not.
   a side panel on the left and the bottom bar under everything:
   - **Bottom bar** (`layouts/bottom-bar/`): a thin bar across the full width,
     on both pages. It holds the server status, "Server: live" or "Server:
-    offline" (tooltip: "Connected; changes are saved" / "Offline; changes
-    wait"), and nothing else. There is no "reconnecting": the socket's retry
+    offline" (tooltip: "Connected to the server" / "No connection to the server"), and nothing else. There is no "reconnecting": the socket's retry
     cycle would only make it flicker.
   - **Home** (`layouts/home-window/`, modelled on SolidCraft's start page).
     Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
@@ -916,10 +917,16 @@ whether the session still exists and shows the login form if not.
       1024 px for the right one): drag the inner edge between 224 and 480 px; the
       width is kept in `localStorage` (`rmx:panel-widths`). At the minimum width,
       dragging on past half of it closes the panel, and in the same drag,
-      coming back past that point opens it again.
+      coming back past that point opens it again. The strip is a 2 px accent line on
+      the panel edge, shown on hover and during the whole drag (the cursor stays
+      the resize cursor until release, also after the panel closed). Opening,
+      closing or resizing a panel only changes the size of the canvas view; the
+      canvas keeps what is on screen where it is (the view is shifted back when
+      the left edge moves). The toggle buttons use one icon per panel
+      (`PanelLeft`, `PanelRight`) whether it is open or closed.
     - **Top bar:** over the canvas and the right panel, up to the right edge,
       with a line under it. The open map's name is at the left (click to
-      rename); its edit box is as wide as the name, between a minimum and a
+      rename); its edit box is as wide as the name, between one letter and a
       maximum width (a hidden copy of the text sets it, because CSS
       `field-sizing` is missing in Firefox), and a long name is cut with an
       ellipsis when not edited. The right panel toggle is at the right.

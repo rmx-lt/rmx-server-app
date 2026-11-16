@@ -27,6 +27,8 @@ function readWidths() {
 interface UiShellState {
     sideWidth: number;
     rightWidth: number;
+    /** The panel whose resize strip is being dragged (the strip itself unmounts when the panel closes). */
+    resizing: "side" | "right" | null;
     setPanelWidth: (panel: "side" | "right", width: number) => void;
     sideOpen: boolean;
     rightOpen: boolean;
@@ -45,6 +47,7 @@ interface UiShellState {
 // The panels start open only where there is room for them next to the canvas.
 export const useUiShellStore = create<UiShellState>()((set) => ({
     ...readWidths(),
+    resizing: null,
     setPanelWidth: (panel, width) => {
         set(panel === "side" ? { sideWidth: clampWidth(width) } : { rightWidth: clampWidth(width) });
         const { sideWidth, rightWidth } = useUiShellStore.getState();

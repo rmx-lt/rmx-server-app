@@ -26,13 +26,21 @@ export default function PanelResizeHandle({ side }: { side: "left" | "right" }) 
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             window.removeEventListener("pointercancel", up);
-            document.body.style.cursor = "";
+            cursorLock.remove();
+            useUiShellStore.setState({ resizing: null });
         };
-        document.body.style.cursor = "col-resize";
+        // The cursor stays the resize cursor wherever it goes (also after the panel closed and the strip is gone) until release.
+        const cursorLock = document.createElement("style");
+        cursorLock.textContent = "* { cursor: col-resize !important; }";
+        document.head.append(cursorLock);
+        useUiShellStore.setState({ resizing: panel });
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
         window.addEventListener("pointercancel", up);
     };
+
+    const panel = side === "left" ? "side" : "right";
+    const resizing = useUiShellStore((s) => s.resizing === panel);
 
     return (
         <div
@@ -40,7 +48,10 @@ export default function PanelResizeHandle({ side }: { side: "left" | "right" }) 
             aria-orientation="vertical"
             aria-label={side === "left" ? "Resize side panel" : "Resize right panel"}
             onPointerDown={onPointerDown}
-            className={`absolute inset-y-0 z-10 hidden w-1.5 cursor-col-resize touch-none transition-colors hover:bg-accent/40 active:bg-accent/60 ${side === "left" ? "right-0 md:block" : "left-0 lg:block"}`}
-        />
+            className={`group absolute inset-y-0 z-10 hidden w-2 cursor-col-resize touch-none ${side === "left" ? "right-0 md:block" : "left-0 lg:block"}`}
+        >
+            {/* A thin line on the panel edge; the grab area around it is wider. */}
+            <div className={`absolute inset-y-0 w-0.5 bg-accent ${side === "left" ? "right-0" : "left-0"} ${resizing ? "" : "opacity-0 group-hover:opacity-100"}`} />
+        </div>
     );
 }
