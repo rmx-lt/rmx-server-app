@@ -7,6 +7,10 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "Ctrl+Alt+N",
         shortcut: ["Ctrl", "Alt", "N"],
     } satisfies ShortcutBindingConfig,
+    "home.back": {
+        keys: "Escape",
+        shortcut: ["Esc"],
+    } satisfies ShortcutBindingConfig,
     "controls.toggle": {
         keys: "Ctrl+Alt+C",
         shortcut: ["Ctrl", "Alt", "C"],

@@ -6,10 +6,11 @@ import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObj
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
 import { useMapListStore } from "@/model/mapListStore";
+import { readLastMapId, rememberLastMapId, usePageStore } from "@/model/pageStore";
 import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
-import { currentMapContent, flushSave, resetSave } from "@/features/canvas-editing/data/canvasBridge";
+import { currentMapContent, flushSave, requestSave, resetSave } from "@/features/canvas-editing/data/canvasBridge";
 
-// Opening, starting and duplicating maps. The maps live on the server
+// Opening, starting, duplicating and deleting maps. The maps live on the server
 // (src/data/planning/maps.ts), a new one from the moment it is made; the
 // stores hold the open one, and the autosave keeps it saved. A map with
 // id 0 exists only when the server could not be reached at startup; its
@@ -38,6 +39,18 @@ function showMap(content: MapContent): void {
     useCanvasHistoryStore.getState().resetHistory();
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
     resetSave();
+    rememberLastMapId(content.map.id);
+    void useMapListStore.getState().refresh();
+}
+
+/** Leaves no map open (the stores hold a blank one) and forgets the last map. */
+function closeMap(): void {
+    useMapStore.getState().setMap(BLANK_MAP);
+    useCanvasObjectStore.getState().setObjects([]);
+    useCanvasHistoryStore.getState().resetHistory();
+    useGeoAnchorStore.getState().setLoadedMapGeoAnchor(undefined);
+    resetSave();
+    rememberLastMapId(null);
     void useMapListStore.getState().refresh();
 }
 
@@ -47,25 +60,34 @@ async function createBlankMap(): Promise<number> {
     return createMap({ map: BLANK_MAP, zones: [], geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor }, BLANK_MAP.name);
 }
 
-/** Opens the map changed last, or makes a new one when there is none. Nothing is saved first. */
-export async function openLatestMap(): Promise<void> {
-    const [latest] = await listMaps();
-    showMap(await loadMap(latest ? latest.id : await createBlankMap()));
+/** At login: opens the map opened last in this browser; when there is none or it is gone, shows Home. Nothing is saved first. */
+export async function openStartMap(): Promise<void> {
+    const wanted = readLastMapId();
+    const maps = await listMaps();
+    if (wanted !== null && maps.some((m) => m.id === wanted)) {
+        showMap(await loadMap(wanted));
+        usePageStore.getState().setPage("workbench");
+    } else {
+        closeMap();
+        usePageStore.getState().setPage("home");
+    }
 }
 
-/** Opens a map. */
+/** Opens a map and shows it in the workbench. */
 export async function openMap(mapId: number): Promise<void> {
     await flushSave();
     showMap(await loadMap(mapId));
+    usePageStore.getState().setPage("workbench");
 }
 
-/** Makes a new map on the server and opens it. */
+/** Makes a new map on the server and opens it in the workbench. */
 export async function newMap(): Promise<void> {
     await flushSave();
     showMap(await loadMap(await createBlankMap()));
+    usePageStore.getState().setPage("workbench");
 }
 
-/** Makes a copy of a map ("name (copy)") on the server and opens it. */
+/** Makes a copy of a map ("name (copy)") on the server and makes it the open one (the page stays). */
 export async function duplicateMap(mapId: number): Promise<void> {
     await flushSave();
     const content = mapId === useMapStore.getState().map.id ? currentMapContent() : await loadMap(mapId);
@@ -76,14 +98,17 @@ export async function duplicateMap(mapId: number): Promise<void> {
 export async function renameMapById(mapId: number, name: string): Promise<void> {
     const trimmed = name.trim();
     if (!trimmed) return;
-    if (mapId === useMapStore.getState().map.id) useMapStore.getState().setName(trimmed);
-    else {
+    if (mapId === useMapStore.getState().map.id) {
+        useMapStore.getState().setName(trimmed);
+        // The canvas that watches the name is not mounted on Home.
+        requestSave();
+    } else {
         await renameMap(mapId, trimmed);
         await useMapListStore.getState().refresh();
     }
 }
 
-/** Asks first, then deletes a map; deleting the open one opens the next (or makes a new one). */
+/** Asks first, then deletes a map; deleting the open one leaves no map open (the user is on Home). */
 export function requestDeleteMap(mapId: number, name: string): void {
     useConfirmationModalStore.getState().requestConfirmation({
         title: "Delete map",
@@ -95,7 +120,7 @@ export function requestDeleteMap(mapId: number, name: string): void {
             // Nothing of a map that is going away is saved.
             if (wasOpen) resetSave();
             await deleteMap(mapId);
-            if (wasOpen) await openLatestMap();
+            if (wasOpen) closeMap();
             else await useMapListStore.getState().refresh();
         },
     });
