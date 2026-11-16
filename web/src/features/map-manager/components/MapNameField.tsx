@@ -35,7 +35,7 @@ export default function MapNameField() {
         return (
             <span className={`relative inline-grid min-w-0 ${width}`}>
                 <span aria-hidden className={`${shared} invisible col-start-1 row-start-1 overflow-hidden whitespace-pre`}>
-                    {draft || " "}
+                    {draft || "M"}
                 </span>
                 <input
                     ref={inputRef}
@@ -49,7 +49,7 @@ export default function MapNameField() {
                         if (e.key === "Enter") commit();
                         if (e.key === "Escape") setIsEditing(false);
                     }}
-                    className={`${shared} col-start-1 row-start-1 w-full min-w-0 bg-surface outline-none ring-2 ring-accent`}
+                    className={`${shared} col-start-1 row-start-1 w-0 min-w-full bg-surface outline-none ring-2 ring-accent`}
                 />
             </span>
         );

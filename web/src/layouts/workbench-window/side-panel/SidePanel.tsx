@@ -1,5 +1,5 @@
 import { Radio, RadioGroup } from "@headlessui/react";
-import { Bot, Gamepad2, House, PanelLeftClose, PenTool, Sprout } from "lucide-react";
+import { Bot, Gamepad2, House, PanelLeft, PenTool, Sprout } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MODES, type Mode } from "@/config/modes/modes";
@@ -80,7 +80,7 @@ export default function SidePanel() {
                             onClick={toggleSide}
                             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
                         >
-                            <PanelLeftClose size={18} strokeWidth={1.75} />
+                            <PanelLeft size={18} strokeWidth={1.75} />
                         </button>
                     </Tooltip>
                 </div>

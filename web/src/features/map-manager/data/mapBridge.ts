@@ -40,7 +40,6 @@ function showMap(content: MapContent): void {
     useCanvasHistoryStore.getState().resetHistory();
     useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
     resetSave();
-    useGeoAnchorStore.getState().setPromptOpen(false);
     useMapListStore.setState({ error: null });
     rememberLastMapId(content.map.id);
     void useMapListStore.getState().refresh();
@@ -57,9 +56,9 @@ function closeMap(): void {
     void useMapListStore.getState().refresh();
 }
 
-/** Creates a blank map on the server, without a geo anchor (newMap asks where it is). Returns its id. */
+/** Creates a blank map on the server, at the user's default geo anchor (none when unset). Returns its id. */
 async function createBlankMap(): Promise<number> {
-    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [], geoAnchor: undefined }, BLANK_MAP.name);
+    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [], geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor }, BLANK_MAP.name);
 }
 
 /** At login: opens the map opened last in this browser; when there is none, it is gone or it can't be opened, shows Home. Nothing is saved first. */
@@ -91,7 +90,6 @@ export async function newMap(): Promise<void> {
     await flushSave();
     showMap(await loadMap(await createBlankMap()));
     usePageStore.getState().setPage("workbench");
-    useGeoAnchorStore.getState().setPromptOpen(true);
 }
 
 /** Makes a copy of a map ("name (copy)") on the server and makes it the open one (the page stays). */

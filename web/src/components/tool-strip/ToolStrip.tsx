@@ -44,7 +44,7 @@ export function ToolStripButton({ label, icon: Icon, shortcut, note, active, dan
             aria-pressed={active === undefined ? undefined : active}
             aria-disabled={off || undefined}
             onClick={off ? undefined : onClick}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                 off
                     ? "cursor-not-allowed text-faint"
                     : active
