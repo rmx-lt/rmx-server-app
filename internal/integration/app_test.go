@@ -174,7 +174,7 @@ func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The three it adopted, plus the ones after them.
-	eq(t, applied, 8)
+	eq(t, applied, 9)
 	// Running again does nothing, and the old table is still there.
 	if err := db.Migrate(ctx, pool); err != nil {
 		t.Fatal(err)
