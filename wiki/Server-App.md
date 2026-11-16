@@ -853,6 +853,12 @@ whether the session still exists and shows the login form if not.
   line is 40 px wide when the map unit is metres); the wheel (Alt + wheel),
   the buttons and the shortcuts animate to their target, anchored on the cursor
   (the canvas centre for buttons and shortcuts), and a new step retargets it.
+  Fit and Home animate the same way (position and scale), and a wheel step or a
+  new action retargets them. In select mode an area brightens its fill on hover
+  and more when selected; the vertices of the selected area are small squares
+  (a ring on hover, an accent ring when selected, the hover colour when both),
+  and an edge midpoint is a plain ring that shows only when the cursor is near.
+  Handle sizes are screen pixels, constant at every zoom.
   The bottom bar of the workbench shows a scale bar as long as one grid cell,
   labelled in the map's unit.
   The map has no format, type, coordinate system, headland, route points or

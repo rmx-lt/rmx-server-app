@@ -16,6 +16,8 @@ interface CanvasViewState {
     setCanvasSize: (width: number, height: number) => void;
     /** Animates the scale by `factor`, keeping the screen point `anchor` (default: canvas centre) fixed. A step during an animation moves the target on. */
     zoomBy: (factor: number, anchor?: Point) => void;
+    /** Animates to `scale` and `position` (the target view); a new step or action retargets it. */
+    animateTo: (scale: number, position: Point) => void;
     zoomIn: () => void;
     zoomOut: () => void;
     resetView: () => void;
@@ -24,7 +26,7 @@ interface CanvasViewState {
 const clamp = (s: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s));
 
 // The running zoom animation; any direct change of the view cancels it.
-let anim: { target: number; anchor: Point; world: Point; raf: number; last: number } | null = null;
+let anim: { target: number; anchor: Point; world: Point; toWorld?: Point; raf: number; last: number } | null = null;
 
 function cancelAnim() {
     if (anim) cancelAnimationFrame(anim.raf);
@@ -37,7 +39,12 @@ export const useCanvasViewStore = create<CanvasViewState>((set, get) => {
         const { scale } = get();
         const k = 1 - Math.exp(-(now - anim.last) / ZOOM_ANIMATION_MS);
         anim.last = now;
-        const done = Math.abs(Math.log(anim.target / scale)) < 0.001;
+        if (anim.toWorld) {
+            anim.world = { x: anim.world.x + (anim.toWorld.x - anim.world.x) * k, y: anim.world.y + (anim.toWorld.y - anim.world.y) * k };
+        }
+        const done =
+            Math.abs(Math.log(anim.target / scale)) < 0.001 &&
+            (!anim.toWorld || Math.hypot(anim.toWorld.x - anim.world.x, anim.toWorld.y - anim.world.y) * anim.target < 0.5);
         // Geometric easing: equal steps in zoom feel equal at every scale.
         const next = done ? anim.target : scale * Math.pow(anim.target / scale, k);
         set({
@@ -75,16 +82,28 @@ export const useCanvasViewStore = create<CanvasViewState>((set, get) => {
             anim.raf = requestAnimationFrame(frame);
         },
 
+        animateTo: (scale, position) => {
+            const { scale: from, position: pos, canvasSize } = get();
+            const target = clamp(scale);
+            const c = { x: canvasSize.width / 2, y: canvasSize.height / 2 };
+            if (anim) cancelAnimationFrame(anim.raf);
+            anim = {
+                target,
+                anchor: c,
+                world: { x: (c.x - pos.x) / from, y: (c.y - pos.y) / from },
+                toWorld: { x: (c.x - position.x) / target, y: (c.y - position.y) / target },
+                raf: 0,
+                last: performance.now(),
+            };
+            anim.raf = requestAnimationFrame(frame);
+        },
+
         zoomIn: () => get().zoomBy(ZOOM_BUTTON_FACTOR),
         zoomOut: () => get().zoomBy(1 / ZOOM_BUTTON_FACTOR),
 
         resetView: () => {
-            cancelAnim();
-            const { canvasSize } = get();
-            set({
-                position: { x: canvasSize.width / 2, y: canvasSize.height / 2 },
-                scale: 1,
-            });
+            const { canvasSize, animateTo } = get();
+            animateTo(1, { x: canvasSize.width / 2, y: canvasSize.height / 2 });
         },
     };
 });
