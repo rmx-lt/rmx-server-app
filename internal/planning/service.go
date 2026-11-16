@@ -1,5 +1,5 @@
 // Package planning stores what users plan in the web app: their maps (each
-// one JSON document: mowing, no-go and navigation zones, geo anchor) and their per-user settings. Every call is scoped
+// one JSON document: zones with their mowing, no-go and navigation areas, geo anchor) and their per-user settings. Every call is scoped
 // to one user; another user's map answers as if it did not exist.
 package planning
 
@@ -27,8 +27,8 @@ const (
 	MaxSettingBytes = 16 << 10
 	// MaxSettings is the most settings one user can have.
 	MaxSettings = 100
-	// maxZones and maxVertices bound one document.
-	maxZones    = 5000
+	// maxAreas and maxVertices bound one document.
+	maxAreas    = 5000
 	maxVertices = 100_000
 )
 
@@ -176,22 +176,35 @@ func checkMap(name string, doc api.MapDoc) (string, []byte, error) {
 }
 
 func checkDoc(doc *api.MapDoc) error {
-	if len(doc.Zones) > maxZones {
-		return apperr.BadRequest("too many zones (at most %d)", maxZones)
+	if len(doc.Zones) == 0 {
+		return apperr.BadRequest("a map needs at least one zone")
 	}
-	ids := make(map[int64]bool, len(doc.Zones))
+	zoneIDs := make(map[int64]bool, len(doc.Zones))
+	areaIDs := map[int64]bool{}
 	vertices := 0
 	for _, z := range doc.Zones {
-		switch z.Category {
-		case "mowing", "no_go", "navigation":
-		default:
-			return apperr.BadRequest("zone %d: category must be mowing, no_go or navigation", z.ID)
+		if n := strings.TrimSpace(z.Name); n == "" || utf8.RuneCountInString(n) > MaxNameLength {
+			return apperr.BadRequest("zone %d: name must be 1 to %d characters", z.ID, MaxNameLength)
 		}
-		if ids[z.ID] {
+		if zoneIDs[z.ID] {
 			return apperr.BadRequest("zone id %d appears twice", z.ID)
 		}
-		ids[z.ID] = true
-		vertices += len(z.Vertices)
+		zoneIDs[z.ID] = true
+		if len(areaIDs)+len(z.Areas) > maxAreas {
+			return apperr.BadRequest("too many areas (at most %d)", maxAreas)
+		}
+		for _, a := range z.Areas {
+			switch a.Category {
+			case "mowing", "no_go", "navigation":
+			default:
+				return apperr.BadRequest("area %d: category must be mowing, no_go or navigation", a.ID)
+			}
+			if areaIDs[a.ID] {
+				return apperr.BadRequest("area id %d appears twice", a.ID)
+			}
+			areaIDs[a.ID] = true
+			vertices += len(a.Vertices)
+		}
 	}
 	if vertices > maxVertices {
 		return apperr.BadRequest("too many vertices (at most %d)", maxVertices)
@@ -202,14 +215,19 @@ func checkDoc(doc *api.MapDoc) error {
 	return nil
 }
 
-// normalize turns missing lists into empty ones, so the client always gets arrays.
+// normalize turns missing lists into empty ones, so the client always gets arrays,
+// and trims the zone names like the map name.
 func normalize(doc *api.MapDoc) {
-	if doc.Zones == nil {
-		doc.Zones = []api.Zone{}
-	}
 	for i := range doc.Zones {
-		if doc.Zones[i].Vertices == nil {
-			doc.Zones[i].Vertices = []api.Point{}
+		z := &doc.Zones[i]
+		z.Name = strings.TrimSpace(z.Name)
+		if z.Areas == nil {
+			z.Areas = []api.Area{}
+		}
+		for j := range z.Areas {
+			if z.Areas[j].Vertices == nil {
+				z.Areas[j].Vertices = []api.Point{}
+			}
 		}
 	}
 }

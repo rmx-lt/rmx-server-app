@@ -29,7 +29,7 @@ export default function CanvasViewControls() {
         <div role="group" aria-label="View" className="pointer-events-auto absolute bottom-4 max-md:bottom-20 right-3 flex flex-col rounded-xl border border-line bg-surface p-1 shadow-lg">
             <ViewButton label="Zoom in" icon={ZoomIn} onClick={zoomIn} />
             <ViewButton label="Zoom out" icon={ZoomOut} onClick={zoomOut} />
-            <ViewButton label="Fit all zones" icon={Maximize} onClick={fitView} />
+            <ViewButton label="Fit all areas" icon={Maximize} onClick={fitView} />
             <ViewButton label="Home" icon={House} shortcut={S["canvas.reset-view"].shortcut} onClick={resetView} />
         </div>
     );

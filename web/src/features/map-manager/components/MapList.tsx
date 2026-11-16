@@ -1,41 +1,14 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { Copy, Ellipsis, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import RenameInput, { menuItem } from "@/components/ui/RenameInput";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MAP_NAME_MAX_LENGTH } from "@/config/db-ops/databaseConstraintsConfig";
-import { useShortcutsBlocked } from "@/hooks/shortcut-manager/useShortcutsBlocked";
 import { duplicateMap, openMap, renameMapById, requestDeleteMap } from "@/features/map-manager/data/mapBridge";
 import { useMapListStore } from "@/model/mapListStore";
 import { useMapStore } from "@/model/mapStore";
 
-const menuItem = "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-fg data-focus:bg-hover";
 const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-
-function RenameInput({ name, onDone }: { name: string; onDone: (name?: string) => void }) {
-    const [draft, setDraft] = useState(name);
-    const ref = useRef<HTMLInputElement>(null);
-    useShortcutsBlocked("map-list-rename", true);
-    useEffect(() => {
-        // After the menu has given focus back to its button.
-        const id = requestAnimationFrame(() => ref.current?.select());
-        return () => cancelAnimationFrame(id);
-    }, []);
-    return (
-        <input
-            ref={ref}
-            aria-label="Map name"
-            value={draft}
-            maxLength={MAP_NAME_MAX_LENGTH}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => onDone(draft)}
-            onKeyDown={(e) => {
-                if (e.key === "Enter") onDone(draft);
-                if (e.key === "Escape") onDone();
-            }}
-            className="mx-1 min-w-0 flex-1 rounded-md bg-page px-2 py-1.5 text-sm text-fg outline-none ring-2 ring-accent"
-        />
-    );
-}
 
 function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; name: string; mowing: number; noGo: number; updatedAt: string; isOpen: boolean }) {
     const [renaming, setRenaming] = useState(false);
@@ -48,7 +21,7 @@ function MapRow({ id, name, mowing, noGo, updatedAt, isOpen }: { id: number; nam
     return (
         <li className={`group flex items-center rounded-xl ${isOpen ? "bg-hover" : "hover:bg-hover"}`}>
             {renaming ? (
-                <RenameInput name={name} onDone={finishRename} />
+                <RenameInput name={name} label="Map name" maxLength={MAP_NAME_MAX_LENGTH} onDone={finishRename} />
             ) : (
                 <Tooltip label={name}>
                     <button
@@ -103,6 +76,7 @@ export default function MapList() {
     const refresh = useMapListStore((s) => s.refresh);
     const openId = useMapStore((s) => s.map.id);
     const openName = useMapStore((s) => s.map.name);
+    const error = useMapListStore((s) => s.error);
 
     useEffect(() => {
         void refresh();
@@ -111,19 +85,26 @@ export default function MapList() {
     if (items.length === 0) return <p className="px-3 py-6 text-sm text-muted">No maps yet. Make the first one with New map.</p>;
 
     return (
-        <ul aria-label="Maps" className="flex flex-col gap-0.5">
+        <>
+            {error && (
+                <p role="alert" className="mb-2 rounded-lg bg-hover px-3 py-2 text-sm text-danger">
+                    {error}
+                </p>
+            )}
+            <ul aria-label="Maps" className="flex flex-col gap-0.5">
             {items.map((m) => (
                 // The open map's name is live (it may not be saved yet).
                 <MapRow
                     key={m.id}
                     id={m.id}
                     name={m.id === openId ? openName : m.name}
-                    mowing={m.mowingZoneCount}
-                    noGo={m.noGoZoneCount}
+                    mowing={m.mowingAreaCount}
+                    noGo={m.noGoAreaCount}
                     updatedAt={m.updatedAt}
                     isOpen={m.id === openId}
                 />
             ))}
-        </ul>
+            </ul>
+        </>
     );
 }

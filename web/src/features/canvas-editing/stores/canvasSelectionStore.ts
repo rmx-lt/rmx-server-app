@@ -1,13 +1,13 @@
 import { create } from "zustand";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import type { VertexRef } from "@/features/canvas-editing/types/canvas";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 
 interface CanvasSelectionState {
-    selectedObject: Zone | null;
+    selectedObject: Area | null;
     selectedVertexRefs: VertexRef[];
 
-    selectObject: (obj: Zone) => void;
+    selectObject: (obj: Area) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
     toggleVertexSelection: (ref: VertexRef, ctrl: boolean) => void;

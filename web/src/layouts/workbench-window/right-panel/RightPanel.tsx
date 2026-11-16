@@ -7,9 +7,10 @@ import CategoryField from "@/features/inspector/components/object-section/Catego
 import GrossAreaField from "@/features/inspector/components/object-section/GrossAreaField";
 import NetAreaField from "@/features/inspector/components/object-section/NetAreaField";
 import MowingAreaField from "@/features/inspector/components/map-section/MowingAreaField";
-import MowingZoneSumField from "@/features/inspector/components/map-section/MowingZoneSumField";
-import NoGoZoneSumField from "@/features/inspector/components/map-section/NoGoZoneSumField";
+import MowingAreaCountField from "@/features/inspector/components/map-section/MowingAreaCountField";
+import NoGoAreaCountField from "@/features/inspector/components/map-section/NoGoAreaCountField";
 import PerimeterLengthField from "@/features/inspector/components/map-section/PerimeterLengthField";
+import { useMapStore } from "@/model/mapStore";
 import { useUiShellStore, type RightTab } from "@/features/ui-manager/stores/uiShellStore";
 
 const TABS: { id: RightTab; label: string }[] = [
@@ -17,19 +18,20 @@ const TABS: { id: RightTab; label: string }[] = [
     { id: "monitor", label: "Monitor" },
 ];
 
-/** What matters for mowing: the map's totals, or the selected zone. No vertex data. */
+/** What matters for mowing: the active zone's totals, or the selected area. No vertex data. */
 function Details() {
     const hasSelection = useCanvasSelectionStore((s) => s.selectedObject !== null);
+    const zoneName = useMapStore((s) => s.zones.find((z) => z.id === s.activeZoneId)?.name ?? "Zone");
     return (
         <>
-            <InspectorPanelSection title="Map">
-                <MowingZoneSumField />
-                <NoGoZoneSumField />
+            <InspectorPanelSection title={zoneName}>
+                <MowingAreaCountField />
+                <NoGoAreaCountField />
                 <MowingAreaField />
                 <PerimeterLengthField />
             </InspectorPanelSection>
             {hasSelection && (
-                <InspectorPanelSection title="Selected zone">
+                <InspectorPanelSection title="Selected area">
                     <CategoryField />
                     <GrossAreaField />
                     <NetAreaField />

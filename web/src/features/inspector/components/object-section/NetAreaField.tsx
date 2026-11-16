@@ -19,7 +19,7 @@ export default function NetAreaField() {
 
   const netArea = computeNetArea(selectedObject, objects);
 
-  // For no-go zones the field is not applicable
+  // For no-go areas the field is not applicable
   if (netArea === null) return null;
 
   const displayUnit = pickAutoAreaUnit(netArea, selectedUnit);

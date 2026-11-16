@@ -6,7 +6,7 @@
 
 export type Mode = "plan" | "drive" | "mow";
 
-export type LayerId = "zones" | "mower" | "draftBorder" | "jobPath" | "progress";
+export type LayerId = "areas" | "mower" | "draftBorder" | "jobPath" | "progress";
 
 export const MODES: { id: Mode; label: string }[] = [
     { id: "plan", label: "Plan" },
@@ -15,13 +15,13 @@ export const MODES: { id: Mode; label: string }[] = [
 ];
 
 /**
- * Layers per mode. Only `zones` is drawn today; the others have no data until
+ * Layers per mode. Only `areas` is drawn today; the others have no data until
  * the mower features exist (rmx-server-app#93, #94, #105, #106).
  */
 export const MODE_LAYERS: Record<Mode, readonly LayerId[]> = {
-    plan: ["zones"],
-    drive: ["zones", "mower", "draftBorder"],
-    mow: ["zones", "jobPath", "progress", "mower"],
+    plan: ["areas"],
+    drive: ["areas", "mower", "draftBorder"],
+    mow: ["areas", "jobPath", "progress", "mower"],
 };
 
 export function isLayerVisible(mode: Mode, layer: LayerId): boolean {

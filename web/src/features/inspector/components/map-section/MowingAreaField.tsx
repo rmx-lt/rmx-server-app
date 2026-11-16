@@ -5,7 +5,7 @@ import { computeNetArea } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { areaUnitLabel, convertArea, formatNumber, pickAutoAreaUnit } from "@/utils/unitOfMeasure";
 
-/** Area to mow: the mowing zones, less the no-go zones inside them. */
+/** Area to mow: the mowing areas, less the no-go areas inside them. */
 export default function MowingAreaField() {
     const objects = useCanvasObjectStore((s) => s.objects);
     const selectedUnit = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);

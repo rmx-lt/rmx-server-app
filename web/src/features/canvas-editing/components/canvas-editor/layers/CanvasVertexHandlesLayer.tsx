@@ -1,16 +1,16 @@
 import { memo } from "react";
 import { Layer, Circle } from "react-konva";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
 import { LAYER_STYLE } from "@/config/canvas-editing/canvasConfig";
 import { useCanvasColors } from "@/hooks/useTheme";
 import { deriveActiveFill } from "@/utils/colorUtils";
-import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
+import { AREA_CATEGORY, type AreaCategory } from "@/config/db-ops/enums";
 
 interface CanvasVertexHandlesLayerProps {
-    selectedObject: Zone | null;
+    selectedObject: Area | null;
     selectedObjectVertices: Array<{ x: number; y: number }>;
     activeTool: ActiveTool | null;
     scale: number;
@@ -38,7 +38,7 @@ export function CanvasVertexHandlesLayerInner({
     onEdgeMidpointMouseDown,
     onHandleHoverChange,
 }: CanvasVertexHandlesLayerProps) {
-    const category = (selectedObject?.category ?? ZONE_CATEGORY.MOWING) as ZoneCategory;
+    const category = (selectedObject?.category ?? AREA_CATEGORY.MOWING) as AreaCategory;
     const colors = useCanvasColors();
     const accentColor = colors[category].stroke;
     const { edgeWidth } = LAYER_STYLE[category];

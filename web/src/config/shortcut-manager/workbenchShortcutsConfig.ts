@@ -33,11 +33,11 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "S",
         shortcut: ["S"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-mowing-zone": {
+    "canvas.tool-add-mowing-area": {
         keys: "Z",
         shortcut: ["Z"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-no-go-zone": {
+    "canvas.tool-add-no-go-area": {
         keys: "O",
         shortcut: ["O"],
     } satisfies ShortcutBindingConfig,

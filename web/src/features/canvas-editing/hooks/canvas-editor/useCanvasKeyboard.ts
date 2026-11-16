@@ -1,18 +1,18 @@
 import { useCallback } from "react";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
 
 interface UseCanvasKeyboardOptions {
     activeTool: ActiveTool | null;
     drawingPointsCount: number;
-    selectedObject: Zone | null;
+    selectedObject: Area | null;
     selectedVertexRefs: VertexRef[];
     setActiveTool: (tool: ActiveTool | null) => void;
     clearSelection: () => void;
     selectVertex: (ref: VertexRef | null) => void;
-    deleteObject: (obj: Zone) => void;
-    deleteVertex: (obj: Zone, index: number) => void;
-    deleteVertices: (obj: Zone, refs: VertexRef[]) => void;
+    deleteObject: (obj: Area) => void;
+    deleteVertex: (obj: Area, index: number) => void;
+    deleteVertices: (obj: Area, refs: VertexRef[]) => void;
     cancelDrawing: () => void;
 }
 
@@ -33,7 +33,7 @@ export function useCanvasKeyboard({
         (e: React.KeyboardEvent<HTMLDivElement>) => {
             if (e.key === "Escape") {
                 e.preventDefault();
-                if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
+                if (activeTool === "addMowingArea" || activeTool === "addNoGoArea") {
                     if (drawingPointsCount > 0) {
                         cancelDrawing();
                     } else {

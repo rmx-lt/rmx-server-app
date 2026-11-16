@@ -20,7 +20,7 @@ export function toggleTool(tool: ActiveTool): void {
     setActiveTool(activeTool === tool ? null : tool);
 }
 
-/** Delete: removes the selected vertices or zone, else switches the delete tool on or off. */
+/** Delete: removes the selected vertices or area, else switches the delete tool on or off. */
 export function deleteAction(): void {
     if (!inPlanMode()) return;
     const { activeTool, setActiveTool } = useCanvasToolStore.getState();
@@ -48,7 +48,7 @@ export function redoAction(): void {
     if (inPlanMode()) useCanvasHistoryStore.getState().redo();
 }
 
-/** Zooms and moves the view so that every zone is visible. */
+/** Zooms and moves the view so that every area is visible. */
 export function fitView(): void {
     const { objects } = useCanvasObjectStore.getState();
     const { canvasSize, setScale, setPosition } = useCanvasViewStore.getState();
@@ -57,7 +57,7 @@ export function fitView(): void {
     const xs = vertices.map((v) => v.x);
     const ys = vertices.map((v) => v.y);
     const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-    const margin = 0.8; // leave room around the zones, and for the tool strip
+    const margin = 0.8; // leave room around the areas, and for the tool strip
     const fit = Math.min(
         (canvasSize.width * margin) / Math.max(maxX - minX, 1),
         (canvasSize.height * margin) / Math.max(maxY - minY, 1),

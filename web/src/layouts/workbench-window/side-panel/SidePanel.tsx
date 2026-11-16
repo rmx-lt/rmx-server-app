@@ -5,6 +5,7 @@ import AppHeaderLogoBox from "@/components/app-header/AppHeaderLogoBox";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MODES, type Mode } from "@/config/modes/modes";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
+import ZoneList from "@/features/map-manager/components/ZoneList";
 import { useUiShellStore } from "@/features/ui-manager/stores/uiShellStore";
 import Account, { panelRow } from "@/layouts/account/Account";
 import { useModeStore } from "@/model/modeStore";
@@ -50,7 +51,7 @@ function DeviceSpot() {
     );
 }
 
-/** Left panel: logo and name, Home, the mode, the device spot, account and settings. The free space between is for the zone list (rmx-server-app#121). */
+/** Left panel: logo and name, Home, the mode, the device spot, account and settings. The zone list of the open map fills the space between. */
 export default function SidePanel() {
     const sideOpen = useUiShellStore((s) => s.sideOpen);
     const setSideOpen = useUiShellStore((s) => s.setSideOpen);
@@ -88,8 +89,7 @@ export default function SidePanel() {
 
                 <ModeSwitch />
 
-                {/* Free for the zone list of the open map (rmx-server-app#121). */}
-                <div className="min-h-0 flex-1" />
+                <ZoneList />
 
                 <div className="flex flex-col gap-1 border-t border-line pt-2">
                     <DeviceSpot />

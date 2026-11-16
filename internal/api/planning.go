@@ -17,23 +17,33 @@ type GeoAnchor struct {
 	Lon float64 `json:"lon"`
 }
 
-// ZoneCategory says what the mower does in a zone: "mowing" (mow it),
+// AreaCategory says what the mower does in an area: "mowing" (mow it),
 // "no_go" (never enter: trees, beds, ponds) or "navigation" (drive through
 // without mowing: paths between lawns, the way to the dock).
-type ZoneCategory string
+type AreaCategory string
 
-// Zone is one polygon of a map.
-type Zone struct {
+// Area is one polygon of a zone.
+type Area struct {
 	// Unique within its map.
 	ID       int64        `json:"id"`
-	Category ZoneCategory `json:"category"`
-	// Vertices in draw order: mowing and navigation zones clockwise, no-go
-	// zones counter-clockwise (screen coordinates, y down).
+	Category AreaCategory `json:"category"`
+	// Vertices in draw order: mowing and navigation areas clockwise, no-go
+	// areas counter-clockwise (screen coordinates, y down).
 	Vertices []Point `json:"vertices"`
+}
+
+// Zone is a named part of a map, such as "Front lawn". It owns the areas drawn in it.
+type Zone struct {
+	// Unique within its map.
+	ID int64 `json:"id"`
+	// 1 to 100 characters, surrounding spaces removed.
+	Name  string `json:"name"`
+	Areas []Area `json:"areas"`
 }
 
 // MapDoc is the content of a map: its zones and where it lies on the earth. It is saved and loaded as a whole.
 type MapDoc struct {
+	// At least one.
 	Zones []Zone `json:"zones"`
 	// Null when the map is not placed on the earth.
 	GeoAnchor *GeoAnchor `json:"geo_anchor"`
@@ -44,10 +54,10 @@ type MapSummary struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	Revision int64  `json:"revision"`
-	// Counted from the document's zones, by category.
-	MowingZoneCount     int       `json:"mowing_zone_count"`
-	NoGoZoneCount       int       `json:"no_go_zone_count"`
-	NavigationZoneCount int       `json:"navigation_zone_count"`
+	// Counted from the areas of all the document's zones, by category.
+	MowingAreaCount     int       `json:"mowing_area_count"`
+	NoGoAreaCount       int       `json:"no_go_area_count"`
+	NavigationAreaCount int       `json:"navigation_area_count"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 

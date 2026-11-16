@@ -6,6 +6,9 @@ import type { Zone } from "./Zone";
  * MapDoc is the content of a map: its zones and where it lies on the earth. It is saved and loaded as a whole.
  */
 export type MapDoc = {
+  /**
+   * At least one.
+   */
   zones: Array<Zone>,
   /**
    * Null when the map is not placed on the earth.

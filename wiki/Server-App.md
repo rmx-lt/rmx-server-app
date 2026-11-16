@@ -76,7 +76,7 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
-| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, with their areas, and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
 | `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 | `devices` | plain table | `name` (primary key; the device name from the topics), `first_seen_at`, `last_seen_at`, `gateway_status` (`online` / `offline` / null), `gateway_status_at` |
 | `board_state` | plain table | `device` (→ devices, cascade), `board` (`gateway` / `autopilot`), `boot` and `boot_seen_at` (last boot counter seen in any message of the board), `state` (JSONB: the last state message as published) and `state_received_at`; primary key `device` + `board` |
@@ -719,8 +719,10 @@ user. Code: `internal/planning/`, wire types in `internal/api/planning.go`
 (generated to `web/src/data/api/generated/`). All routes need a session;
 another user's map answers 404, as if it did not exist.
 
-**Names.** A **map** is one garden or site, drawn on the canvas. Its
-polygons are **zones**, each with a category:
+**Names.** A **map** is one garden or site, drawn on the canvas. It has
+**zones**: named parts of the map, such as "Front lawn", that own their drawn
+shapes and, later, their settings (cut height and others). A zone's polygons
+are its **areas**, each with a category:
 
 | Category | Meaning |
 |---|---|
@@ -730,13 +732,13 @@ polygons are **zones**, each with a category:
 
 These follow other robot mower apps (Husqvarna: work area, stay-out zone,
 transport path; Mammotion: task area, no-go zone, channel; OpenMowerNext:
-operation, exclusion and navigation areas). In those apps a drawn no-go zone
+operation, exclusion and navigation areas). In those apps a drawn no-go area
 is how a fixed obstacle is mapped; "obstacle" means what the mower's sensors
 find while driving.
 
 | Route | Body → answer |
 |---|---|
-| `GET /api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
+| `GET /api/maps` | → `MapList`: id, name, revision, area counts per category (over all zones), `updated_at`; newest change first |
 | `POST /api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
 | `GET /api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
 | `PUT /api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
@@ -749,12 +751,23 @@ The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
 shadow JavaScript's `Map`.
 
 **One document per map.** The client loads and saves a map as a whole, so
-its content is one JSON document (`MapDoc`): `zones` (id, category,
-vertices) and `geo_anchor` (WGS-84 of the canvas origin, or null). A missing
-list comes back as an empty array. Members a document stored by an earlier
-version still has (format, type, coordinate system, headland, zone `type`,
-`points`, `layer_settings`) are ignored on read and dropped by the next
-save; there is no migration.
+its content is one JSON document (`MapDoc`): `zones` and `geo_anchor`
+(WGS-84 of the canvas origin, or null). A zone is `{ id, name, areas }`; an
+area is `{ id, category, vertices }`. A missing list comes back as an empty
+array. The server refuses a document (400) without a zone, with a zone name
+that is empty or longer than 100 characters after removing surrounding spaces,
+with two zones of one id, with two areas of one id (area ids are unique in the
+whole map, not per zone), with an area category other than the three above,
+and over the limits below. Members a document stored by an earlier version
+still has (format, type, coordinate system, headland, area `type`, `points`,
+`layer_settings`) are ignored on read and dropped by the next save.
+
+**Maps from before zones.** The first version of the document had `zones` as
+the polygons themselves. Development data, so there is no conversion: the
+migration `20261118000000_map_zones.sql` deletes every map whose first zone has
+no `areas`. A map in the old format that still gets in (a restored backup) is
+listed with zero counts, and the web app refuses to open it with a message on
+Home; it can be deleted from its menu.
 
 **Revisions instead of last-write-wins.** Every save names the revision it
 started from. If another browser saved in between, the save is refused with
@@ -762,7 +775,7 @@ started from. If another browser saved in between, the save is refused with
 [Web app](#web-app), "Saving"); another client may instead reload.
 
 **Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
-spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
+spaces removed), a body of at most 4 MiB, 5000 areas, 100 000 vertices,
 a geo anchor inside
 ±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
 at most 16 KiB of JSON, at most 100 settings per user.
@@ -771,7 +784,7 @@ at most 16 KiB of JSON, at most 100 settings per user.
 
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
-`65d23b7` (rmx-server-app#51): draw a map (mowing zones and no-go zones) on a canvas, inspect it, and save it. It opens on the login form
+`65d23b7` (rmx-server-app#51): draw a map (mowing areas and no-go areas) on a canvas, inspect it, and save it. It opens on the login form
 when there is no session; after login the shell loads (see "The shell" below).
 While logged in the
 app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
@@ -782,19 +795,23 @@ whether the session still exists and shows the login form if not.
   `web/src/data/planning/` (the API client is `web/src/data/api/planning.ts`).
   The browser keeps no planning data; the IndexedDB database `blade-terminal`
   of earlier versions is deleted at login, without import. The UI and the code
-  use the server's names: map, mowing zone, no-go zone, and the zone
-  categories `mowing` and `no_go` as they are, with no translation
+  use the server's names: map, zone, area, mowing area, no-go area, and the
+  area categories `mowing` and `no_go` as they are, with no translation
   ([rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82)).
-  The web app can't draw navigation zones yet
+  The web app can't draw navigation areas yet
   ([rmx-server-app#81](https://github.com/rmx-lt/rmx-server-app/issues/81)), so
-  `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
-  and writes them back unchanged on every save (renumbered if a drawn zone took
-  their id).
+  `src/data/planning/maps.ts` keeps a map's navigation areas, and the areas of
+  zones it does not show, out of the canvas and writes them back unchanged on
+  every save (renumbered if a drawn area took their id). The open map's zones
+  and the active zone (the zone the canvas shows and drawing adds to; for now
+  the first, and a map has one) are in `model/mapStore.ts`; the canvas holds the
+  active zone's areas. A new map is created with one zone, "Zone 1".
 - **Saving.** Everything is saved by itself; there is no save status, Save
   button, autosave switch or leave-page warning. A new map (New map on
   Home, Ctrl+Alt+N) is created on the server at once. After login the app
   opens the map opened last in this browser (its id is kept in `localStorage`,
-  key `rmx:last-map`), or shows Home when there is none or it no longer exists;
+  key `rmx:last-map`), or shows Home when there is none, it no longer exists or
+  it can't be opened (the message is on Home, and the key is forgotten);
   nothing is created by itself. Duplicate in a map's menu on Home makes a copy
   ("name (copy)") and makes it the open map, and Home stays. A change is saved
   one second after the last one (a burst is one save): the whole map with the
@@ -811,7 +828,7 @@ whether the session still exists and shows the login form if not.
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
   read once per login.
-- **Layers.** Users can't change styles. The widths of the zone layers are
+- **Layers.** Users can't change styles. The widths of the area layers are
   constants (`LAYER_STYLE` in
   `web/src/config/canvas-editing/canvasConfig.ts`), the colours come from the
   theme (see "Name, logo and theme"), and the code decides what is
@@ -856,7 +873,7 @@ whether the session still exists and shows the login form if not.
     Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
     only when a map is open), New map (Ctrl+Alt+N), and at the bottom the
     account menu and the settings button. Work area: a New map card and the
-    list of maps, newest change first, with the zone counts and the time of
+    list of maps, newest change first, with the area counts ("2 mowing · 1 no-go", over all zones) and the time of
     the last change; the open map is marked "Open". A click opens a map in the
     workbench; its menu has Rename (in place), Duplicate and Delete (a
     confirmation first). Deleting the open map leaves no map open and the user
@@ -864,9 +881,10 @@ whether the session still exists and shows the login form if not.
     the same code as before the move.
   - **Workbench** (`layouts/workbench-window/`):
     - **Side panel** (left, collapsible; Ctrl+Alt+C): logo and name, a Home
-      button, the mode switch, then free space (for the zones of the open map,
-      [rmx-server-app#121](https://github.com/rmx-lt/rmx-server-app/issues/121)),
-      a device spot (placeholder until
+      button, the mode switch, then the **Zones** list of the open map (in
+      every mode): the active zone is marked, a zone is renamed from its menu
+      (Rename) or by double click, in place, and the change is saved by the
+      autosave. There is no add, delete or reorder of zones yet. Then a device spot (placeholder until
       [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
       and at the bottom the account menu and the settings button. It has no map
       list and no New map.
@@ -878,10 +896,10 @@ whether the session still exists and shows the login form if not.
       ellipsis when not edited. The right panel toggle is at the right.
     - **Canvas** in the middle, with the tool strip floating at the bottom
       middle (a rounded strip) and the view controls (zoom in, zoom out, fit
-      all zones, home) at the bottom right in every mode.
-    - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (the
-      map's zone counts, area to mow and perimeter; for a selected zone its
-      category and gross and net area; no vertex data) and Monitor (a
+      all areas, home) at the bottom right in every mode.
+    - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (under
+      the active zone's name: its area counts, area to mow and perimeter; for a
+      selected area its category and gross and net area; no vertex data) and Monitor (a
       placeholder).
   - **Settings modal**: a page list on the left, on both pages. Account (user
     name, log out, log out everywhere), Appearance (theme, unit of measure) and
@@ -911,9 +929,9 @@ whether the session still exists and shows the login form if not.
 
   | Mode | Tool strip | Layers |
   |---|---|---|
-  | Plan | select (S), mowing zone (Z), no-go zone (O), delete (D), undo (Ctrl+Z), redo (Ctrl+Y) | zones |
-  | Drive | driving control, mower mode, blade, stop, record border, rewind, save as zone | zones, mower, draft border |
-  | Mow | plan job, start, pause, resume, go to point, follow path | zones, job path, progress, mower |
+  | Plan | select (S), mowing area (Z), no-go area (O), delete (D), undo (Ctrl+Z), redo (Ctrl+Y) | areas |
+  | Drive | driving control, mower mode, blade, stop, record border, rewind, save as area | areas, mower, draft border |
+  | Mow | plan job, start, pause, resume, go to point, follow path | areas, job path, progress, mower |
 
   Plan works fully; the tools and their shortcuts work in Plan mode only, and
   leaving Plan puts the active tool away. Drive and Mow are the shell only:
@@ -1269,8 +1287,8 @@ password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
 fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
-the planning API: a map's create/read/update/delete, zone counts per
-category, the revision conflict, invalid input, that users can't see each
+the planning API: a map's create/read/update/delete, area counts per
+category, the checks on zones (at least one, name length, unique ids), the revision conflict, invalid input, that users can't see each
 other's maps, and settings; and the mower domain: a simulated gateway publishes
 state, catalogues, telemetry and events, and the API and WebSocket show the
 device, its keys, latest values, the history of a gauge and of a counter across
