@@ -16,7 +16,7 @@ interface AnchorFieldsProps {
     onClear: () => void;
 }
 
-function AnchorFields({ draft, onChange, onClear }: AnchorFieldsProps) {
+export function AnchorFields({ draft, onChange, onClear }: AnchorFieldsProps) {
     return (
         <>
             <SettingsPanelInput

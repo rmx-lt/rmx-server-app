@@ -832,7 +832,21 @@ whether the session still exists and shows the login form if not.
   constants (`LAYER_STYLE` in
   `web/src/config/canvas-editing/canvasConfig.ts`), the colours come from the
   theme (see "Name, logo and theme"), and the code decides what is
-  visible: the grid always, the satellite map when the map has a geo anchor.
+  visible: the grid always, the map background when the map has a geo anchor.
+  The background has two layers, switched by the Layers button in the bottom
+  left corner of the canvas (it shows the layer you would switch to): satellite
+  (ArcGIS World Imagery) and map (ArcGIS World Street Map), both from
+  `server.arcgisonline.com`, no key, attribution shown on the canvas (the
+  OpenStreetMap tile servers are not used: their usage policy rules out bulk
+  loading). The choice is the per-user setting `map.layer`. Tiles load smoothly:
+  a tile that has not arrived yet is drawn from the cached tiles of the zoom
+  levels around it (scaled), the image cache holds at most 600 tiles, and loads
+  nobody needs any more (a fast zoom or pan) are cancelled. A new map asks where
+  it is ("Where is this map?": the browser's location, the user's default anchor
+  or typed coordinates; Done with nothing entered leaves the map without a
+  background); the pin button next to Layers asks again for the open map. Moving
+  the anchor keeps the zones at their canvas coordinates: they move with it over
+  the earth.
   The grid has two levels (a stronger line every 5 minor cells; the cell size
   follows the zoom through `pickGridLevel`, from 0.04 to 40 000 map
   units) and fades out towards the edges. The zoom goes up to 200 (a 20 cm
