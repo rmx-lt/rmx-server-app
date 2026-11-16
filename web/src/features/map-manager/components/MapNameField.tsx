@@ -6,7 +6,7 @@ import { useShortcutsBlocked } from "@/hooks/shortcut-manager/useShortcutsBlocke
 
 const shared = "rounded-lg px-2.5 py-1 text-sm font-medium text-fg";
 // As wide as the name, between a minimum and a maximum.
-const width = "min-w-32 max-w-[min(28rem,100%)]";
+const width = "max-w-[min(28rem,100%)]";
 
 /** The open map's name at the left of the top bar; click to rename. */
 export default function MapNameField() {
@@ -63,7 +63,7 @@ export default function MapNameField() {
                     setDraft(name);
                     setIsEditing(true);
                 }}
-                className={`${shared} ${width} min-w-0 cursor-pointer truncate text-left hover:bg-hover`}
+                className={`${shared} ${width} min-w-6 cursor-pointer truncate text-left hover:bg-hover`}
             >
                 {name}
             </button>

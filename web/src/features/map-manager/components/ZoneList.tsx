@@ -31,6 +31,7 @@ function ZoneRow({ id, name, isActive }: { id: number; name: string; isActive: b
                     </button>
                 </Tooltip>
             )}
+            {!renaming && (
             <Menu>
                 <Tooltip label="Zone menu">
                     <MenuButton
@@ -48,6 +49,7 @@ function ZoneRow({ id, name, isActive }: { id: number; name: string; isActive: b
                     </MenuItem>
                 </MenuItems>
             </Menu>
+            )}
         </li>
     );
 }

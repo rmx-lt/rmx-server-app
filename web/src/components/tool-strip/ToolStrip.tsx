@@ -48,7 +48,7 @@ export function ToolStripButton({ label, icon: Icon, shortcut, note, active, dan
                 off
                     ? "cursor-not-allowed text-faint"
                     : active
-                      ? `cursor-pointer text-on-accent ${danger ? "bg-danger" : "bg-accent"}`
+                      ? `cursor-pointer border ${danger ? "border-danger bg-danger-soft text-danger" : "border-accent bg-accent/15 text-accent"}`
                       : `cursor-pointer hover:bg-hover ${danger ? "text-danger" : "text-fg"}`
             }`}
         >

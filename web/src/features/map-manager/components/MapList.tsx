@@ -35,6 +35,7 @@ function MapRow({ id, name, updatedAt, isOpen }: { id: number; name: string; upd
                     </button>
                 </Tooltip>
             )}
+            {!renaming && (
             <Menu>
                 <Tooltip label="Map menu">
                     <MenuButton
@@ -62,6 +63,7 @@ function MapRow({ id, name, updatedAt, isOpen }: { id: number; name: string; upd
                     </MenuItem>
                 </MenuItems>
             </Menu>
+            )}
         </li>
     );
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, SquarePen } from "lucide-react";
+import { ArrowLeft, Map, Plus, SquarePen } from "lucide-react";
 import ConfirmationModal from "@/components/modals/confirmation-modal/ConfirmationModal";
 import Tooltip from "@/components/tooltip/Tooltip";
 import AppHeaderLogoBox from "@/components/app-header/AppHeaderLogoBox";
@@ -65,10 +65,16 @@ export default function HomeWindow() {
                         <button
                             type="button"
                             onClick={makeMap}
-                            className="mt-6 flex w-full max-w-60 cursor-pointer flex-col items-start gap-6 rounded-2xl border border-dashed border-line-strong p-4 text-left transition-colors hover:bg-hover"
+                            className="mt-6 flex w-full max-w-72 cursor-pointer items-center gap-3 rounded-2xl border border-accent p-3 text-left transition-colors hover:bg-hover"
                         >
-                            <Plus size={20} strokeWidth={1.75} aria-hidden className="text-accent" />
-                            <span className="text-sm font-medium">New map</span>
+                            <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                                <Map size={20} strokeWidth={1.75} aria-hidden />
+                                <Plus size={12} strokeWidth={2.5} aria-hidden className="absolute -right-1 -bottom-1 rounded-full bg-page" />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-sm font-medium">New map</span>
+                                <span className="block truncate text-xs text-muted">Start with an empty map</span>
+                            </span>
                         </button>
                         <h2 className="mt-10 mb-2 px-3 text-xs font-medium text-faint">Your maps</h2>
                         <MapList />
