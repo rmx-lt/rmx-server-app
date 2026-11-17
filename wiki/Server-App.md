@@ -836,7 +836,7 @@ whether the session still exists and shows the login form if not.
   Grid map type (or when the map has no anchor, so the canvas is never bare).
   The background has three types: Satellite (ArcGIS World Imagery), Map (ArcGIS
   World Street Map), both from `server.arcgisonline.com`, no key, attribution
-  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 16px from the side edges, as far as from the strip) (the OpenStreetMap tile servers are not used: their usage
+  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 24px from the bottom and the side edges of the canvas, just above the strip) (the OpenStreetMap tile servers are not used: their usage
   policy rules out bulk loading), and Grid (no tiles, no request, only the
   grid). The Layers button in the bottom left corner of the canvas is captioned "Layers" and, while hovered or focused, shows the name of the type
   it switches to (a click toggles Satellite and Grid; from Map it goes to
