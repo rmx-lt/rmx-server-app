@@ -63,7 +63,6 @@ export function readCanvasColors() {
     return {
         grid: token("canvas-grid"),
         select: token("accent"),
-        handle: token("canvas-handle"),
         midpoint: token("canvas-midpoint"),
         midpointEdge: token("canvas-midpoint-edge"),
         mowing: {

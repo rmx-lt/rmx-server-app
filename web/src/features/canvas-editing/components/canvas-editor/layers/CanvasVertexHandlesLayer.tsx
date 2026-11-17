@@ -45,7 +45,7 @@ export function CanvasVertexHandlesLayerInner({
     if (!selectedObject) return <Layer />;
     // Sizes are screen pixels divided by the zoom, so they stay constant on screen.
     const half = 4 / scale; // half the side of the square
-    const ringRadius = 8.5 / scale;
+    const ringRadius = 10 / scale;
     const ringWidth = 1.5 / scale;
     const ringWidthSelected = 2.5 / scale;
     const midRadius = 5 / scale;
@@ -76,6 +76,8 @@ export function CanvasVertexHandlesLayerInner({
                         fill="transparent"
                         onMouseDown={(e) => {
                             e.cancelBubble = true;
+                            // The insert shifts the edge indexes: without this the next edge's ring flashes.
+                            setHover(null);
                             onEdgeMidpointMouseDown(selectedObject.id, i, mid);
                         }}
                         onMouseEnter={enter("mid", i)}
@@ -100,8 +102,8 @@ export function CanvasVertexHandlesLayerInner({
                     selectedVertexRefs.some((sv) => sameVertexRef(sv, ref)) ||
                     (draggingVertexRef !== null && sameVertexRef(draggingVertexRef, ref));
                 const isHovered = hover?.kind === "vertex" && hover.index === i;
-                // hover < selected; a hovered selected vertex shows the hover colour
-                const ring = isHovered ? accentColor : isSelected ? colors.select : null;
+                // The ring has the area colour; selected differs from hover by its width.
+                const ring = isHovered || isSelected ? accentColor : null;
                 return [
                     ring && (
                         <Circle
@@ -122,7 +124,7 @@ export function CanvasVertexHandlesLayerInner({
                         offsetY={half}
                         width={half * 2}
                         height={half * 2}
-                        fill={colors.handle}
+                        fill={accentColor}
                         stroke={accentColor}
                         strokeWidth={1 / scale}
                         hitStrokeWidth={8 / scale}
