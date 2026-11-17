@@ -34,22 +34,25 @@ const MAX_FALLBACK_LEVELS = 4;
  * not chosen: their usage policy rules out an app that loads tiles in bulk.
  * Note: ArcGIS uses z/y/x order (row before column), unlike the standard z/x/y.
  */
-const TILE_SERVICE: Record<MapLayer, string> = {
+/** The layers that have tiles; Empty draws and requests nothing. */
+type TileLayer = Exclude<MapLayer, "empty">;
+
+const TILE_SERVICE: Record<TileLayer, string> = {
     satellite: "World_Imagery",
     street: "World_Street_Map",
 };
 
-export const TILE_ATTRIBUTION: Record<MapLayer, string> = {
+export const TILE_ATTRIBUTION: Record<TileLayer, string> = {
     satellite: "Esri, Maxar, Earthstar Geographics, and the GIS User Community",
     street: "Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community",
 };
 
-export function tileUrl(layer: MapLayer, z: number, x: number, y: number): string {
+export function tileUrl(layer: TileLayer, z: number, x: number, y: number): string {
     return `https://server.arcgisonline.com/ArcGIS/rest/services/${TILE_SERVICE[layer]}/MapServer/tile/${z}/${y}/${x}`;
 }
 
 interface TileEntry {
-    layer: MapLayer;
+    layer: TileLayer;
     z: number;
     x: number;
     y: number;
@@ -76,7 +79,7 @@ function CanvasMapTileLayerInner() {
     const [imageVersion, setImageVersion] = useState(0);
 
     const tiles = useMemo<TileEntry[]>(() => {
-        if (!geoAnchor) return [];
+        if (!geoAnchor || layer === "empty") return [];
 
         const { width, height } = canvasSize;
         if (width <= 0 || height <= 0) return [];
@@ -254,7 +257,7 @@ function CanvasMapTileLayerInner() {
         }
     }, [geoAnchor, tiles, canvasSize, imageVersion]);
 
-    if (!geoAnchor) return null;
+    if (!geoAnchor || layer === "empty") return null;
 
     return (
         <>
@@ -264,7 +267,7 @@ function CanvasMapTileLayerInner() {
                 aria-hidden="true"
             />
             {/* The tile terms ask for it on the map. */}
-            <div className="pointer-events-none absolute bottom-0 left-24 right-16 truncate bg-surface/70 px-2 py-0.5 text-right text-[10px] text-muted max-md:hidden">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-surface/70 px-2 py-0.5 text-right text-[10px] text-muted max-md:hidden">
                 {TILE_ATTRIBUTION[layer]}
             </div>
         </>
