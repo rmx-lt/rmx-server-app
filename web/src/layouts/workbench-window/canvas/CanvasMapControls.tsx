@@ -101,10 +101,17 @@ export default function CanvasMapControls() {
                         type="button"
                         aria-label={`Layers: switch to ${next.name}`}
                         onClick={() => useMapLayerStore.getState().toggle()}
-                        className={`${PICTURE} h-[72px] w-[72px] cursor-pointer flex-col justify-end border-surface transition hover:-translate-y-0.5 hover:border-accent focus-visible:-translate-y-0.5 focus-visible:border-accent ${FOCUS}`}
+                        className={`group/layers ${PICTURE} h-[72px] w-[72px] cursor-pointer flex-col justify-end border-surface transition hover:-translate-y-0.5 hover:border-accent focus-visible:-translate-y-0.5 focus-visible:border-accent ${FOCUS}`}
                     >
                         <MapTypeThumb type={next.id} />
-                        <span className="relative w-full bg-surface/85 py-0.5 text-center text-[10px] font-medium text-fg">{next.name}</span>
+                        {/* "Layers" at rest; the type a click switches to while hovered or focused. */}
+                        <span className="relative w-full bg-surface/85 py-0.5 text-center text-[10px] font-medium text-fg">
+                            <span className="flex items-center justify-center gap-1 group-hover/layers:hidden group-focus-visible/layers:hidden">
+                                <Layers size={11} aria-hidden />
+                                Layers
+                            </span>
+                            <span className="hidden group-hover/layers:block group-focus-visible/layers:block">{next.name}</span>
+                        </span>
                     </button>
                     {listOpen && (
                         // 72 px high like the button: 40 px pictures, the name and the padding.
