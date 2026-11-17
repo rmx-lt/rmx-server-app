@@ -93,6 +93,11 @@ body {
     background-color: var(--color-page);
     color: var(--color-fg);
 }
+/* One placeholder colour for every field, dimmer than typed text. */
+::placeholder {
+    color: var(--color-faint);
+    opacity: 1;
+}
 /* Safari inherits user-select: none into inputs and stops them selecting. */
 input,
 textarea,
