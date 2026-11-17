@@ -14,22 +14,22 @@ const byId = (id: MapLayer) => TYPES.find((t) => t.id === id)!;
 /** How long the list stays open after the cursor has left the button and the list. */
 const CLOSE_DELAY_MS = 2000;
 
-const PICTURE = "relative flex h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 shadow-lg";
+const PICTURE = "relative flex shrink-0 overflow-hidden rounded-xl border-2 shadow-lg";
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
-/** A tile with the name under the picture (hover list, Map details). `selected` is only set in Map details. */
-function Tile({ label, selected, onClick, children }: { label: string; selected?: boolean; onClick: () => void; children: ReactNode }) {
+/** A tile with the name under the picture (hover list: `small`; Map details). `selected` is only set in Map details. */
+function Tile({ label, selected, small, onClick, children }: { label: string; selected?: boolean; small?: boolean; onClick: () => void; children: ReactNode }) {
     return (
-        <button type="button" aria-pressed={selected} onClick={onClick} className={`group flex w-14 cursor-pointer flex-col items-center gap-1 rounded-xl ${FOCUS}`}>
-            <span className={`${PICTURE} items-center justify-center bg-surface ${selected ? "border-accent" : "border-surface group-hover:border-accent/60"}`}>{children}</span>
+        <button type="button" aria-pressed={selected} onClick={onClick} className={`group flex cursor-pointer flex-col items-center gap-1 rounded-xl ${small ? "w-10" : "w-14"} ${FOCUS}`}>
+            <span className={`${PICTURE} ${small ? "h-10 w-10" : "h-14 w-14"} items-center justify-center bg-surface ${selected ? "border-accent" : "border-surface group-hover:border-accent/60"}`}>{children}</span>
             <span className="text-[10px] font-medium leading-none text-fg">{label}</span>
         </button>
     );
 }
 
-function TypeTile({ type, selected }: { type: { id: MapLayer; name: string }; selected?: boolean }) {
+function TypeTile({ type, selected, small }: { type: { id: MapLayer; name: string }; selected?: boolean; small?: boolean }) {
     return (
-        <Tile label={type.name} selected={selected} onClick={() => useMapLayerStore.getState().set(type.id)}>
+        <Tile label={type.name} selected={selected} small={small} onClick={() => useMapLayerStore.getState().set(type.id)}>
             <MapTypeThumb type={type.id} />
         </Tile>
     );
@@ -81,7 +81,7 @@ export default function CanvasMapControls() {
                     </header>
                     {/* A section is a titled block; add further ones (detail layers) next to this one. */}
                     <h3 className="mb-1.5 text-xs font-medium text-muted">Map type</h3>
-                    <div className="flex gap-2">
+                    <div className="flex justify-around">
                         {TYPES.map((t) => (
                             <TypeTile key={t.id} type={t} selected={layer === t.id} />
                         ))}
@@ -101,24 +101,33 @@ export default function CanvasMapControls() {
                         type="button"
                         aria-label={`Layers: switch to ${next.name}`}
                         onClick={() => useMapLayerStore.getState().toggle()}
-                        className={`${PICTURE} cursor-pointer flex-col justify-end border-surface transition hover:-translate-y-0.5 hover:border-accent focus-visible:-translate-y-0.5 focus-visible:border-accent ${FOCUS}`}
+                        className={`group/layers ${PICTURE} h-[72px] w-[72px] cursor-pointer flex-col justify-end border-surface transition hover:-translate-y-0.5 hover:border-accent focus-visible:-translate-y-0.5 focus-visible:border-accent ${FOCUS}`}
                     >
                         <MapTypeThumb type={next.id} />
-                        <span className="relative w-full bg-surface/85 py-0.5 text-center text-[10px] font-medium text-fg">{next.name}</span>
+                        {/* "Layers" at rest; the type a click switches to while hovered or focused. */}
+                        <span className="relative w-full bg-linear-to-t from-black/80 to-transparent pt-4 pb-1 text-center text-[10px] font-medium text-white">
+                            <span className="flex items-center justify-center gap-1 group-hover/layers:hidden group-focus-visible/layers:hidden">
+                                <Layers size={11} aria-hidden />
+                                Layers
+                            </span>
+                            <span className="hidden group-hover/layers:block group-focus-visible/layers:block">{next.name}</span>
+                        </span>
                     </button>
                     {listOpen && (
-                        <div className="flex items-start gap-2 rounded-2xl border border-line bg-surface p-2 shadow-lg">
+                        // 72 px high like the button: 40 px pictures, the name and the padding.
+                        <div className="flex h-[72px] items-center gap-2 rounded-2xl border border-line bg-surface px-2 shadow-lg">
                             {TYPES.map((t) => (
-                                <TypeTile key={t.id} type={t} />
+                                <TypeTile key={t.id} type={t} small />
                             ))}
                             <Tile
+                                small
                                 label="More"
                                 onClick={() => {
                                     setListOpen(false);
                                     setDetailsOpen(true);
                                 }}
                             >
-                                <Layers size={20} className="text-fg" aria-hidden />
+                                <Layers size={18} className="text-fg" aria-hidden />
                             </Tile>
                         </div>
                     )}
