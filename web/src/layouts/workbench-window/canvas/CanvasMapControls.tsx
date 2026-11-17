@@ -105,7 +105,7 @@ export default function CanvasMapControls() {
                     >
                         <MapTypeThumb type={next.id} />
                         {/* "Layers" at rest; the type a click switches to while hovered or focused. */}
-                        <span className="relative w-full bg-surface/85 py-0.5 text-center text-[10px] font-medium text-fg">
+                        <span className="relative w-full bg-linear-to-t from-black/80 to-transparent pt-4 pb-1 text-center text-[10px] font-medium text-white">
                             <span className="flex items-center justify-center gap-1 group-hover/layers:hidden group-focus-visible/layers:hidden">
                                 <Layers size={11} aria-hidden />
                                 Layers
