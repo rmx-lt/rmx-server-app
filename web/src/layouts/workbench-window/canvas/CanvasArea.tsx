@@ -8,8 +8,8 @@ export default function CanvasArea() {
     return (
         <main className="relative min-h-0 flex-1 overflow-hidden">
             <CanvasEditor />
-            {/* Keeps the controls above the map attribution strip (also on Grid, so they do not jump). inset-x-1 plus the left-3/right-3 of the controls = 16px, the same as the gap above the strip. */}
-            <div className="pointer-events-none absolute inset-x-1 top-0 bottom-4">
+            {/* The controls are 24px from the bottom and from the sides of the canvas (this inset plus their own bottom-4 / left-3 / right-3), which clears the map attribution strip (about 19px) by a few pixels; the same on Grid, so they do not jump. */}
+            <div className="pointer-events-none absolute inset-x-3 top-0 bottom-2">
                 <CanvasTools />
                 <CanvasViewControls />
                 <CanvasMapControls />

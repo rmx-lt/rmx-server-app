@@ -17,7 +17,7 @@ const CLOSE_DELAY_MS = 2000;
 const PICTURE = "relative flex shrink-0 overflow-hidden rounded-xl border-2 shadow-lg";
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
-/** A tile with the name under the picture (hover list: `small`; Map details). `selected` is only set in Map details. */
+/** A tile with the name under the picture (hover list: `small`; Map details). `selected` marks the current type. */
 function Tile({ label, selected, small, onClick, children }: { label: string; selected?: boolean; small?: boolean; onClick: () => void; children: ReactNode }) {
     return (
         <button type="button" aria-pressed={selected} onClick={onClick} className={`group flex cursor-pointer flex-col items-center gap-1 rounded-xl ${small ? "w-10" : "w-14"} ${FOCUS}`}>
@@ -117,7 +117,7 @@ export default function CanvasMapControls() {
                         // 72 px high like the button: 40 px pictures, the name and the padding.
                         <div className="flex h-[72px] items-center gap-2 rounded-2xl border border-line bg-surface px-2 shadow-lg">
                             {TYPES.map((t) => (
-                                <TypeTile key={t.id} type={t} small />
+                                <TypeTile key={t.id} type={t} small selected={layer === t.id} />
                             ))}
                             <Tile
                                 small

@@ -836,14 +836,14 @@ whether the session still exists and shows the login form if not.
   Grid map type (or when the map has no anchor, so the canvas is never bare).
   The background has three types: Satellite (ArcGIS World Imagery), Map (ArcGIS
   World Street Map), both from `server.arcgisonline.com`, no key, attribution
-  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 16px from the side edges, as far as from the strip) (the OpenStreetMap tile servers are not used: their usage
+  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 24px from the bottom and the side edges of the canvas, just above the strip) (the OpenStreetMap tile servers are not used: their usage
   policy rules out bulk loading), and Grid (no tiles, no request, only the
   grid). The Layers button in the bottom left corner of the canvas is captioned "Layers" and, while hovered or focused, shows the name of the type
   it switches to (a click toggles Satellite and Grid; from Map it goes to
   Satellite). Hovering or focusing it opens a separate card of tiles to its right (the three
-  types and More; names under the pictures, no mark on the current type; the card is as high as the button; the Satellite and Map pictures are one bundled sample tile each, in `web/src/assets`); the card stays open for 2 seconds after the cursor leaves. More
+  types and More; names under the pictures, the current type marked; the card is as high as the button; the Satellite and Map pictures are one bundled sample tile each, in `web/src/assets`); the card stays open for 2 seconds after the cursor leaves. More
   opens a "Map details" panel that takes the place of the button and the card, with a "Map type" section; it
-  closes only with its X or Escape and then the button returns. Map details marks the current type. The choice is the per-user setting `map.layer`
+  closes only with its X or Escape and then the button returns. Map details marks the current type too. The choice is the per-user setting `map.layer`
   (`satellite`, `street` or `empty`; any other value reads as satellite). Tiles load smoothly:
   a tile that has not arrived yet is drawn from the cached tiles of the zoom
   levels around it (scaled), the image cache holds at most 600 tiles, and loads
