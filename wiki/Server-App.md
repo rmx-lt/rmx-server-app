@@ -841,7 +841,7 @@ whether the session still exists and shows the login form if not.
   grid). The Layers button in the bottom left corner of the canvas shows the type
   it switches to (a click toggles Satellite and Grid; from Map it goes to
   Satellite). Hovering or focusing it opens a separate card of tiles to its right (the three
-  types and More; names under the pictures, no mark on the current type); the card stays open for 2 seconds after the cursor leaves. More
+  types and More; names under the pictures, no mark on the current type; the card is as high as the button; the Satellite and Map pictures are one bundled sample tile each, in `web/src/assets`); the card stays open for 2 seconds after the cursor leaves. More
   opens a "Map details" panel that takes the place of the button and the card, with a "Map type" section; it
   closes only with its X or Escape and then the button returns. Map details marks the current type. The choice is the per-user setting `map.layer`
   (`satellite`, `street` or `empty`; any other value reads as satellite). Tiles load smoothly:

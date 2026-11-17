@@ -32,4 +32,9 @@ declare module "*.png" {
   export = path;
 }
 
+declare module "*.jpg" {
+  const path: `${string}.jpg`;
+  export = path;
+}
+
 declare module "*.css" {}
