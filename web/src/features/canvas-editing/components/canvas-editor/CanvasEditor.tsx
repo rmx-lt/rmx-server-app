@@ -62,7 +62,7 @@ export default function CanvasEditor() {
     toggleVertexSelection,
   } = useCanvasSelectionStore();
 
-  const { containerRef, size } = useCanvasSize();
+  const { containerRef, size } = useCanvasSize(stageRef);
 
   useEffect(() => {
     if (size.width > 0 && size.height > 0) {
