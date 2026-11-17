@@ -100,8 +100,8 @@ export function CanvasVertexHandlesLayerInner({
                     selectedVertexRefs.some((sv) => sameVertexRef(sv, ref)) ||
                     (draggingVertexRef !== null && sameVertexRef(draggingVertexRef, ref));
                 const isHovered = hover?.kind === "vertex" && hover.index === i;
-                // hover < selected; a hovered selected vertex shows the hover colour
-                const ring = isHovered ? accentColor : isSelected ? colors.select : null;
+                // The ring has the area colour; selected differs from hover by its width.
+                const ring = isHovered || isSelected ? accentColor : null;
                 return [
                     ring && (
                         <Circle
@@ -122,7 +122,7 @@ export function CanvasVertexHandlesLayerInner({
                         offsetY={half}
                         width={half * 2}
                         height={half * 2}
-                        fill={colors.handle}
+                        fill={accentColor}
                         stroke={accentColor}
                         strokeWidth={1 / scale}
                         hitStrokeWidth={8 / scale}

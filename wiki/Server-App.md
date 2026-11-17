@@ -866,7 +866,7 @@ whether the session still exists and shows the login form if not.
   (`panning` in `canvasViewStore`) stops a running animation, and wheel, buttons,
   shortcuts, Fit and Home do nothing until it ends. In select mode an area brightens its fill on hover
   and more when selected; the vertices of the selected area are small squares
-  (a ring on hover, an accent ring when selected, the hover colour when both),
+  filled in the area colour (a thin ring in that colour on hover, a thicker one when selected),
   and an edge midpoint is a plain ring that shows only when the cursor is near.
   Handle sizes are screen pixels, constant at every zoom.
   The bottom bar of the workbench shows a scale bar as long as one grid cell,
