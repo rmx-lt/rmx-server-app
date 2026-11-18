@@ -43,7 +43,7 @@ export default function Account() {
                     onClick={() => openSettings()}
                     className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
                 >
-                    <Settings size={16} strokeWidth={1.75} />
+                    <Settings size={18} strokeWidth={1.75} />
                 </button>
             </Tooltip>
         </div>
