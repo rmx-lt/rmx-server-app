@@ -838,8 +838,8 @@ whether the session still exists and shows the login form if not.
   World Street Map), both from `server.arcgisonline.com`, no key, attribution
   shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 24px from the bottom and the side edges of the canvas, just above the strip) (the OpenStreetMap tile servers are not used: their usage
   policy rules out bulk loading), and Grid (no tiles, no request, only the
-  grid). The Layers button in the bottom left corner of the canvas is captioned "Layers" and, while hovered or focused, shows the name of the type
-  it switches to (a click toggles Satellite and Grid; from Map it goes to
+  grid). The Layers button in the bottom left corner of the canvas is captioned "Layers" and, while its card (below) is open, shows the name of the type
+  it switches to, changing back as the card closes; it does not move on hover or press (a click toggles Satellite and Grid; from Map it goes to
   Satellite). Hovering or focusing it opens a separate card of tiles to its right (the three
   types and More; names under the pictures, the current type marked; the card is as high as the button; the Satellite and Map pictures are one bundled sample tile each, in `web/src/assets`); the card stays open for 2 seconds after the cursor leaves. More
   opens a "Map details" panel that takes the place of the button and the card, with a "Map type" section; it

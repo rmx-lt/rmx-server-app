@@ -101,16 +101,19 @@ export default function CanvasMapControls() {
                         type="button"
                         aria-label={`Layers: switch to ${next.name}`}
                         onClick={() => useMapLayerStore.getState().toggle()}
-                        className={`group/layers ${PICTURE} h-[72px] w-[72px] cursor-pointer flex-col justify-end border-surface transition hover:-translate-y-0.5 hover:border-accent focus-visible:-translate-y-0.5 focus-visible:border-accent ${FOCUS}`}
+                        className={`${PICTURE} h-[72px] w-[72px] cursor-pointer flex-col justify-end border-surface transition-colors hover:border-accent focus-visible:border-accent ${FOCUS}`}
                     >
                         <MapTypeThumb type={next.id} />
-                        {/* "Layers" at rest; the type a click switches to while hovered or focused. */}
+                        {/* The type a click switches to while the list is open, "Layers" otherwise: both follow listOpen. */}
                         <span className="relative w-full bg-linear-to-t from-black/80 to-transparent pt-4 pb-1 text-center text-[10px] font-medium text-white">
-                            <span className="flex items-center justify-center gap-1 group-hover/layers:hidden group-focus-visible/layers:hidden">
-                                <Layers size={11} aria-hidden />
-                                Layers
-                            </span>
-                            <span className="hidden group-hover/layers:block group-focus-visible/layers:block">{next.name}</span>
+                            {listOpen ? (
+                                next.name
+                            ) : (
+                                <span className="flex items-center justify-center gap-1">
+                                    <Layers size={11} aria-hidden />
+                                    Layers
+                                </span>
+                            )}
                         </span>
                     </button>
                     {listOpen && (
