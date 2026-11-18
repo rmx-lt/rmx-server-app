@@ -975,7 +975,8 @@ whether the session still exists and shows the login form if not.
   - Modals, menus, tabs and selects are Headless UI (focus trap, Escape,
     arrow keys); icons are `lucide-react`. The panel and tool state lives in
     `features/ui-manager/stores/uiShellStore.ts`.
-- **Modes.** Plan, Drive and Mow, switched in the side panel; one store
+- **Modes.** Mow, Plan and Drive, switched in the side panel (Mow is the
+  default and comes first); one store
   (`model/modeStore.ts`) holds the mode, and `config/modes/modes.ts` says what
   each shows. The mode decides the tool strip, the visible canvas layers and the
   right panel's content (Details while planning, Monitor in the other two);
@@ -983,9 +984,9 @@ whether the session still exists and shows the login form if not.
 
   | Mode | Tool strip | Layers |
   |---|---|---|
+  | Mow | plan job, start, pause, resume, go to point, follow path | areas, job path, progress, mower |
   | Plan | select (S), mowing area (Z), no-go area (O), delete (D), undo (Ctrl+Z), redo (Ctrl+Y) | areas |
   | Drive | driving control, mower mode, blade, stop, record border, rewind, save as area | areas, mower, draft border |
-  | Mow | plan job, start, pause, resume, go to point, follow path | areas, job path, progress, mower |
 
   Plan works fully; the tools and their shortcuts work in Plan mode only, and
   leaving Plan puts the active tool away. Drive and Mow are the shell only:

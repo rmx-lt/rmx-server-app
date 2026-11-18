@@ -1,5 +1,5 @@
 import { Radio, RadioGroup } from "@headlessui/react";
-import { Bot, Gamepad2, House, PanelLeft, PenTool, Sprout } from "lucide-react";
+import { Bot, DraftingCompass, House, Navigation, PanelLeft, SquarePlay } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MODES, type Mode } from "@/config/modes/modes";
@@ -12,9 +12,9 @@ import { useModeStore } from "@/model/modeStore";
 import { usePageStore } from "@/model/pageStore";
 
 const MODE_ICON: Record<Mode, ComponentType<{ size?: number; strokeWidth?: number }>> = {
-    plan: PenTool,
-    drive: Gamepad2,
-    mow: Sprout,
+    mow: SquarePlay,
+    plan: DraftingCompass,
+    drive: Navigation,
 };
 
 function ModeSwitch() {
