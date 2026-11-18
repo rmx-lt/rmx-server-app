@@ -868,7 +868,10 @@ whether the session still exists and shows the login form if not.
   and more when selected; the vertices of the selected area are small squares
   filled in the area colour (a thin ring in that colour on hover, a thicker one when selected),
   and an edge midpoint is a plain ring that shows only when the cursor is near.
-  Handle sizes are screen pixels, constant at every zoom.
+  Handle sizes are screen pixels, constant at every zoom, and follow SolidCraft's sketch editor:
+  a 5 px square, a radius-6 vertex ring, a radius-4 midpoint ring. A press within 8 px grabs a
+  vertex or a midpoint (the midpoint ring shows from 14 px), and a vertex pulled from a midpoint
+  keeps its offset from the cursor instead of jumping to it.
   The bottom bar of the workbench shows a scale bar as long as one grid cell,
   labelled in the map's unit, on every map type.
   The map has no format, type, coordinate system, headland, route points or
