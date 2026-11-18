@@ -44,12 +44,15 @@ export function CanvasVertexHandlesLayerInner({
     const edgeMidpoints = selectedObject ? computeEdgeMidpoints(selectedObjectVertices) : [];
     if (!selectedObject) return <Layer />;
     // Sizes are screen pixels divided by the zoom, so they stay constant on screen.
-    const half = 4 / scale; // half the side of the square
-    const ringRadius = 10 / scale;
+    const half = 2.5 / scale; // half the side of the square
+    const ringRadius = 6 / scale;
     const ringWidth = 1.5 / scale;
-    const ringWidthSelected = 2.5 / scale;
-    const midRadius = 5 / scale;
+    const ringWidthSelected = 2 / scale;
+    const midRadius = 4 / scale;
+    const midWidth = 1 / scale;
     const midNear = 14 / scale; // a cursor this close shows the midpoint ring
+    const midGrab = 8 / scale; // only a press this close drags (SolidCraft's point reach)
+    const vertexGrab = 8 / scale;
 
     const enter = (kind: "vertex" | "mid", index: number) => () => {
         setHover({ kind, index });
@@ -75,6 +78,9 @@ export function CanvasVertexHandlesLayerInner({
                         radius={midNear}
                         fill="transparent"
                         onMouseDown={(e) => {
+                            if (e.evt.button !== 0) return;
+                            const ptr = e.target.getStage()?.getRelativePointerPosition();
+                            if (!ptr || Math.hypot(ptr.x - mid.x, ptr.y - mid.y) > midGrab) return;
                             e.cancelBubble = true;
                             // The insert shifts the edge indexes: without this the next edge's ring flashes.
                             setHover(null);
@@ -90,7 +96,7 @@ export function CanvasVertexHandlesLayerInner({
                             y={mid.y}
                             radius={midRadius}
                             stroke={accentColor}
-                            strokeWidth={ringWidth}
+                            strokeWidth={midWidth}
                             listening={false}
                         />
                     ),
@@ -127,7 +133,12 @@ export function CanvasVertexHandlesLayerInner({
                         fill={accentColor}
                         stroke={accentColor}
                         strokeWidth={1 / scale}
-                        hitStrokeWidth={8 / scale}
+                        // Grab area: a circle around the vertex (local origin is the square's corner).
+                        hitFunc={(ctx, shape) => {
+                            ctx.beginPath();
+                            ctx.arc(half, half, vertexGrab, 0, Math.PI * 2);
+                            ctx.fillStrokeShape(shape);
+                        }}
                         draggable
                         onClick={(e) => {
                             e.cancelBubble = true;
