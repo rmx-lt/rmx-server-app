@@ -16,7 +16,7 @@ export default function Account() {
     return (
         <div className="flex items-center gap-1">
             <Menu>
-                <MenuButton className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-sm text-fg transition-colors hover:bg-hover data-open:bg-hover">
+                <MenuButton className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm text-fg transition-colors hover:bg-hover data-open:bg-hover">
                     <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-semibold uppercase text-on-accent">
                         {username.slice(0, 1)}
                     </span>
