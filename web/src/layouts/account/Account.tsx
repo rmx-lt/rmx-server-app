@@ -6,7 +6,7 @@ import { useAuthStore } from "@/features/auth/stores/authStore";
 import { useUiShellStore } from "@/features/ui-manager/stores/uiShellStore";
 
 /** A row of a side panel (button look). */
-export const panelRow = "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors";
+export const panelRow = "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors";
 const menuItem = "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-fg data-focus:bg-hover";
 
 /** The account menu and the settings button, at the bottom of both side panels. */
@@ -16,7 +16,7 @@ export default function Account() {
     return (
         <div className="flex items-center gap-1">
             <Menu>
-                <MenuButton className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-sm text-fg transition-colors hover:bg-hover data-open:bg-hover">
+                <MenuButton className="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left text-sm text-fg transition-colors hover:bg-hover data-open:bg-hover">
                     <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-semibold uppercase text-on-accent">
                         {username.slice(0, 1)}
                     </span>
