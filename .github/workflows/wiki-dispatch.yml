@@ -1,0 +1,18 @@
+# Asks blade-of-grass to republish the wiki. Runs on pushes to development
+# that change wiki/. Why: the GitHub wiki is built from every repo's wiki/
+# folder. Calls the shared workflow in rmx-lt/blade-of-grass; the canonical
+# copy of this file is tools/drift/callers/split/ there.
+# Spec: https://github.com/rmx-lt/blade-of-grass/issues/74
+name: wiki-dispatch
+
+on:
+  push:
+    branches: [development]
+    paths: ['wiki/**']
+
+permissions: {}
+
+jobs:
+  wiki-dispatch:
+    uses: rmx-lt/blade-of-grass/.github/workflows/reusable-wiki-dispatch.yml@development
+    secrets: inherit

@@ -1351,16 +1351,21 @@ so after changing one, run them.
 
 ## CI/CD
 
-`.github/workflows/ci.yml`, on every pull request and push:
+`.github/workflows/ci.yml`, on pull requests to `development` and pushes to
+`development` (a newer push cancels the older run). The four job names are the
+required checks; a `development` → `production` PR reuses their results, so
+`production` gets no CI run of its own.
 
 1. **go**: gofmt, `go vet`, staticcheck, `go test -race` (with the import rules), TS types up to date.
 2. **client** (the web app in `web/`; the job keeps its name, a required check): `bun install --frozen-lockfile`, eslint, tsc, `bun test`, build.
 3. **integration**: `compose.dev.yaml` up, integration tests.
-4. **image**: after 1–3 pass, builds the Docker image (cached in the GitHub
-   Actions cache). On pull requests and `development` it is only built. On
-   `production` it is pushed as `sha-<short>` and `production`; on a `v*` tag
-   as `X.Y.Z` and `X.Y`.
-5. **deploy**: only on `production`, sends the new tag to the VPS (see below).
+4. **image**: builds the Docker image (cached in the GitHub Actions cache), in
+   parallel with 1–3. Never pushed.
+
+`.github/workflows/deploy.yml`, on every push to `production` except wiki-only
+changes, and by hand (`workflow_dispatch`, from `production`) to redeploy:
+builds the image, pushes it as `sha-<short>` and `production`, then sends the
+tag to the VPS (see below).
 
 Dependabot (`.github/dependabot.yml`) opens weekly updates for Go modules, the
 web app (`web/`, bun ecosystem: `package.json` + `bun.lock`), GitHub Actions and the
@@ -1377,7 +1382,6 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 |---|---|
 | `sha-<short>` | every push to `production` (deploy this one: immutable) |
 | `production` | latest `production` |
-| `X.Y.Z`, `X.Y` | release tags `vX.Y.Z` |
 
 **Container:**
 
@@ -1443,8 +1447,8 @@ id is its login. Its ACL needs: its own `mower/<login>/#` (covered by the broker
 route: browsers don't use MQTT. An old `MQTT_WS_URL` in the
 environment is ignored.
 
-**Deploy job:** every push to `production` deploys automatically (`feat/…` → PR → `development` → PR → `production`). After the `image`
-job, the `deploy` job in `ci.yml` connects over SSH as the VPS user `deploy`
+**Deploy job:** every push to `production` deploys automatically (`feat/…` → PR → `development` → PR → `production`), except one that only changes `wiki/`. After pushing the image,
+`deploy.yml` connects over SSH as the VPS user `deploy`
 and sends only the tag `sha-<short>`. That user's key is restricted to one
 forced command, the deploy script in `rmx-server-infra` (it moves from the old
 probe stack to `services/app/` in
