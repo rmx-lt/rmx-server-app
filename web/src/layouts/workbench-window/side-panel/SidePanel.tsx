@@ -42,7 +42,7 @@ function ModeSwitch() {
 function DeviceSpot() {
     return (
         <Tooltip label="The mower appears here once it is connected">
-            <div tabIndex={0} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted">
+            <div tabIndex={0} className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-muted">
                 <Bot size={16} strokeWidth={1.75} aria-hidden />
                 <span className="min-w-0 flex-1 truncate">Mower</span>
                 <span className="text-xs text-faint">Not connected</span>
