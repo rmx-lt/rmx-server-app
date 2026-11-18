@@ -1,0 +1,91 @@
+# Builds the image, pushes it to GHCR (sha-<short>, production) and deploys it
+# to the VPS. Runs on every push to production (a merged development ->
+# production PR) except wiki-only changes, and by hand (workflow_dispatch) to
+# redeploy. Why: production only changes through a PR that passed the required
+# checks of ci.yml, so this workflow runs no tests of its own.
+# Spec: https://github.com/rmx-lt/rmx-server-app/issues/169
+name: Deploy
+
+on:
+  push:
+    branches: [production]
+    paths-ignore: ['wiki/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The SSH key's authorized_keys entry on the VPS
+  # forces one deploy script (source in rmx-server-infra; it moves from the old
+  # probe stack to services/app/ in https://github.com/rmx-lt/rmx-server-infra/issues/85),
+  # so the only thing this job can send is the tag.
+  # The script pulls the image, restarts the app container, waits for /health
+  # and rolls back if it isn't healthy (then this job fails).
+  # Secrets: DEPLOY_HOST, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS
+  # (the VPS host key line, pinned, so no trust-on-first-use).
+  deploy:
+    name: Deploy to VPS
+    # workflow_dispatch can pick any branch; only production deploys.
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    # One deploy at a time, in order; never cancel one halfway.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/rmx-lt/rmx-server-app
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=production
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Deploy sha-<short> over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          # Same tag as the metadata step's type=sha,format=short (7 characters).
+          TAG="sha-${GITHUB_SHA::7}"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          # Retry only connection failures (exit 255): the VPS network
+          # sometimes drops new SSH connections. The script is idempotent.
+          for attempt in 1 2 3; do
+            rc=0
+            ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+              "deploy@$DEPLOY_HOST" "$TAG" || rc=$?
+            [ "$rc" -ne 255 ] && break
+            echo "SSH connection failed (attempt $attempt), retrying in 20 s"
+            sleep 20
+          done
+          rm -f ~/.ssh/deploy_key
+          exit "$rc"
