@@ -1120,8 +1120,8 @@ dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (be
 dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
-Then open <http://localhost:3000/> and log in as `DEV_USER` / `DEV_PASSWORD`
-from `.env` (default `dev` / `dev-password-123`). The script:
+Then open <http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in
+`.env` renames the login). The script:
 
 - creates `.env` from `.env.example` when it is missing;
 - refuses to start when port 8080 or 3000 is taken (a leftover server would
@@ -1129,7 +1129,8 @@ from `.env` (default `dev` / `dev-password-123`). The script:
 - starts TimescaleDB + Mosquitto (`compose.dev.yaml`; they keep running after
   Ctrl+C, stop them with `docker compose -f compose.dev.yaml down`);
 - builds `rmx-server` and `devsim` into `.dev/` (gitignored), creates the dev
-  login or resets its password to `DEV_PASSWORD`;
+  login and sets its password to `123` directly in the dev database (the
+  12-character minimum stays for real logins);
 - runs the web dev server (hot reload), the server and the simulated mower in
   one terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
   `.env` it rebuilds and restarts the server and the mower; a build error
