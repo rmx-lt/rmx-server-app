@@ -1120,6 +1120,9 @@ dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (be
 dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
+From `web/`, `bun run dev:all` runs the same script (with `pwsh`); arguments
+pass through: `bun run dev:all -NoSim`.
+
 Then open <http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in
 `.env` renames the login). The script:
 
