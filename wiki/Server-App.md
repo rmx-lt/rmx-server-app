@@ -1103,7 +1103,7 @@ prop changes), and write `ref.current` in an effect, never during render.
 
 ```
 compose.dev.yaml, dev/mosquitto/  local/CI stack: TimescaleDB + Mosquitto
-package.json                      only `bun run dev` from the root (runs dev/run.ps1); no dependencies
+package.json                      only `bun run dev` (runs dev/run.ps1); no dependencies
 Dockerfile                        multi-stage: bun build + go build → distroless/static
 .github/                          CI workflow, Dependabot
 ```
@@ -1112,21 +1112,18 @@ Dockerfile                        multi-stage: bun build + go build → distrole
 
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 
-**One command** (PowerShell, from the repo):
+From the repo root:
 
 ```powershell
-dev\run.ps1             # stack + Go server + web dev server + simulated mower
-dev\run.ps1 -NoSim      # without the simulated mower
-dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (below)
-dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
+bun run dev             # stack + Go server + web dev server + simulated mower
+bun run dev -NoSim      # without the simulated mower
+bun run dev -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (below)
+bun run dev -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
-`bun run dev` from the repo root (root `package.json`) runs the same script
-with `pwsh`; arguments pass through: `bun run dev -NoSim`. Inside `web/`,
-`bun run dev` is only the web dev server.
-
-Then open <http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in
-`.env` renames the login). The script:
+It runs `dev/run.ps1` (root `package.json`). Then open
+<http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in `.env`
+renames the login). The script:
 
 - creates `.env` from `.env.example` when it is missing;
 - refuses to start when port 8080 or 3000 is taken (a leftover server would
@@ -1209,7 +1206,7 @@ still counts and relays the autopilot's topics as it would.
   the `fix` switch, default `rtk_fixed`), signatures of firmware images.
 
 **Switches** provoke the edge cases. Set them at start with `-set name=value`
-(`dev\run.ps1 -SimSet`), or on the running mower with
+(`bun run dev -SimSet`), or on the running mower with
 `go run ./cmd/devsim ctl <name> <value>` (the control endpoint listens on
 `127.0.0.1:18090`; `-control` changes it):
 
@@ -1250,31 +1247,6 @@ a row in the `paths` table (`transfer.StorePath`). `devsim send` and the tests
 The real board connects only to the VPS broker (port 8884, client
 certificate), so testing with it means a production deploy.
 
-**By hand**, the same steps one by one:
-
-```powershell
-# 1. Settings: dev-only passwords for the local stack.
-Copy-Item .env.example .env
-
-# 2. TimescaleDB + Mosquitto (localhost only).
-docker compose -f compose.dev.yaml up -d --wait
-
-# 3. The server (reads .env, runs migrations, listens on 127.0.0.1:8080).
-go run ./cmd/rmx-server
-
-# 4. The web dev server, in a second terminal.
-cd web
-bun install
-bun run dev
-```
-
-Create a login once (the dev database keeps it), then open
-<http://localhost:3000/> and log in; the workbench loads:
-
-```powershell
-go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
-```
-
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
 `test-device` with the `TEST_DEVICE_PASSWORD` from `.env`
 (`test-device-dev`), publishing to `mower/<name>/gateway/fw/req` (needs
@@ -1290,7 +1262,7 @@ installed on the PC):
 | 55432 | TimescaleDB (`postgres://app:db-dev@127.0.0.1:55432/app`) |
 | 11883 | Mosquitto, plain MQTT (the server and test devices) |
 
-**How the dev server works.** `bun run dev` runs `web/dev/server.ts`:
+**How the web dev server works.** It is `web/dev/server.ts`:
 `Bun.serve` with an HTML import of `public/index.html`, so Bun bundles the app
 on the fly with hot module reloading and Tailwind (`bun-plugin-tailwind` in
 `bunfig.toml`). The same server proxies `/api/*`, `/health`,

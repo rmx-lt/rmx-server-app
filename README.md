@@ -24,31 +24,12 @@ types in `web/src/data/api/generated` are generated from the Go types in
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 
 ```powershell
-dev\run.ps1    # everything: database + broker, Go server (restarts on save), web dev server, simulated mower
-bun run dev     # the same, from the repo root (arguments pass through: bun run dev -NoSim)
+bun run dev    # from the repo root: database + broker, Go server (restarts on save), web dev server, simulated mower
 ```
 
 Open <http://localhost:3000/> and log in as `dev` / `123`. `go run ./cmd/devsim send ping`
-talks to the simulated mower. Details, and the steps by hand: wiki Server-App,
-"Local development". By hand:
-
-```powershell
-# 1. Settings (dev-only passwords), then TimescaleDB + Mosquitto.
-Copy-Item .env.example .env
-docker compose -f compose.dev.yaml up -d --wait
-
-# 2. The server (runs migrations, listens on 127.0.0.1:8080).
-go run ./cmd/rmx-server
-
-# 3. The web dev server, in a second terminal.
-cd web
-bun install
-bun run dev
-```
-
-Create a login once (`go run ./cmd/rmx-server create-user dev`, any
-password of 12+ characters), then open <http://localhost:3000/> and log in; the workbench loads. Ports, MQTT testing and
-the checks CI runs: see the wiki page Server-App.
+talks to the simulated mower. Options, ports, MQTT testing and the checks CI
+runs: wiki Server-App, "Local development".
 
 Checks before a pull request:
 
