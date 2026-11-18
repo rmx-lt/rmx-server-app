@@ -1,5 +1,5 @@
 import { Radio, RadioGroup } from "@headlessui/react";
-import { Bot, DraftingCompass, House, Navigation, PanelLeft, SquarePlay } from "lucide-react";
+import { Bot, DraftingCompass, House, Navigation, PanelLeft, Play } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 import Tooltip from "@/components/tooltip/Tooltip";
 import { MODES, type Mode } from "@/config/modes/modes";
@@ -12,7 +12,7 @@ import { useModeStore } from "@/model/modeStore";
 import { usePageStore } from "@/model/pageStore";
 
 const MODE_ICON: Record<Mode, ComponentType<{ size?: number; strokeWidth?: number }>> = {
-    mow: SquarePlay,
+    mow: Play,
     plan: DraftingCompass,
     drive: Navigation,
 };
