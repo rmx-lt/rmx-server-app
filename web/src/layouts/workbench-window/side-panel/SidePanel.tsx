@@ -93,7 +93,7 @@ export default function SidePanel() {
 
                 <ZoneList />
 
-                <div className="flex flex-col gap-1 border-t border-line pt-2">
+                <div className="-mx-3 flex flex-col gap-1 border-t border-line px-3 pt-2">
                     <DeviceSpot />
                     <Account />
                 </div>
