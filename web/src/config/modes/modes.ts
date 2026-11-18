@@ -4,14 +4,14 @@
  * content; there is no separate view switch. Users cannot change visibility.
  */
 
-export type Mode = "plan" | "drive" | "mow";
+export type Mode = "mow" | "plan" | "drive";
 
 export type LayerId = "areas" | "mower" | "draftBorder" | "jobPath" | "progress";
 
 export const MODES: { id: Mode; label: string }[] = [
+    { id: "mow", label: "Mow" },
     { id: "plan", label: "Plan" },
     { id: "drive", label: "Drive" },
-    { id: "mow", label: "Mow" },
 ];
 
 /**

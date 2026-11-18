@@ -1,4 +1,4 @@
-import { MousePointer2, Pentagon, Redo2, Square, Trash2, Undo2 } from "lucide-react";
+import { MousePointer2, Redo2, SquareCheckBig, SquareX, Trash2, Undo2 } from "lucide-react";
 import { ToolStripButton, ToolStripSeparator } from "@/components/tool-strip/ToolStrip";
 import { WORKBENCH_SHORTCUTS as S } from "@/config/shortcut-manager/workbenchShortcutsConfig";
 import { deleteAction, redoAction, toggleTool, undoAction } from "@/features/canvas-editing/data/canvasActions";
@@ -14,8 +14,8 @@ export default function PlanTools() {
     return (
         <>
             <ToolStripButton label="Select" icon={MousePointer2} shortcut={S["canvas.tool-select"].shortcut} active={activeTool === "select"} onClick={() => toggleTool("select")} />
-            <ToolStripButton label="Mowing area" icon={Pentagon} shortcut={S["canvas.tool-add-mowing-area"].shortcut} active={activeTool === "addMowingArea"} onClick={() => toggleTool("addMowingArea")} />
-            <ToolStripButton label="No-go area" icon={Square} shortcut={S["canvas.tool-add-no-go-area"].shortcut} active={activeTool === "addNoGoArea"} onClick={() => toggleTool("addNoGoArea")} />
+            <ToolStripButton label="Mowing area" icon={SquareCheckBig} shortcut={S["canvas.tool-add-mowing-area"].shortcut} active={activeTool === "addMowingArea"} onClick={() => toggleTool("addMowingArea")} />
+            <ToolStripButton label="No-go area" icon={SquareX} shortcut={S["canvas.tool-add-no-go-area"].shortcut} active={activeTool === "addNoGoArea"} onClick={() => toggleTool("addNoGoArea")} />
             <ToolStripSeparator />
             <ToolStripButton label="Delete" icon={Trash2} danger shortcut={S["canvas.tool-delete"].shortcut} active={activeTool === "delete"} onClick={deleteAction} />
             <ToolStripSeparator />
