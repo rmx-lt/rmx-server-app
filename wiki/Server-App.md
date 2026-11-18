@@ -1103,6 +1103,7 @@ prop changes), and write `ref.current` in an effect, never during render.
 
 ```
 compose.dev.yaml, dev/mosquitto/  local/CI stack: TimescaleDB + Mosquitto
+package.json                      only `bun run dev:all` (runs dev/run.ps1); no dependencies
 Dockerfile                        multi-stage: bun build + go build → distroless/static
 .github/                          CI workflow, Dependabot
 ```
@@ -1120,8 +1121,8 @@ dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (be
 dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
-From `web/`, `bun run dev:all` runs the same script (with `pwsh`); arguments
-pass through: `bun run dev:all -NoSim`.
+`bun run dev:all` (from the repo root, defined in the root `package.json`) runs
+the same script with `pwsh`; arguments pass through: `bun run dev:all -NoSim`.
 
 Then open <http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in
 `.env` renames the login). The script:

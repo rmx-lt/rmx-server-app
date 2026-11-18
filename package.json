@@ -1,0 +1,7 @@
+{
+  "name": "rmx-server-app-dev",
+  "private": true,
+  "scripts": {
+    "dev:all": "pwsh -NoProfile -File dev/run.ps1"
+  }
+}
