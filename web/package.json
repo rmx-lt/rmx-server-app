@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot dev/server.ts",
+    "dev:all": "pwsh -NoProfile -File ../dev/run.ps1",
     "build": "bun scripts/build.ts",
     "lint": "bun --bun eslint .",
     "typecheck": "bun --bun tsc --noEmit",

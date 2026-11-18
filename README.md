@@ -25,6 +25,7 @@ You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 
 ```powershell
 dev\run.ps1    # everything: database + broker, Go server (restarts on save), web dev server, simulated mower
+cd web; bun run dev:all   # the same, from web/ (arguments pass through: bun run dev:all -NoSim)
 ```
 
 Open <http://localhost:3000/> and log in as `dev` / `123`. `go run ./cmd/devsim send ping`
