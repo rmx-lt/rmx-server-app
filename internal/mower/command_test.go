@@ -477,9 +477,11 @@ func TestParseCommandParams(t *testing.T) {
 		{api.BoardGateway, "autopilot_reset", nil},
 		{api.BoardAutopilot, "stop", nil},
 		{api.BoardAutopilot, "blade", raw(`{"on":true}`)},
-		{api.BoardAutopilot, "follow", raw(`{"points":[[54.68712345,25.27965432]],"reverse":true,"blade":false,"speed":0.5}`)},
+		{api.BoardAutopilot, "follow", raw(`{"points":[[54.68712345,25.27965432]],"reverse":true,"type":"edge"}`)},
+		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2]]}`)},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":{"max":1.5,"transit":0,"edge":null,"fill":0.5,"manual":2}}`)},
 		{api.BoardAutopilot, "record_start", raw(`{"session":"r-17","spacing":0.1}`)},
-		{api.BoardAutopilot, "job_start", raw(`{"job":"j-2031","size":4096,"sha256":"` + strings.Repeat("ab", 32) + `","from_point":413}`)},
+		{api.BoardAutopilot, "path_start", raw(`{"path":"j-2031","size":4096,"sha256":"` + strings.Repeat("ab", 32) + `","from_point":413}`)},
 		{api.BoardAutopilot, "restart", nil},
 	}
 	for _, c := range good {
@@ -510,9 +512,17 @@ func TestParseCommandParams(t *testing.T) {
 		{api.BoardAutopilot, "follow", raw(`{"points":[[91,0]]}`), "latitude out of range"},
 		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2,3]]}`), "a point with three numbers"},
 		{api.BoardAutopilot, "follow", raw(`{"points":` + strings.Repeat("[[1,2],", 100) + `[1,2]]}`), "101 points"},
-		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2]],"speed":0}`), "speed 0"},
-		{api.BoardAutopilot, "job_start", raw(`{"job":"j-1","size":1,"sha256":"ABC"}`), "bad sha256"},
-		{api.BoardAutopilot, "job_start", raw(`{"job":"j 1","size":1,"sha256":"` + strings.Repeat("a", 64) + `"}`), "bad job id"},
+		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2]],"speed":0.5}`), "speed is gone"},
+		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2]],"blade":true}`), "blade is gone"},
+		{api.BoardAutopilot, "follow", raw(`{"points":[[1,2]],"type":"mow"}`), "unknown type"},
+		{api.BoardAutopilot, "speed_limit", nil, "limits is required"},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":{}}`), "no limit named"},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":{"top":1}}`), "unknown limit"},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":{"max":-0.1}}`), "negative limit"},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":{"max":"1"}}`), "limit as a string"},
+		{api.BoardAutopilot, "speed_limit", raw(`{"limits":[1]}`), "limits as an array"},
+		{api.BoardAutopilot, "path_start", raw(`{"path":"j-1","size":1,"sha256":"ABC"}`), "bad sha256"},
+		{api.BoardAutopilot, "path_start", raw(`{"path":"j 1","size":1,"sha256":"` + strings.Repeat("a", 64) + `"}`), "bad path id"},
 		{"toaster", "stop", nil, "unknown board"},
 	}
 	for _, c := range bad {
@@ -562,7 +572,7 @@ func rowWith(gatewayStatus, gatewayState, autopilotState string) deviceRow {
 const (
 	gwUp      = `{"protocol":"0.1","boot":2,"autopilot_link":"up"}`
 	apIdle    = `{"protocol":"0.1","boot":1,"mode":"idle"}`
-	apJob     = `{"protocol":"0.1","boot":1,"mode":"job","job":"j-1"}`
+	apPath    = `{"protocol":"0.1","boot":1,"mode":"path","path":"j-1"}`
 	apManual  = `{"protocol":"0.1","boot":1,"mode":"manual"}`
 	apFault   = `{"protocol":"0.1","boot":1,"mode":"fault"}`
 	apUnknown = `{"protocol":"0.1","boot":1}`
@@ -575,11 +585,11 @@ func TestGatewayRestartAndOtaRefusedOnlyForAKnownBusyAutopilot(t *testing.T) {
 			t.Errorf("%s with an idle autopilot: %v", cmd, err)
 		}
 		for name, row := range map[string]deviceRow{
-			"a job runs":             rowWith("online", gwUp, apJob),
-			"manual":                 rowWith("online", gwUp, apManual),
-			"fault":                  rowWith("online", gwUp, apFault),
-			"a state without a mode": rowWith("online", gwUp, apUnknown),
-			"link not reported, job": rowWith("online", "", apJob),
+			"a path runs":             rowWith("online", gwUp, apPath),
+			"manual":                  rowWith("online", gwUp, apManual),
+			"fault":                   rowWith("online", gwUp, apFault),
+			"a state without a mode":  rowWith("online", gwUp, apUnknown),
+			"link not reported, path": rowWith("online", "", apPath),
 		} {
 			err := checkAllowed(row, api.BoardGateway, cmd)
 			if e := apperr.From(err); err == nil || e.Code != api.CodeConflict {
@@ -591,8 +601,8 @@ func TestGatewayRestartAndOtaRefusedOnlyForAKnownBusyAutopilot(t *testing.T) {
 	// says, and no autopilot state was ever received.
 	for _, cmd := range []string{"restart", "ota"} {
 		for name, row := range map[string]deviceRow{
-			"link down, stale job":    rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apJob),
-			"link incompatible":       rowWith("online", `{"protocol":"0.1","autopilot_link":"incompatible"}`, apJob),
+			"link down, stale path":   rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apPath),
+			"link incompatible":       rowWith("online", `{"protocol":"0.1","autopilot_link":"incompatible"}`, apPath),
 			"link down, idle":         rowWith("online", `{"protocol":"0.1","autopilot_link":"down"}`, apIdle),
 			"no autopilot state ever": rowWith("online", gwUp, ""),
 			"no states at all":        rowWith("", "", ""),
@@ -603,17 +613,17 @@ func TestGatewayRestartAndOtaRefusedOnlyForAKnownBusyAutopilot(t *testing.T) {
 			}
 		}
 	}
-	// A running job is named in the reason.
-	if err := checkAllowed(rowWith("online", gwUp, apJob), api.BoardGateway, "restart"); err == nil || !strings.Contains(err.Error(), "job") {
+	// A running path is named in the reason.
+	if err := checkAllowed(rowWith("online", gwUp, apPath), api.BoardGateway, "restart"); err == nil || !strings.Contains(err.Error(), "path") {
 		t.Errorf("reason: %v", err)
 	}
 	// The idle rule is for the gateway's restart and update only.
 	for _, cmd := range []string{"ping", "autopilot_reset"} {
-		if err := checkAllowed(rowWith("online", gwUp, apJob), api.BoardGateway, cmd); err != nil {
-			t.Errorf("%s during a job: %v", cmd, err)
+		if err := checkAllowed(rowWith("online", gwUp, apPath), api.BoardGateway, cmd); err != nil {
+			t.Errorf("%s during a path: %v", cmd, err)
 		}
 	}
-	if err := checkAllowed(rowWith("online", gwUp, apJob), api.BoardAutopilot, "restart"); err != nil {
+	if err := checkAllowed(rowWith("online", gwUp, apPath), api.BoardAutopilot, "restart"); err != nil {
 		t.Errorf("the autopilot's own restart is the board's to refuse (wrong_mode): %v", err)
 	}
 }

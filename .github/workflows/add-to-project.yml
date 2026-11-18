@@ -1,0 +1,17 @@
+# Adds new issues to the org project Blade of Grass. Runs when an issue is
+# opened, reopened or transferred. Why: the project's auto-add covers only one
+# repo on our plan. Calls the shared workflow in rmx-lt/blade-of-grass; the
+# canonical copy of this file is tools/drift/callers/split/ there.
+# Spec: https://github.com/rmx-lt/blade-of-grass/issues/74
+name: add-to-project
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+
+permissions: {}
+
+jobs:
+  add-to-project:
+    uses: rmx-lt/blade-of-grass/.github/workflows/reusable-add-to-project.yml@development
+    secrets: inherit

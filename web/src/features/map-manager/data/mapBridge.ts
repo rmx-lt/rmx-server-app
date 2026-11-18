@@ -1,152 +1,132 @@
-import { createMap, loadMap, overwriteMap, type MapContent } from "@/data/planning/maps";
-import { initialLayerSettings } from "@/data/planning/layerSettings";
-import { COORD_SYSTEM, MAP_FORMAT, MAP_TYPE, ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { createMap, deleteMap, listMaps, loadMap as fetchContent, renameMap, MapFormatError, type MapContent } from "@/data/planning/maps";
 import type { MapInfo } from "@/data/planning/schemaTypes";
-import type { ImportedMapData } from "@/features/map-manager/utils/importMapXml";
-import { useMapStore } from "@/model/mapStore";
+import { FIRST_ZONE, useMapStore } from "@/model/mapStore";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
 import { useCanvasHistoryStore } from "@/features/canvas-editing/stores/canvasHistoryStore";
-import { useSaveModeStore } from "@/model/saveModeStore";
-import { loadLayerSettings } from "@/model/layerSettingsStore";
-import { useMapPointStore } from "@/model/mapPointStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
-import { currentMapContent, flushAutosave, saveCanvas } from "@/features/canvas-editing/data/canvasBridge";
+import { useMapListStore } from "@/model/mapListStore";
+import { readLastMapId, rememberLastMapId, usePageStore } from "@/model/pageStore";
+import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
+import { currentMapContent, flushSave, requestSave, resetSave } from "@/features/canvas-editing/data/canvasBridge";
 
-// Opening, starting, copying and importing maps. The maps live on the server
-// (src/data/planning/maps.ts); the stores hold the open one. A new map has
-// id 0 until its first save, when the server gives it one.
+// Opening, starting, duplicating and deleting maps. The maps live on the server
+// (src/data/planning/maps.ts), a new one from the moment it is made; the
+// stores hold the open one, and the autosave keeps it saved. A map with
+// id 0 exists only when the server could not be reached at startup; its
+// first save creates it.
 
 const BLANK_MAP: MapInfo = {
     id: 0,
     name: "Untitled Map",
-    format: MAP_FORMAT.POLYGON,
-    type: MAP_TYPE.ANY_OFFLINE,
-    coordSystem: COORD_SYSTEM.CARTESIAN,
-    headlandEnabled: true,
-    headlandWidth: "10",
-    mowingZoneCount: 0,
-    noGoZoneCount: 0,
+    mowingAreaCount: 0,
+    noGoAreaCount: 0,
 };
 
-function countByCategory(zones: { category: string }[], category: string): number {
-    return zones.filter((z) => z.category === category).length;
-}
-
-function modeAfterFirstSave(): "manual" | "autosave" {
-    return useSaveModeStore.getState().isAutoSaveEnabled ? "autosave" : "manual";
-}
-
-/** Puts a map into the stores, clean (nothing to save). */
-function showMap(content: MapContent): void {
-    const { zones } = content;
-    useMapStore.getState().setMap({
-        ...content.map,
-        mowingZoneCount: countByCategory(zones, ZONE_CATEGORY.MOWING),
-        noGoZoneCount: countByCategory(zones, ZONE_CATEGORY.NO_GO),
-    });
-    useMapStore.getState().clearDirty();
-    useCanvasObjectStore.getState().setObjects(zones);
-    useCanvasHistoryStore.getState().resetHistory();
-    loadLayerSettings(content.layerSettings);
-    useMapPointStore.getState().setPoints(content.points);
-    useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
-}
-
-/** Starts a blank, unsaved map placed at the user's default geo anchor. */
-async function showBlankMap(): Promise<void> {
-    await useGeoAnchorStore.getState().loadSystemGeoAnchor();
-    showMap({
-        map: BLANK_MAP,
-        zones: [],
-        points: [],
-        geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor,
-        layerSettings: initialLayerSettings(0),
-    });
-}
-
-/** Starts a blank map at app startup. */
-export async function initializeMap(): Promise<void> {
-    useSaveModeStore.getState().setMode("session");
-    await showBlankMap();
-}
-
-/** Discards the open map and starts a blank one without saving. */
-export async function resetMap(): Promise<void> {
-    await flushAutosave();
-    useSaveModeStore.getState().setMode("session");
-    await showBlankMap();
-}
-
-/** Opens a saved map. */
-export async function openMap(mapId: number): Promise<void> {
-    await flushAutosave();
-    const content = await loadMap(mapId);
-    useSaveModeStore.getState().setMode(modeAfterFirstSave());
-    showMap(content);
-}
-
-/** Saves the open map as a new map, or over an existing one (selectedEnvId), then opens it. */
-export async function saveMapAs(name: string, selectedMapId: number | null): Promise<void> {
-    const content = currentMapContent();
-    const id = selectedMapId === null ? await createMap(content, name) : await overwriteMap(selectedMapId, content, name);
-    await openMap(id);
-}
-
-/**
- * Saves a copy of the open map as a new map without switching to it.
- * Returns the copy's id, so the caller can offer to open it.
- */
-export async function copyMap(name: string): Promise<number> {
-    return createMap(currentMapContent(), name);
-}
-
-/** Saves a map read from an XML file as a new map, then opens it. */
-export async function importMap(data: ImportedMapData): Promise<void> {
-    await useGeoAnchorStore.getState().loadSystemGeoAnchor();
-    const zones = data.zones.map((z, i) => ({
-        id: z.id > 0 ? z.id : i + 1,
-        mapId: 0,
-        category: z.category,
-        type: z.type,
-        vertexCount: z.vertices.length,
-        area: 0,
-        vertices: z.vertices,
-    }));
-    const id = await createMap(
-        {
-            map: {
-                id: 0,
-                name: data.name,
-                format: data.format,
-                type: data.type,
-                coordSystem: data.coordSystem,
-                headlandEnabled: data.headlandEnabled,
-                headlandWidth: data.headlandWidth,
-                mowingZoneCount: countByCategory(zones, ZONE_CATEGORY.MOWING),
-                noGoZoneCount: countByCategory(zones, ZONE_CATEGORY.NO_GO),
-            },
-            zones,
-            points: data.mapPoints.map((p) => ({ mapId: 0, type: p.type, point: p.point })),
-            geoAnchor: data.geoAnchor ?? useGeoAnchorStore.getState().systemGeoAnchor,
-            layerSettings: initialLayerSettings(0),
-        },
-        data.name,
-    );
-    await openMap(id);
-}
-
-/**
- * Applies an autosave toggle to the current save mode:
- * - Enabling while mode is "manual" → switches to "autosave" and immediately saves any dirty state.
- * - Enabling while mode is "session" → no mode change; autosave activates on the next manual save.
- * - Disabling while mode is "autosave" → switches to "manual".
- */
-export async function applyAutoSaveToggle(enabled: boolean): Promise<void> {
-    const { mode, setMode } = useSaveModeStore.getState();
-    if (enabled && mode === "manual") {
-        setMode("autosave");
-        await saveCanvas();
-    } else if (!enabled && mode === "autosave") {
-        setMode("manual");
+/** Reads a map from the server; when it can't be opened, says why on Home before failing. */
+async function loadMap(id: number): Promise<MapContent> {
+    try {
+        return await fetchContent(id);
+    } catch (err) {
+        const reason = err instanceof MapFormatError ? err.message : `The map could not be opened (${err instanceof Error ? err.message : "unknown error"}).`;
+        useMapListStore.setState({ error: reason });
+        throw err;
     }
+}
+
+/** Puts a map into the stores; showing it is not a change to save. */
+function showMap(content: MapContent): void {
+    useMapStore.getState().setMap(content.map, content.zones, content.activeZoneId);
+    useCanvasObjectStore.getState().setObjects(content.areas);
+    useCanvasHistoryStore.getState().resetHistory();
+    useGeoAnchorStore.getState().setLoadedMapGeoAnchor(content.geoAnchor);
+    resetSave();
+    useMapListStore.setState({ error: null });
+    rememberLastMapId(content.map.id);
+    void useMapListStore.getState().refresh();
+}
+
+/** Leaves no map open (the stores hold a blank one) and forgets the last map. */
+function closeMap(): void {
+    useMapStore.getState().setMap(BLANK_MAP, [FIRST_ZONE], FIRST_ZONE.id);
+    useCanvasObjectStore.getState().setObjects([]);
+    useCanvasHistoryStore.getState().resetHistory();
+    useGeoAnchorStore.getState().setLoadedMapGeoAnchor(undefined);
+    resetSave();
+    rememberLastMapId(null);
+    void useMapListStore.getState().refresh();
+}
+
+/** Creates a blank map on the server, at the user's default geo anchor (none when unset). Returns its id. */
+async function createBlankMap(): Promise<number> {
+    return createMap({ map: BLANK_MAP, zones: [FIRST_ZONE], activeZoneId: FIRST_ZONE.id, areas: [], geoAnchor: useGeoAnchorStore.getState().systemGeoAnchor }, BLANK_MAP.name);
+}
+
+/** At login: opens the map opened last in this browser; when there is none, it is gone or it can't be opened, shows Home. Nothing is saved first. */
+export async function openStartMap(): Promise<void> {
+    const wanted = readLastMapId();
+    const maps = await listMaps();
+    if (wanted !== null && maps.some((m) => m.id === wanted)) {
+        try {
+            showMap(await loadMap(wanted));
+            usePageStore.getState().setPage("workbench");
+            return;
+        } catch (err) {
+            console.error("the last map could not be opened", err);
+        }
+    }
+    closeMap();
+    usePageStore.getState().setPage("home");
+}
+
+/** Opens a map and shows it in the workbench. */
+export async function openMap(mapId: number): Promise<void> {
+    await flushSave();
+    showMap(await loadMap(mapId));
+    usePageStore.getState().setPage("workbench");
+}
+
+/** Makes a new map on the server and opens it in the workbench. */
+export async function newMap(): Promise<void> {
+    await flushSave();
+    showMap(await loadMap(await createBlankMap()));
+    usePageStore.getState().setPage("workbench");
+}
+
+/** Makes a copy of a map ("name (copy)") on the server and makes it the open one (the page stays). */
+export async function duplicateMap(mapId: number): Promise<void> {
+    await flushSave();
+    const content = mapId === useMapStore.getState().map.id ? currentMapContent() : await loadMap(mapId);
+    showMap(await loadMap(await createMap(content, `${content.map.name} (copy)`)));
+}
+
+/** Renames a map. The open one changes in the store and is saved by the autosave. */
+export async function renameMapById(mapId: number, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (mapId === useMapStore.getState().map.id) {
+        useMapStore.getState().setName(trimmed);
+        // The canvas that watches the name is not mounted on Home.
+        requestSave();
+    } else {
+        await renameMap(mapId, trimmed);
+        await useMapListStore.getState().refresh();
+    }
+}
+
+/** Asks first, then deletes a map; deleting the open one leaves no map open (the user is on Home). */
+export function requestDeleteMap(mapId: number, name: string): void {
+    useConfirmationModalStore.getState().requestConfirmation({
+        title: "Delete map",
+        message: `Delete "${name}"? This cannot be undone.`,
+        tone: "danger",
+        confirmLabel: "Delete",
+        confirmAction: async () => {
+            const wasOpen = mapId === useMapStore.getState().map.id;
+            // Nothing of a map that is going away is saved.
+            if (wasOpen) resetSave();
+            await deleteMap(mapId);
+            if (wasOpen) closeMap();
+            else await useMapListStore.getState().refresh();
+        },
+    });
 }

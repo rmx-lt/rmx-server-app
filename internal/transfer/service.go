@@ -1,16 +1,17 @@
 // Package transfer serves files to the mower's boards as MQTT chunks (wiki
 // Mower-Protocol §12): signed firmware images for the gateway and for the
-// autopilot, and the autopilot's job files.
+// autopilot, and the autopilot's path files.
 //
-// The board checks the image signature and the job file itself. This domain
-// only reads a file out of a directory, splits it into 4096-byte chunks and
-// builds the binary frame. Each topic set (gateway/fw, autopilot/fw,
-// autopilot/job) has its own directory, so a request on one set can only
-// reach that set's files. The topic layout and the byte layout are the
-// contract; the server's side is in wiki Server-App, "Chunk transfer".
+// The board checks the image signature and the path file itself. This domain
+// only reads a file, splits it into 4096-byte chunks and builds the binary
+// frame. The firmware sets (gateway/fw, autopilot/fw) each have their own
+// directory; the path set (autopilot/path) is read from the paths table. A
+// request on one set can only reach that set's files. The topic layout and the
+// byte layout are the contract; the server's side is in wiki Server-App,
+// "Chunk transfer".
 //
-// Files: service.go (the directories), mqtt.go (the device payloads, the topic
-// sets and the request handler). Transfer has no table, so no store.go.
+// Files: service.go (the directories), store.go (the paths table), mqtt.go (the
+// device payloads, the topic sets and the request handler).
 package transfer
 
 import (
@@ -31,8 +32,8 @@ const (
 	HeaderMaxChunk = math.MaxUint16
 	// MaxFirmwareBytes is the largest firmware image this server sends (32 MiB).
 	MaxFirmwareBytes int64 = 32 << 20
-	// MaxJobBytes is the largest job file (1 MiB, §11).
-	MaxJobBytes int64 = 1 << 20
+	// MaxPathBytes is the largest path file (1 MiB, §11).
+	MaxPathBytes int64 = 1 << 20
 	// MaxFileNameLen bounds a file name (§12).
 	MaxFileNameLen = 128
 )
@@ -44,7 +45,7 @@ var fileName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 var (
 	// ErrBadName is a file name that is not allowed.
 	ErrBadName = errors.New("bad file name")
-	// ErrNotFound is a name that is not a regular file in the set's directory.
+	// ErrNotFound is a name that is not a regular file in the set's directory, or not a stored path.
 	ErrNotFound = errors.New("file not found")
 	// ErrTooLarge is a file over the set's size limit.
 	ErrTooLarge = errors.New("file is too large")
@@ -78,6 +79,17 @@ type Meta struct {
 	Size   int64
 	Chunks uint32
 	Sum    [32]byte
+}
+
+// sliceChunk is chunk index of an in-memory file (a stored path).
+func sliceChunk(name string, doc []byte, sum [32]byte, index uint32) (Meta, []byte, error) {
+	meta := Meta{Name: name, Size: int64(len(doc)), Chunks: ChunkCount(int64(len(doc))), Sum: sum}
+	if index >= meta.Chunks {
+		return meta, nil, ErrBadIndex
+	}
+	start := min(int64(index)*ChunkBytes, int64(len(doc)))
+	end := min(start+ChunkBytes, int64(len(doc)))
+	return meta, doc[start:end:end], nil
 }
 
 // Dir reads files from one directory. The directory is opened with os.Root,

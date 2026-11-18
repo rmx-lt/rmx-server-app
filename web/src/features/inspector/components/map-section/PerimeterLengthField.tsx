@@ -1,6 +1,6 @@
 import InspectorPanelSectionField from "@/components/inspector-panel/InspectorPanelSectionField";
 import { useCanvasObjectStore } from "@/features/canvas-editing/stores/canvasObjectStore";
-import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import { AREA_CATEGORY } from "@/config/db-ops/enums";
 import { useMapStore } from "@/model/mapStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
 import { computePolygonPerimeter } from "@/utils/geometry";
@@ -14,7 +14,7 @@ export default function PerimeterLengthField() {
             .filter(
                 (o) =>
                     o.mapId === mapId &&
-                    (o.category === ZONE_CATEGORY.MOWING || o.category === ZONE_CATEGORY.NO_GO),
+                    (o.category === AREA_CATEGORY.MOWING || o.category === AREA_CATEGORY.NO_GO),
             )
             .reduce((sum, o) => sum + computePolygonPerimeter(o.vertices), 0),
     );

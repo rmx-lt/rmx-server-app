@@ -1,53 +1,31 @@
+# Checks only: Go, client, integration tests and a Docker image build (never
+# pushed). Runs on PRs to development and on pushes to development, with no
+# path filters, so every development commit has results. Why: the four job
+# names are the required checks (ruleset `rmx: CI`); production only changes
+# through a PR from development, which reuses these results, so production
+# needs no CI run of its own. The image is pushed and deployed by deploy.yml.
+# Spec: https://github.com/rmx-lt/rmx-server-app/issues/169
 name: CI
 
 on:
   pull_request:
+    branches: [development]
   push:
-    branches: [development, production]
-    tags: ["v*"]
+    branches: [development]
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Superseded PR runs are cancelled; runs on branches and tags always finish.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push supersedes the older run, on a PR and on development alike.
+  cancel-in-progress: true
 
 jobs:
-  # Push runs only: does the push change anything outside wiki/? A push to
-  # production that only changes wiki/** neither pushes the image nor deploys.
-  changes:
-    name: Changed paths
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    outputs:
-      code: ${{ steps.diff.outputs.code }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - id: diff
-        env:
-          BEFORE: ${{ github.event.before }}
-          SHA: ${{ github.sha }}
-        run: |
-          # A new branch or tag (all-zero before), a failing diff or an empty diff
-          # (e.g. an empty commit pushed to force a redeploy) counts as code.
-          # Only a non-empty diff with every path under wiki/ is not code.
-          code=true
-          if [[ ! "$BEFORE" =~ ^0+$ ]] && files=$(git diff --name-only "$BEFORE" "$SHA") && [ -n "$files" ]; then
-            code=false
-            while IFS= read -r f; do
-              case "$f" in wiki/*) ;; *) code=true ;; esac
-            done <<< "$files"
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "code=$code"
-
   go:
     name: Go (fmt, vet, staticcheck, unit tests)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       # Installs the Go version from go.mod and caches modules and the build.
@@ -77,6 +55,7 @@ jobs:
   client:
     name: Client (eslint, tsc, bun test, build)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -99,6 +78,7 @@ jobs:
   integration:
     name: Integration tests (TimescaleDB + Mosquitto)
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       # The same compose file as local development. (GitHub "service
@@ -117,92 +97,19 @@ jobs:
         if: failure()
         run: docker compose -f compose.dev.yaml logs
 
+  # Builds the image to test the Dockerfile; never pushed (deploy.yml pushes).
+  # No needs: it runs in parallel with the tests to shorten the PR wait.
   image:
     name: Docker image
-    needs: [changes, go, client, integration]
-    # `changes` is skipped on pull requests; a skipped need would skip this job,
-    # so the needs are checked by hand (same condition as the default).
-    if: ${{ !cancelled() && needs.go.result == 'success' && needs.client.result == 'success' && needs.integration.result == 'success' }}
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - name: Log in to GHCR
-        if: github.event_name != 'pull_request' && (github.event_name != 'push' || needs.changes.outputs.code == 'true')
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/rmx-lt/rmx-server-app
-          tags: |
-            type=sha,prefix=sha-,format=short,enable=${{ github.ref == 'refs/heads/production' }}
-            type=raw,value=production,enable=${{ github.ref == 'refs/heads/production' }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=pr
-      # Pushed only from production and v* tags; pull requests and development
-      # only build it (to test the Dockerfile). A push that only changes wiki/**
-      # (needs.changes.outputs.code) is not pushed either.
       - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
-          push: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' && (github.ref == 'refs/heads/production' || startsWith(github.ref, 'refs/tags/')) }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # Deploy every push to production (a merged development -> production PR).
-  # The SSH key's authorized_keys entry on the VPS
-  # forces one deploy script (source in rmx-server-infra; it moves from the old
-  # probe stack to services/app/ in https://github.com/rmx-lt/rmx-server-infra/issues/85),
-  # so the only thing this job can send is the tag.
-  # The script pulls the image, restarts the app container, waits for /health
-  # and rolls back if it isn't healthy (then this job fails).
-  # Secrets: DEPLOY_HOST, DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS
-  # (the VPS host key line, pinned, so no trust-on-first-use).
-  deploy:
-    name: Deploy to VPS
-    if: github.event_name == 'push' && github.ref == 'refs/heads/production' && needs.changes.outputs.code == 'true'
-    needs: [changes, image]
-    runs-on: ubuntu-24.04
-    environment: production
-    # One deploy at a time, in order; never cancel one halfway.
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    steps:
-      - name: Deploy sha-<short> over SSH
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-          # Same tag as the image job's type=sha,format=short (7 characters).
-          TAG="sha-${GITHUB_SHA::7}"
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
-          # Retry only connection failures (exit 255): the VPS network
-          # sometimes drops new SSH connections. The script is idempotent.
-          for attempt in 1 2 3; do
-            rc=0
-            ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
-              -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
-              "deploy@$DEPLOY_HOST" "$TAG" || rc=$?
-            [ "$rc" -ne 255 ] && break
-            echo "SSH connection failed (attempt $attempt), retrying in 20 s"
-            sleep 20
-          done
-          rm -f ~/.ssh/deploy_key
-          exit "$rc"

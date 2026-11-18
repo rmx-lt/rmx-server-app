@@ -1,0 +1,21 @@
+# Checks the PR body rules (Wiki:, Depends on:; Wiki-Policy sections 4-5).
+# Runs on PRs to development. Why: the required status check
+# `wiki-check / check` gates every merge. Calls the shared workflow in
+# rmx-lt/blade-of-grass; the canonical copy of this file is
+# tools/drift/callers/split/ there.
+# Spec: https://github.com/rmx-lt/blade-of-grass/issues/74
+name: wiki-check
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+    branches: [development]
+
+permissions: {}
+
+jobs:
+  wiki-check:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: rmx-lt/blade-of-grass/.github/workflows/reusable-wiki-check.yml@development

@@ -20,7 +20,7 @@ const (
 	headerLen    = 64
 	chunkSize    = 4096
 	maxRetries   = 5
-	maxJobBytes  = 1 << 20
+	maxPathBytes = 1 << 20
 	maxFwBytes   = 32 << 20
 	defaultTmout = 10 * time.Second
 )

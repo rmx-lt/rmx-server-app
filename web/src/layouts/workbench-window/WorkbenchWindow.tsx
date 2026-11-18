@@ -1,39 +1,31 @@
-import ApplicationHeader from "./application-header/ApplicationHeader";
-import ToolBar from "./tool-bar/ToolBar";
-import ControlsPanel from "./controls-panel/ControlsPanel";
-import InspectorPanel from "./inspector-panel/InspectorPanel";
-import StatusBar from "./status-bar/StatusBar";
-import CanvasEditorLayout from "./canvas-editor/CanvasEditorLayout";
 import ConfirmationModal from "@/components/modals/confirmation-modal/ConfirmationModal";
 import { useWorkbenchShortcuts } from "@/layouts/workbench-window/useWorkbenchShortcuts";
-import MapPickerModal from "@/features/map-manager/components/map-picker-modal/MapPickerModal";
-import SaveAsModal from "@/features/map-manager/components/save-as-modal/SaveAsModal";
-import CopyMapModal from "@/features/map-manager/components/copy-map-modal/CopyMapModal";
-import ImportModal from "@/features/map-manager/components/import-modal/ImportModal";
-import GeoAnchorModal from "@/features/geo-anchor/components/GeoAnchorModal";
+import BottomBar from "@/layouts/bottom-bar/BottomBar";
+import CanvasArea from "./canvas/CanvasArea";
+import RightPanel from "./right-panel/RightPanel";
+import SettingsModal from "./settings/SettingsModal";
+import SidePanel from "./side-panel/SidePanel";
+import TopBar from "./top-bar/TopBar";
 
+/** The shell: side panel on the left; top bar, canvas and right panel in the middle; the bottom bar under all of them. */
 export default function WorkbenchWindow() {
   useWorkbenchShortcuts();
 
   return (
-    <div className="flex flex-col w-full h-full">
-      <ApplicationHeader />
-      <ToolBar />
-      <div className="relative flex-1 overflow-hidden">
-        <CanvasEditorLayout />
-        <div className="absolute inset-0 flex pointer-events-none z-10">
-          <ControlsPanel />
-          <div className="flex-1 select-none" />
-          <InspectorPanel />
+    <div className="flex h-full w-full flex-col overflow-hidden bg-page text-fg">
+      <div className="flex min-h-0 flex-1">
+        <SidePanel />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar />
+          <div className="flex min-h-0 flex-1">
+            <CanvasArea />
+            <RightPanel />
+          </div>
         </div>
       </div>
-      <StatusBar />
-      <MapPickerModal />
+      <BottomBar />
+      <SettingsModal />
       <ConfirmationModal />
-      <SaveAsModal />
-      <CopyMapModal />
-      <ImportModal />
-      <GeoAnchorModal />
     </div>
   );
 }

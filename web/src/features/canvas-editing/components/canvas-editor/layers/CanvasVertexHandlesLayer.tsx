@@ -1,21 +1,14 @@
-import { memo } from "react";
-import { Layer, Circle } from "react-konva";
-import { CanvasVertexIdLabel } from "@/features/canvas-editing/components/canvas-editor/shapes/CanvasVertexIdLabel";
+import { memo, useState } from "react";
+import { Layer, Circle, Rect } from "react-konva";
 import type { ActiveTool, VertexRef } from "@/features/canvas-editing/types/canvas";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import { computeEdgeMidpoints, type Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { sameVertexRef } from "@/features/canvas-editing/utils/canvasObjectUtils";
-import {
-    COLOR_VERTEX_FILL,
-    COLOR_EDGE_MIDPOINT_FILL,
-    COLOR_EDGE_MIDPOINT_STROKE,
-} from "@/config/canvas-editing/canvasConfig";
-import { deriveActiveFill } from "@/utils/colorUtils";
-import { usePolygonLayerStyle } from "@/features/canvas-editing/hooks/canvas-editor/usePolygonLayerStyle";
-import { ZONE_CATEGORY, type ZoneCategory } from "@/config/db-ops/enums";
+import { useCanvasColors } from "@/hooks/useTheme";
+import { AREA_CATEGORY, type AreaCategory } from "@/config/db-ops/enums";
 
 interface CanvasVertexHandlesLayerProps {
-    selectedObject: Zone | null;
+    selectedObject: Area | null;
     selectedObjectVertices: Array<{ x: number; y: number }>;
     activeTool: ActiveTool | null;
     scale: number;
@@ -43,38 +36,109 @@ export function CanvasVertexHandlesLayerInner({
     onEdgeMidpointMouseDown,
     onHandleHoverChange,
 }: CanvasVertexHandlesLayerProps) {
-    const category = (selectedObject?.category ?? ZONE_CATEGORY.MOWING) as ZoneCategory;
-    const { stroke: accentColor, edgeWidth, showVertexIds } = usePolygonLayerStyle(category);
+    const category = (selectedObject?.category ?? AREA_CATEGORY.MOWING) as AreaCategory;
+    const colors = useCanvasColors();
+    const [hover, setHover] = useState<{ kind: "vertex" | "mid"; index: number } | null>(null);
+    const accentColor = colors[category].stroke;
     const isLayerListening = activeTool === "select" && selectedObject !== null;
     const edgeMidpoints = selectedObject ? computeEdgeMidpoints(selectedObjectVertices) : [];
     if (!selectedObject) return <Layer />;
-    const vertexRadius = Math.max(6, edgeWidth * 1.5) / scale;
-    const vertexStrokeNormal = Math.max(2, edgeWidth * 0.4) / scale;
-    const vertexStrokeActive = Math.max(3, edgeWidth * 0.6) / scale;
-    const midpointRadius = Math.max(4, edgeWidth) / scale;
-    const midpointStroke = Math.max(1.5, edgeWidth * 0.3) / scale;
-    const activeFill = deriveActiveFill(COLOR_VERTEX_FILL);
+    // Sizes are screen pixels divided by the zoom, so they stay constant on screen.
+    const half = 2.5 / scale; // half the side of the square
+    const ringRadius = 6 / scale;
+    const ringWidth = 1.5 / scale;
+    const ringWidthSelected = 2 / scale;
+    const midRadius = 4 / scale;
+    const midWidth = 1 / scale;
+    const midNear = 14 / scale; // a cursor this close shows the midpoint ring
+    const midGrab = 8 / scale; // only a press this close drags (SolidCraft's point reach)
+    const vertexGrab = 8 / scale;
+
+    const enter = (kind: "vertex" | "mid", index: number) => () => {
+        setHover({ kind, index });
+        onHandleHoverChange(true);
+    };
+    const leave = () => {
+        setHover(null);
+        onHandleHoverChange(false);
+    };
 
     return (
         <Layer listening={isLayerListening}>
-            {selectedObjectVertices.map((v, i) => {
-                const ref: VertexRef = { objectId: selectedObject.id, index: i };
+            {/* Midpoints first, so a vertex stays on top where they overlap. */}
+            {selectedObjectVertices.map((_, i) => {
                 const mid = edgeMidpoints[i];
                 if (!mid) return null;
-
-                const isActiveVertex =
-                    selectedVertexRefs.some((sv) => sameVertexRef(sv, ref)) ||
-                    (draggingVertexRef !== null && sameVertexRef(draggingVertexRef, ref));
-
+                const near = hover?.kind === "mid" && hover.index === i;
                 return [
                     <Circle
+                        key={`edge-midpoint-hit-${i}`}
+                        x={mid.x}
+                        y={mid.y}
+                        radius={midNear}
+                        fill="transparent"
+                        onMouseDown={(e) => {
+                            if (e.evt.button !== 0) return;
+                            const ptr = e.target.getStage()?.getRelativePointerPosition();
+                            if (!ptr || Math.hypot(ptr.x - mid.x, ptr.y - mid.y) > midGrab) return;
+                            e.cancelBubble = true;
+                            // The insert shifts the edge indexes: without this the next edge's ring flashes.
+                            setHover(null);
+                            onEdgeMidpointMouseDown(selectedObject.id, i, mid);
+                        }}
+                        onMouseEnter={enter("mid", i)}
+                        onMouseLeave={leave}
+                    />,
+                    near && (
+                        <Circle
+                            key={`edge-midpoint-ring-${i}`}
+                            x={mid.x}
+                            y={mid.y}
+                            radius={midRadius}
+                            stroke={accentColor}
+                            strokeWidth={midWidth}
+                            listening={false}
+                        />
+                    ),
+                ];
+            })}
+            {selectedObjectVertices.map((v, i) => {
+                const ref: VertexRef = { objectId: selectedObject.id, index: i };
+                const isSelected =
+                    selectedVertexRefs.some((sv) => sameVertexRef(sv, ref)) ||
+                    (draggingVertexRef !== null && sameVertexRef(draggingVertexRef, ref));
+                const isHovered = hover?.kind === "vertex" && hover.index === i;
+                // The ring has the area colour; selected differs from hover by its width.
+                const ring = isHovered || isSelected ? accentColor : null;
+                return [
+                    ring && (
+                        <Circle
+                            key={`vertex-ring-${i}`}
+                            x={v.x}
+                            y={v.y}
+                            radius={ringRadius}
+                            stroke={ring}
+                            strokeWidth={isSelected ? ringWidthSelected : ringWidth}
+                            listening={false}
+                        />
+                    ),
+                    <Rect
                         key={`vertex-handle-${i}`}
                         x={v.x}
                         y={v.y}
-                        radius={vertexRadius}
-                        fill={isActiveVertex ? activeFill : COLOR_VERTEX_FILL}
+                        offsetX={half}
+                        offsetY={half}
+                        width={half * 2}
+                        height={half * 2}
+                        fill={accentColor}
                         stroke={accentColor}
-                        strokeWidth={isActiveVertex ? vertexStrokeActive : vertexStrokeNormal}
+                        strokeWidth={1 / scale}
+                        // Grab area: a circle around the vertex (local origin is the square's corner).
+                        hitFunc={(ctx, shape) => {
+                            ctx.beginPath();
+                            ctx.arc(half, half, vertexGrab, 0, Math.PI * 2);
+                            ctx.fillStrokeShape(shape);
+                        }}
                         draggable
                         onClick={(e) => {
                             e.cancelBubble = true;
@@ -83,34 +147,8 @@ export function CanvasVertexHandlesLayerInner({
                         onDragStart={() => onVertexDragStart(ref)}
                         onDragMove={(e) => onVertexDragMove(ref, { x: e.target.x(), y: e.target.y() })}
                         onDragEnd={(e) => onVertexDragEnd(ref, { x: e.target.x(), y: e.target.y() })}
-                        onMouseEnter={() => onHandleHoverChange(true)}
-                        onMouseLeave={() => onHandleHoverChange(false)}
-                    />,
-                    showVertexIds && (
-                        <CanvasVertexIdLabel
-                            key={`vertex-id-label-${i}`}
-                            index={i}
-                            x={v.x}
-                            y={v.y}
-                            scale={scale}
-                            edgeWidth={edgeWidth}
-                            accentColor={accentColor}
-                        />
-                    ),
-                    <Circle
-                        key={`edge-midpoint-handle-${i}`}
-                        x={mid.x}
-                        y={mid.y}
-                        radius={midpointRadius}
-                        fill={COLOR_EDGE_MIDPOINT_FILL}
-                        stroke={COLOR_EDGE_MIDPOINT_STROKE}
-                        strokeWidth={midpointStroke}
-                        onMouseDown={(e) => {
-                            e.cancelBubble = true;
-                            onEdgeMidpointMouseDown(selectedObject.id, i, mid);
-                        }}
-                        onMouseEnter={() => onHandleHoverChange(true)}
-                        onMouseLeave={() => onHandleHoverChange(false)}
+                        onMouseEnter={enter("vertex", i)}
+                        onMouseLeave={leave}
                     />,
                 ];
             })}

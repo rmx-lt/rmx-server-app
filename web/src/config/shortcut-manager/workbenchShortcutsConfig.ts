@@ -7,17 +7,9 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "Ctrl+Alt+N",
         shortcut: ["Ctrl", "Alt", "N"],
     } satisfies ShortcutBindingConfig,
-    "map.save-as": {
-        keys: "Ctrl+Shift+S",
-        shortcut: ["Ctrl", "Shift", "S"],
-    } satisfies ShortcutBindingConfig,
-    "map.open": {
-        keys: "Ctrl+O",
-        shortcut: ["Ctrl", "O"],
-    } satisfies ShortcutBindingConfig,
-    "map.save": {
-        keys: "Ctrl+S",
-        shortcut: ["Ctrl", "S"],
+    "home.back": {
+        keys: "Escape",
+        shortcut: ["Esc"],
     } satisfies ShortcutBindingConfig,
     "controls.toggle": {
         keys: "Ctrl+Alt+C",
@@ -41,11 +33,11 @@ export const WORKBENCH_SHORTCUTS = {
         keys: "S",
         shortcut: ["S"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-mowing-zone": {
+    "canvas.tool-add-mowing-area": {
         keys: "Z",
         shortcut: ["Z"],
     } satisfies ShortcutBindingConfig,
-    "canvas.tool-add-no-go-zone": {
+    "canvas.tool-add-no-go-area": {
         keys: "O",
         shortcut: ["O"],
     } satisfies ShortcutBindingConfig,

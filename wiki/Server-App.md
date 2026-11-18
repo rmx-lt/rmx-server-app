@@ -2,7 +2,7 @@
 
 The backend and web app of **Blade of Grass**, an open-source robotic lawn mower
 (Go backend, React frontend). Today it serves login and sessions, a WebSocket
-for the browser, firmware images and job files to the mower's boards over MQTT
+for the browser, firmware images and path files to the mower's boards over MQTT
 (see [Firmware over MQTT](#firmware-over-mqtt)), what the mower reports (state,
 metric catalogues, telemetry, events; see [Mower ingest](#mower-ingest)), the
 commands, live driving and monitor streams it sends the mower (see
@@ -58,7 +58,7 @@ over HTTPS and its WebSocket, with their session.
 - **MQTT** (devices): the server keeps a retained `online`/`offline` on
   `mower/status/server`, is the only publisher of commands and live-driving
   setpoints (see [Mower commands](#mower-commands)), serves firmware images and
-  job files as binary chunks (see [Firmware over MQTT](#firmware-over-mqtt)),
+  path files as binary chunks (see [Firmware over MQTT](#firmware-over-mqtt)),
   and stores what the gateway and the autopilot publish under
   `mower/<name>/gateway/…` and `mower/<name>/autopilot/…` (see [Mower ingest](#mower-ingest)).
 - **Login**: the app's own login page and server-side sessions in a cookie
@@ -76,7 +76,7 @@ stays, so nothing runs twice.
 |---|---|---|
 | `users` | plain table | `id`, `username` (lower case, unique), `password_hash` (Argon2id PHC string), `created_at`, `password_changed_at` |
 | `sessions` | plain table | `id_hash` (SHA-256 of the cookie token), `user_id` (→ users, cascade), `created_at`, `last_seen_at`, `expires_at`, `user_agent` |
-| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, points, layer settings and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
+| `maps` | plain table | `id`, `user_id` (→ users, cascade), `name` (1–100 characters), `revision` (starts at 1, +1 per save), `doc` (JSONB: the map's zones, with their areas, and geo anchor, see [Planning API](#planning-api)), `created_at`, `updated_at` |
 | `user_settings` | plain table | `user_id` (→ users, cascade), `key`, `value` (JSONB), `updated_at`; primary key `user_id` + `key` |
 | `devices` | plain table | `name` (primary key; the device name from the topics), `first_seen_at`, `last_seen_at`, `gateway_status` (`online` / `offline` / null), `gateway_status_at` |
 | `board_state` | plain table | `device` (→ devices, cascade), `board` (`gateway` / `autopilot`), `boot` and `boot_seen_at` (last boot counter seen in any message of the board), `state` (JSONB: the last state message as published) and `state_received_at`; primary key `device` + `board` |
@@ -86,6 +86,7 @@ stays, so nothing runs twice.
 | `metric_latest` | plain table | the newest value per `device` + `board` + `metric`: `time`, `boot`, `value` (null: not known) |
 | `commands` | plain table | the commands the server sent: `id` (primary key), `device`, `board`, `cmd`, `params` (JSONB, **never a secret**), `state` (`sent`, `accepted`, `done`, `failed`, `unknown`), `error`, `message`, `result` (JSONB), `attempts` (1 to 4), `requested_by`, `created_at`, `updated_at`, `finished_at`. The monitor keep-alives are not stored |
 | `ntrip_sent` | plain table | per `device`: a keyed fingerprint of the caster settings its gateway acknowledged (not the password, and it cannot be turned back into it), `sent_at` |
+| `paths` | plain table | the path files the mower downloads: `id` (primary key; the path id of [Mower-Protocol](Mower-Protocol) §11), `doc` (bytea, the file's bytes exactly as the mower gets them, at most 1 MiB), `size` and `sha256` (both generated from `doc`, so they cannot disagree with it), `created_at` |
 | `telemetry` | hypertable | `time`, `device`, `board`, `metric`, `boot`, `value` (double): one row per known value; daily chunks, compressed after a day, no retention policy yet |
 
 The first migrations still create the old `records` and `record_events`
@@ -140,7 +141,7 @@ The contract between the mower and the server is wiki [Mower-Protocol](Mower-Pro
 commands, chunk transfer. The server implements the state, catalogue, telemetry
 and event topics of it (see [Mower ingest](#mower-ingest)), the commands, live
 driving and monitor (see [Mower commands](#mower-commands)) and chunk transfer
-(see [Firmware over MQTT](#firmware-over-mqtt)); job planning, border recording
+(see [Firmware over MQTT](#firmware-over-mqtt)); path planning, border recording
 and the autopilot's side of them follow
 ([blade-of-grass#6](https://github.com/rmx-lt/blade-of-grass/issues/6)).
 
@@ -154,7 +155,7 @@ MQTT topics (`<prefix>` is `mower`; the full table is wiki
 | `<prefix>/<name>/<board>/cmd/ack` | device → server | the ack of a command |
 | `<prefix>/<name>/autopilot/drive` | server → device | a live-driving setpoint, QoS 0 |
 | `<prefix>/<name>/<board>/monitor` | device → server | monitor samples, QoS 0 |
-| `<prefix>/<name>/gateway/fw/…`, `autopilot/fw/…`, `autopilot/job/…` | both | chunk transfer: `req` (device → server), `chunk` and `res` (server → device) |
+| `<prefix>/<name>/gateway/fw/…`, `autopilot/fw/…`, `autopilot/path/…` | both | chunk transfer: `req` (device → server), `chunk` and `res` (server → device) |
 | `<prefix>/<name>/gateway/#`, `<prefix>/<name>/autopilot/#` | device → server | subscribed as a whole; the topics handled are in [Mower ingest](#mower-ingest) |
 
 The byte layout of a chunk, and the request, are in
@@ -167,30 +168,36 @@ The server answers only on the topics of the name it got the request on.
 
 ## Firmware over MQTT
 
-A board downloads a firmware image or a job file as binary chunks on the same
+A board downloads a firmware image or a path file as binary chunks on the same
 MQTT connection it already uses: **chunk transfer**, wiki
 [Mower-Protocol](Mower-Protocol) §12 (the contract; this section says how the
 server does it). The files stay signed or checked by the board; the transport
 adds the SHA-256 of the whole file to every chunk, so a download can start or
 continue at any chunk. Code: `internal/transfer/`.
 
-Three topic sets, each with its own directory, so a request on one set can only
+Three topic sets, each with its own source, so a request on one set can only
 reach that set's files:
 
-| Topics (below `<prefix>/<name>/`) | Who asks | Files | Directory |
+| Topics (below `<prefix>/<name>/`) | Who asks | Files | Source |
 |---|---|---|---|
-| `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | `$FIRMWARE_DIR/gateway/` |
-| `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | `$FIRMWARE_DIR/autopilot/` |
-| `autopilot/job/req`, `chunk`, `res` | autopilot | `<job>.json` | `$JOB_DIR/` |
+| `gateway/fw/req`, `chunk`, `res` | gateway | `<version>.bin` | directory `$FIRMWARE_DIR/gateway/` |
+| `autopilot/fw/req`, `chunk`, `res` | autopilot | `<version>.bin` | directory `$FIRMWARE_DIR/autopilot/` |
+| `autopilot/path/req`, `chunk`, `res` | autopilot | `<path>.json` | table `paths`, row `id = <path>` |
 
-A set whose directory is not there serves no files: every request gets
+A firmware set whose directory is not there serves no files: every request gets
 `not_found`. Names are looked up inside the directory only (`os.Root`), so a name
-cannot escape it. A firmware image is at most 32 MiB, a job file 1 MiB. The
-SHA-256 is cached in memory and recomputed when the file's size or modification
-time changes.
+cannot escape it. A firmware image is at most 32 MiB. The SHA-256 is cached in
+memory and recomputed when the file's size or modification time changes. A path
+file is the `doc` of its row (at most 1 MiB) and its hash is the row's `sha256`;
+a name that is not `<id>.json` of a stored path gets `not_found`.
+
+A path gets into the table through `transfer.StorePath(ctx, q, id, doc)`, an
+internal function (no HTTP route): the tests and, until jobs exist, nothing else
+call it. It keeps the bytes as given, so the `size` and `sha256` of a
+`path_start` command are the row's.
 
 **One request open per topic set.** A board has one request open per set, and the
-server answers requests on different sets side by side: a job file and a firmware
+server answers requests on different sets side by side: a path file and a firmware
 image download at the same time. A second request on the same set that arrives
 before the answer to the first is published is ignored (the board asks again
 after its 10 s). QoS is 1. Chunks and errors are not retained. A topic that does
@@ -268,7 +275,7 @@ An error is JSON on `<set>/res` (never on `chunk`):
 | `code` | When |
 |---|---|
 | `bad_request` | The JSON is not a request, the file name is not allowed, or the chunk number is past the end |
-| `not_found` | No such regular file in that set |
+| `not_found` | No such regular file in that set, or no such path in the table |
 | `internal` | The server could not read the file, or it is too large |
 
 `request_id` is empty when the id itself was missing or not valid. Branch on
@@ -278,9 +285,8 @@ An error is JSON on `<set>/res` (never on `chunk`):
 
 `FIRMWARE_DIR` is the directory of firmware images (read-only) with the
 subdirectories `gateway/` and `autopilot/`; a missing subdirectory leaves that
-set empty (logged at start). `JOB_DIR` is the directory of job files
-(`<job>.json`, read-only for this domain: job planning writes them). Unset, the
-set is not served. There is no chunk-size setting any more.
+set empty (logged at start). Unset, the firmware sets are not served. Paths have
+no setting: they are in the database. There is no chunk-size setting.
 
 **esp-mqtt buffer.** The gateway is an ESP32. esp-mqtt's receive buffer
 (`esp_mqtt_client_config_t.buffer.size`) defaults to
@@ -296,18 +302,20 @@ default: the board's request is a small JSON publish.
 
 ### Mount on the VPS
 
-The app container does not have these directories until `rmx-server-infra`
-mounts them. That change is not in this repo. In `services/app/compose.yaml`, on
+The app container does not have the firmware directory until `rmx-server-infra`
+mounts it. That change is not in this repo. In `services/app/compose.yaml`, on
 `app`:
 
 ```yaml
 environment:
   FIRMWARE_DIR: /firmware
-  JOB_DIR: /jobs
 volumes:
   - <host directory of the images>:/firmware:ro
-  - <host directory of the job files>:/jobs:ro
 ```
+
+Paths need no mount: they are in the database
+([rmx-server-infra#109](https://github.com/rmx-lt/rmx-server-infra/issues/109)
+removes the old path directory from the stack).
 
 The images move into `gateway/` and `autopilot/` below the host directory: the
 single flat directory the server served before this layout is not read any more.
@@ -364,6 +372,9 @@ stored one means the board restarted: the server records it (`boot_seen_at`)
 and pushes a `device_changed` with change `boot`. A lower one is ignored for
 this purpose, because the counter only grows and a lower value is a message
 held up from before the restart. Every stored value carries its `boot`.
+The `speed_limit` field of the autopilot's state (§7.1: `max`, `transit`,
+`edge`, `fill`, `manual`, in m/s) is stored and shown like the rest of it; the
+server reads nothing from it.
 
 `autopilot_stale` is true while the gateway's status is not `online` or the
 gateway's state says `autopilot_link` is not `up` (§7.1), and also while the
@@ -464,9 +475,9 @@ streams and the correction caster's settings. The contract is wiki
 [Mower-Protocol](Mower-Protocol) §5, §6.4, §8, §9, §13 and §15; this section
 says what the server does with it. Code: `internal/mower/` (`command.go`, `drive.go`,
 `monitor.go`, `ntrip.go`, the SQL in `store.go`), wire types in
-`internal/api/command.go`. The server is the only publisher of commands. Job
+`internal/api/command.go`. The server is the only publisher of commands. Path
 planning and border recording logic are not here yet: the server sends
-`job_start`, `record_start` and `record_stop` when a user asks, and does nothing
+`path_start`, `record_start` and `record_stop` when a user asks, and does nothing
 else with them.
 
 ### The command sender
@@ -522,8 +533,12 @@ All routes need a session (and an allowed `Origin` for the POST).
 Commands a user may send: gateway `ping`, `restart`, `ota` (`version`, optional
 `file`, `size`), `autopilot_reset`; autopilot `stop`, `manual_start`,
 `manual_stop`, `blade` (`on`), `follow` (`points` 1 to 100 of `[lat, lon]`,
-optional `reverse`, `blade`, `speed`), `record_start` (`session`, optional
-`spacing`), `record_stop`, `job_start` (`job`, `size`, `sha256`, optional
+optional `reverse`, optional `type`: `transit` (the default), `edge` or `fill`),
+`speed_limit` (`limits`: one or more of `max`, `transit`, `edge`, `fill`,
+`manual`, each a number of 0 or above in m/s, 0 meaning no limit, or `null` for
+the firmware's default; any other name or value is a `400`, and the server sets
+no upper bound), `record_start` (`session`, optional
+`spacing`), `record_stop`, `path_start` (`path`, `size`, `sha256`, optional
 `from_point`), `pause`, `resume`, `clear_fault`, `ota`, `restart`.
 
 WebSocket requests (`op`):
@@ -704,8 +719,10 @@ user. Code: `internal/planning/`, wire types in `internal/api/planning.go`
 (generated to `web/src/data/api/generated/`). All routes need a session;
 another user's map answers 404, as if it did not exist.
 
-**Names.** A **map** is one garden or site, drawn on the canvas. Its
-polygons are **zones**, each with a category:
+**Names.** A **map** is one garden or site, drawn on the canvas. It has
+**zones**: named parts of the map, such as "Front lawn", that own their drawn
+shapes and, later, their settings (cut height and others). A zone's polygons
+are its **areas**, each with a category:
 
 | Category | Meaning |
 |---|---|
@@ -715,13 +732,13 @@ polygons are **zones**, each with a category:
 
 These follow other robot mower apps (Husqvarna: work area, stay-out zone,
 transport path; Mammotion: task area, no-go zone, channel; OpenMowerNext:
-operation, exclusion and navigation areas). In those apps a drawn no-go zone
+operation, exclusion and navigation areas). In those apps a drawn no-go area
 is how a fixed obstacle is mapped; "obstacle" means what the mower's sensors
 find while driving.
 
 | Route | Body → answer |
 |---|---|
-| `GET /api/maps` | → `MapList`: id, name, revision, zone counts per category, `updated_at`; newest change first |
+| `GET /api/maps` | → `MapList`: id, name, revision, area counts per category (over all zones), `updated_at`; newest change first |
 | `POST /api/maps` | `MapCreate` {name, doc} → 201 `MapDetail` at revision 1 |
 | `GET /api/maps/{id}` | → `MapDetail` {id, name, revision, updated_at, doc} |
 | `PUT /api/maps/{id}` | `MapUpdate` {name, revision, doc} → `MapDetail` at revision + 1; 409 `conflict` when `revision` is not the stored one |
@@ -734,19 +751,32 @@ The type is `MapDetail`, not `Map`, so the generated TypeScript doesn't
 shadow JavaScript's `Map`.
 
 **One document per map.** The client loads and saves a map as a whole, so
-its content is one JSON document (`MapDoc`): format, type, coordinate
-system, headland, `zones` (id, category, type, vertices), `points` (at most
-one each of `start`, `end`, `start_end`), `layer_settings` (layer id,
-setting id, value) and `geo_anchor` (WGS-84 of the canvas origin, or null).
-Missing lists come back as empty arrays.
+its content is one JSON document (`MapDoc`): `zones` and `geo_anchor`
+(WGS-84 of the canvas origin, or null). A zone is `{ id, name, areas }`; an
+area is `{ id, category, vertices }`. A missing list comes back as an empty
+array. The server refuses a document (400) without a zone, with a zone name
+that is empty or longer than 100 characters after removing surrounding spaces,
+with two zones of one id, with two areas of one id (area ids are unique in the
+whole map, not per zone), with an area category other than the three above,
+and over the limits below. Members a document stored by an earlier version
+still has (format, type, coordinate system, headland, area `type`, `points`,
+`layer_settings`) are ignored on read and dropped by the next save.
+
+**Maps from before zones.** The first version of the document had `zones` as
+the polygons themselves. Development data, so there is no conversion: the
+migration `20261118000000_map_zones.sql` deletes every map whose first zone has
+no `areas`. A map in the old format that still gets in (a restored backup) is
+listed with zero counts, and the web app refuses to open it with a message on
+Home; it can be deleted from its menu.
 
 **Revisions instead of last-write-wins.** Every save names the revision it
 started from. If another browser saved in between, the save is refused with
-409 and the client has to reload; nothing is overwritten silently.
+409. The web app then saves over the stored revision (see
+[Web app](#web-app), "Saving"); another client may instead reload.
 
 **Limits** (400 when exceeded): a name of 1 to 100 characters (surrounding
-spaces removed), a body of at most 4 MiB, 5000 zones, 100 000 vertices,
-1000 layer settings of at most 4096 characters each, a geo anchor inside
+spaces removed), a body of at most 4 MiB, 5000 areas, 100 000 vertices,
+a geo anchor inside
 ±90/±180. Setting keys match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, values are
 at most 16 KiB of JSON, at most 100 settings per user.
 
@@ -754,10 +784,9 @@ at most 16 KiB of JSON, at most 100 settings per user.
 
 The web app in `web/` is the blade-terminal workbench, ported from
 [jRmx0/blade-terminal](https://github.com/jRmx0/blade-terminal) at commit
-`65d23b7` (rmx-server-app#51): draw a map (mowing zones, no-go zones, start and
-end points) on a canvas, inspect it, and save it. It opens on the login form
-when there is no session; after login the workbench loads, with the user menu
-(log out, log out everywhere) at the right of its header. While logged in the
+`65d23b7` (rmx-server-app#51): draw a map (mowing areas and no-go areas) on a canvas, inspect it, and save it. It opens on the login form
+when there is no session; after login the shell loads (see "The shell" below).
+While logged in the
 app keeps the WebSocket open; when it closes, the app asks `/api/auth/me`
 whether the session still exists and shows the login form if not.
 
@@ -766,34 +795,209 @@ whether the session still exists and shows the login form if not.
   `web/src/data/planning/` (the API client is `web/src/data/api/planning.ts`).
   The browser keeps no planning data; the IndexedDB database `blade-terminal`
   of earlier versions is deleted at login, without import. The UI and the code
-  use the server's names: map, mowing zone, no-go zone, and the zone
-  categories `mowing` and `no_go` as they are, with no translation
+  use the server's names: map, zone, area, mowing area, no-go area, and the
+  area categories `mowing` and `no_go` as they are, with no translation
   ([rmx-server-app#82](https://github.com/rmx-lt/rmx-server-app/issues/82)).
-  The web app can't draw navigation zones yet
+  The web app can't draw navigation areas yet
   ([rmx-server-app#81](https://github.com/rmx-lt/rmx-server-app/issues/81)), so
-  `src/data/planning/maps.ts` keeps a map's navigation zones out of the canvas
-  and writes them back unchanged on every save (renumbered if a drawn zone took
-  their id).
-- **XML files.** File → Export writes the open map as XML, File → Import reads
-  one into a new map. The root `<map>` holds `<info>` (name, format, type,
-  coordinate system, headland), `<zones>` (one `<zone>` each, categories
-  `mowing` and `no_go`), `<points>` and `<geoAnchor>`. Files of earlier
-  versions (root `<workspace>`, categories `zone` and `obstacle`) are not
-  read: the import says which element or value it expected.
-- **Saving.** A save sends the whole map. The status bar shows the save state;
-  File → Save (Ctrl+S) or a click on "Unsaved changes" saves. A page load
-  starts a new blank map, which gets its id from the server on its first save;
-  saved ones open with File → Open (Ctrl+O), which can also reopen the open map
-  to get the server's version. With File → Autosave on, the map is saved one
-  second after the last change. When the map was saved elsewhere in between,
-  the save is refused (409) and a message says to use Save As or reopen it;
-  nothing is overwritten. The browser warns before leaving while a change is
-  not on the server yet.
+  `src/data/planning/maps.ts` keeps a map's navigation areas, and the areas of
+  zones it does not show, out of the canvas and writes them back unchanged on
+  every save (renumbered if a drawn area took their id). The open map's zones
+  and the active zone (the zone the canvas shows and drawing adds to; for now
+  the first, and a map has one) are in `model/mapStore.ts`; the canvas holds the
+  active zone's areas. A new map is created with one zone, "Zone 1".
+- **Saving.** Everything is saved by itself; there is no save status, Save
+  button, autosave switch or leave-page warning. A new map (New map on
+  Home, Ctrl+Alt+N) is created on the server at once. After login the app
+  opens the map opened last in this browser (its id is kept in `localStorage`,
+  key `rmx:last-map`), or shows Home when there is none, it no longer exists or
+  it can't be opened (the message is on Home, and the key is forgotten);
+  nothing is created by itself. Duplicate in a map's menu on Home makes a copy
+  ("name (copy)") and makes it the open map, and Home stays. A change is saved
+  one second after the last one (a burst is one save): the whole map with the
+  `revision` it was loaded or saved at (`web/src/data/planning/autosave.ts`,
+  wired up in `features/canvas-editing/data/canvasBridge.ts`). A failed save is
+  retried after 1 s, then 2, 4, 8 and at most every 15 s, and at once when the
+  WebSocket opens again, so changes made while the server is down are sent when
+  it is back. Before another map is opened or made, a waiting save is run first;
+  if it fails the switch is refused. When the map was saved elsewhere in
+  between (409 `conflict`), the client reads the stored revision and saves its
+  own document over it: the user's change is never dropped, the other window's
+  change to the same map is. The only state shown is the connection: "Server: live"
+  while the WebSocket is open, "Server: offline" otherwise (bottom bar).
 - **Settings.** UI preferences (unit of measure, floating panels) and the
   default geo anchor of new maps (`geoAnchor.default`) are per-user settings,
-  read once per login. The layers and the setup of their settings are
-  constants in `web/src/data/planning/layerRegistry.ts`; each map stores only
-  its layer setting values.
+  read once per login.
+- **Layers.** Users can't change styles. The widths of the area layers are
+  constants (`LAYER_STYLE` in
+  `web/src/config/canvas-editing/canvasConfig.ts`), the colours come from the
+  theme (see "Name, logo and theme"), and the code decides what is
+  visible: the map background when the map has a geo anchor, and the grid on the
+  Grid map type (or when the map has no anchor, so the canvas is never bare).
+  The background has three types: Satellite (ArcGIS World Imagery), Map (ArcGIS
+  World Street Map), both from `server.arcgisonline.com`, no key, attribution
+  shown in a strip over the full width of the canvas bottom, with the canvas controls above it (also on Grid; the controls sit 24px from the bottom and the side edges of the canvas, just above the strip) (the OpenStreetMap tile servers are not used: their usage
+  policy rules out bulk loading), and Grid (no tiles, no request, only the
+  grid). The Layers button in the bottom left corner of the canvas is captioned "Layers" and, while its card (below) is open, shows the name of the type
+  it switches to, changing back as the card closes; it does not move on hover or press (a click toggles Satellite and Grid; from Map it goes to
+  Satellite). Hovering or focusing it opens a separate card of tiles to its right (the three
+  types and More; names under the pictures, the current type marked; the card is as high as the button; the Satellite and Map pictures are one bundled sample tile each, in `web/src/assets`); the card stays open for 2 seconds after the cursor leaves. More
+  opens a "Map details" panel that takes the place of the button and the card, with a "Map type" section; it
+  closes only with its X or Escape and then the button returns. Map details marks the current type too. The choice is the per-user setting `map.layer`
+  (`satellite`, `street` or `empty`; any other value reads as satellite). Tiles load smoothly:
+  a tile that has not arrived yet is drawn from the cached tiles of the zoom
+  levels around it (scaled), the image cache holds at most 600 tiles, and loads
+  nobody needs any more (a fast zoom or pan) are cancelled. A new map gets the
+  user's default anchor (none when unset: no background). The anchor of the open
+  map is set in the Settings modal, Map defaults: "Use my location" (the
+  message names the real reason when the browser refuses: permission blocked,
+  position unavailable, timeout, or a page that is not https), "Use my default"
+  or typed coordinates. Moving
+  the anchor keeps the zones at their canvas coordinates: they move with it over
+  the earth.
+  The grid has two levels (a stronger line every 5 minor cells; the cell size
+  follows the zoom through `pickGridLevel`, from 0.04 to 40 000 map
+  units) and fades out towards the edges. The zoom goes up to 200 (a 20 cm
+  line is 40 px wide when the map unit is metres); the wheel (Alt + wheel),
+  the buttons and the shortcuts animate to their target, anchored on the cursor
+  (the canvas centre for buttons and shortcuts), and a new step retargets it.
+  Fit and Home animate the same way (position and scale), and a wheel step or a
+  new action retargets them. Pan and zoom never run together: a pan drag
+  (`panning` in `canvasViewStore`) stops a running animation, and wheel, buttons,
+  shortcuts, Fit and Home do nothing until it ends. In select mode an area brightens its fill on hover
+  and more when selected; the vertices of the selected area are small squares
+  filled in the area colour (a thin ring in that colour on hover, a thicker one when selected),
+  and an edge midpoint is a plain ring that shows only when the cursor is near.
+  Handle sizes are screen pixels, constant at every zoom, and follow SolidCraft's sketch editor:
+  a 5 px square, a radius-6 vertex ring, a radius-4 midpoint ring. A press within 8 px grabs a
+  vertex or a midpoint (the midpoint ring shows from 14 px), and a vertex pulled from a midpoint
+  keeps its offset from the cursor instead of jumping to it.
+  The bottom bar of the workbench shows a scale bar as long as one grid cell,
+  labelled in the map's unit, on every map type.
+  The map has no format, type, coordinate system, headland, route points or
+  zone type, and there is no map generator, vertex modifier or XML import and
+  export. The mower owns its dimensions, so the headland comes back when it
+  reports them
+  ([rmx-server-app#100](https://github.com/rmx-lt/rmx-server-app/issues/100));
+  `web/src/features/canvas-editing/utils/headlandGeometry.ts` is kept for that,
+  unused for now.
+- **Name, logo and theme.** The client is called **RMX** (page title, header,
+  login form); the repository, Go module and wiki keep their names. The logo is
+  the RMX mark (`web/src/assets/rmx-logo.png`, shown with rounded corners like
+  the organization avatar; `rmx-favicon.png` is the rounded favicon). Colours
+  are named tokens defined once in `web/src/styles/index.css` with Tailwind's
+  `@theme` (utilities `bg-surface`, `text-fg`, `border-line`, `bg-accent` and so
+  on; the light set is the `@theme` block, the dark set overrides it under
+  `data-theme="dark"`). Components use the token names, never fixed greys or
+  hex values. Tokens: `page` (app background, canvas), `surface` (panels, bars,
+  menus, modals), `raised`, `hover`, `pressed`, `line`, `line-strong`, `fg`,
+  `muted`, `faint` (placeholders and disabled only; below 4.5:1), `accent`,
+  `accent-hover`, `on-accent`, `danger`, `danger-soft`, `ok`, `warn`, `overlay`,
+  and `canvas-*` (grid, mowing and no-go stroke and fill, handles). Konva needs
+  concrete colours, so the canvas layers read the `canvas-*` variables through
+  `useCanvasColors` (`web/src/hooks/useTheme.ts`) and redraw when the theme
+  changes, with no reload. The default follows the system
+  (`prefers-color-scheme`); the user's choice (system, dark, light) is kept in
+  the browser (`localStorage` key `rmx:theme`, no server involved), and a small
+  script in `public/index.html` applies it before first paint, so there is no
+  flash. The choice is made in the settings modal, page
+  Appearance.
+- **The shell.** The structure of the Claude desktop app, with the canvas in
+  place of the chat. The app shows one of two pages, held by one store value
+  (`model/pageStore.ts`, `home` or `workbench`; there is no router), each with
+  a side panel on the left and the bottom bar under everything:
+  - **Bottom bar** (`layouts/bottom-bar/`): a thin bar across the full width,
+    on both pages. It holds the server status, "Server: live" or "Server:
+    offline" (tooltip: "Connected to the server" / "No connection to the server"), and nothing else. There is no "reconnecting": the socket's retry
+    cycle would only make it flicker.
+  - **Home** (`layouts/home-window/`, modelled on SolidCraft's start page).
+    Side panel: logo and name, "Back to *map name*" with its key hint (Esc;
+    only when a map is open), New map (Ctrl+Alt+N), and at the bottom the
+    account menu and the settings button. Work area: a New map card (map icon with
+    a plus, accent border) and the
+    list of maps, newest change first, with the time of the last change; the
+    open map is highlighted, and stronger when hovered. A click opens a map in the
+    workbench; its menu has Rename (in place), Duplicate and Delete (a
+    confirmation first). Deleting the open map leaves no map open and the user
+    on Home. The actions are those in `features/map-manager/data/mapBridge.ts`,
+    the same code as before the move.
+  - **Workbench** (`layouts/workbench-window/`):
+    - **Side panel** (left, collapsible; Ctrl+Alt+C): no logo or name; it
+      starts with the close button at the left, in the place of the top bar's
+      open button, so the toggle does not move. A Home button, the mode switch, then the **Zones** list of the open map (in
+      every mode): the active zone is marked, a zone is renamed from its menu
+      (Rename) or by double click, in place, and the change is saved by the
+      autosave. There is no add, delete or reorder of zones yet. Then a device spot (placeholder until
+      [rmx-server-app#93](https://github.com/rmx-lt/rmx-server-app/issues/93)),
+      and at the bottom the account menu and the settings button. It has no map
+      list and no New map. **Both panels are resizable** (from 768 px, from
+      1024 px for the right one): drag the inner edge between 224 and 480 px; the
+      width is kept in `localStorage` (`rmx:panel-widths`). At the minimum width,
+      dragging on past half of it closes the panel, and in the same drag,
+      coming back past that point opens it again. The strip is a 2 px accent line on
+      the panel edge, shown on hover and during the whole drag (the cursor stays
+      the resize cursor until release, also after the panel closed). Opening,
+      closing or resizing a panel only changes the size of the canvas view; the
+      canvas keeps what is on screen where it is (the view is shifted back when
+      the left edge moves, in the same frame: `useCanvasSize` commits React and
+      draws the stage synchronously in its `ResizeObserver` callback). The toggle buttons use one icon per panel
+      (`PanelLeft`, `PanelRight`) whether it is open or closed.
+    - **Top bar:** over the canvas and the right panel, up to the right edge,
+      with a line under it. The open map's name is at the left (click to
+      rename); its edit box is as wide as the name, between one letter and a
+      maximum width (a hidden copy of the text sets it, because CSS
+      `field-sizing` is missing in Firefox), and a long name is cut with an
+      ellipsis when not edited. The right panel toggle is at the right.
+    - **Canvas** in the middle, with the tool strip floating at the bottom
+      middle (a rounded strip) and the view controls (zoom in, zoom out, fit
+      all areas, home) at the bottom right in every mode.
+    - **Right panel** (collapsible; Ctrl+Alt+I) with the tabs Details (under
+      the active zone's name: its area counts, area to mow and perimeter; for a
+      selected area its category and gross and net area; no vertex data) and Monitor (a
+      placeholder).
+  - **Modals** (`components/ui/Modal.tsx`) fade the backdrop and scale and fade
+    the panel in step (150 ms), on open and on close.
+  - **Settings modal**: a page list on the left, on both pages. Account (user
+    name, log out, log out everywhere), Appearance (theme, unit of measure) and
+    Map defaults (the default geo anchor of new maps, and the open map's own).
+    Later pages (users, NTRIP, devices, shortcuts) come with their own issues.
+  - **Tooltips** (`components/tooltip/Tooltip.tsx`, no dependency): one
+    component for every control that needs one, a small dark box with the label
+    and, where there is one, the shortcut in a muted tone. It shows after a
+    short hover and at once on keyboard focus, hides on Escape and on press,
+    stays inside the window, and is linked to its control with
+    `aria-describedby`. Shortcuts come from
+    `config/shortcut-manager/workbenchShortcutsConfig.ts`, not typed again. No
+    native `title` attributes are used. UI text is not selectable (`select-none` on
+    `body` in `index.css`); inputs, text areas and `role="alert"` messages opt back
+    in. The text selection colour is the browser's.
+  - Under 768 px the workbench side panel, and under 1024 px the right panel,
+    float over the canvas instead of sitting beside it (a tap outside closes
+    them); opening one closes the other on a narrow screen, and both start
+    closed there. On Home the side panel stacks above the work area under 768 px.
+  - Modals, menus, tabs and selects are Headless UI (focus trap, Escape,
+    arrow keys); icons are `lucide-react`. The panel and tool state lives in
+    `features/ui-manager/stores/uiShellStore.ts`.
+- **Modes.** Mow, Plan and Drive, switched in the side panel (Mow is the
+  default and comes first); one store
+  (`model/modeStore.ts`) holds the mode, and `config/modes/modes.ts` says what
+  each shows. The mode decides the tool strip, the visible canvas layers and the
+  right panel's content (Details while planning, Monitor in the other two);
+  there is no separate view switch, and users can't switch layers.
+
+  | Mode | Tool strip | Layers |
+  |---|---|---|
+  | Mow | plan job, start, pause, resume, go to point, follow path | areas, job path, progress, mower |
+  | Plan | select (S), mowing area (Z), no-go area (O), delete (D), undo (Ctrl+Z), redo (Ctrl+Y) | areas |
+  | Drive | driving control, mower mode, blade, stop, record border, rewind, save as area | areas, mower, draft border |
+
+  Plan works fully; the tools and their shortcuts work in Plan mode only, and
+  leaving Plan puts the active tool away. Drive and Mow are the shell only:
+  their tools are inert (they stay in the Tab order and say in a tooltip what
+  they will do) and their layers have nothing to draw yet. The behaviour comes
+  with [rmx-server-app#94](https://github.com/rmx-lt/rmx-server-app/issues/94),
+  [#105](https://github.com/rmx-lt/rmx-server-app/issues/105) and
+  [#106](https://github.com/rmx-lt/rmx-server-app/issues/106).
 - **No algorithm providers.** The client does not connect to external algorithm
   providers: there is no provider, compute, debug, benchmark or performance
   monitor feature, and the only `fetch` calls go to the app's own
@@ -869,13 +1073,13 @@ web/                    React 19 + TS on Bun (same toolchain as blade-terminal)
   scripts/build.ts      production build → dist/
   src/
     app/                main, App, login gate, WebSocket keep-alive
-    layouts/            shell regions; compose features
+    layouts/            the shell: home-window/, workbench-window/ (side-panel, top-bar, canvas, right-panel, settings), bottom-bar/, account/; composes features
     features/<name>/    {components,hooks,stores,data,utils,types}; auth + the blade-terminal features
-    model/              state several features share
+    model/              state several features share (the open map, the map list, the page: Home or workbench, the connection)
     data/               the functions features call
       api/              http + WebSocket clients; generated/ (cmd/gen-ts output, committed)
-      planning/         maps (load, save, conversion to the wire format), settings, layer registry
-    components/         generic widgets only
+      planning/         maps (load, save, conversion to the wire format), settings
+    components/         generic widgets only (ui/ Button and Modal, tooltip/, tool-strip/, settings-panel/ rows, inspector-panel/ rows and tabs, confirmation modal)
     hooks/ utils/ config/ styles/ assets/ testing/
 ```
 
@@ -903,6 +1107,7 @@ prop changes), and write `ref.current` in an effect, never during render.
 
 ```
 compose.dev.yaml, dev/mosquitto/  local/CI stack: TimescaleDB + Mosquitto
+package.json                      only `bun run dev` (runs dev/run.ps1); no dependencies
 Dockerfile                        multi-stage: bun build + go build → distroless/static
 .github/                          CI workflow, Dependabot
 ```
@@ -911,17 +1116,18 @@ Dockerfile                        multi-stage: bun build + go build → distrole
 
 You need Docker Desktop, Go (the version in `go.mod`), and Bun. No Node or npm.
 
-**One command** (PowerShell, from the repo):
+From the repo root:
 
 ```powershell
-dev\run.ps1             # stack + Go server + web dev server + simulated mower
-dev\run.ps1 -NoSim      # without the simulated mower
-dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (below)
-dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations)
+bun run dev             # stack + Go server + web dev server + simulated mower
+bun run dev -NoSim      # without the simulated mower
+bun run dev -SimSet fix=rtk_float,drop-acks=2   # start it with switches set (below)
+bun run dev -ResetDb    # drop the dev database first (fresh migrations)
 ```
 
-Then open <http://localhost:3000/> and log in as `DEV_USER` / `DEV_PASSWORD`
-from `.env` (default `dev` / `dev-password-123`). The script:
+It runs `dev/run.ps1` (root `package.json`). Then open
+<http://localhost:3000/> and log in as `dev` / `123` (`DEV_USER` in `.env`
+renames the login). The script:
 
 - creates `.env` from `.env.example` when it is missing;
 - refuses to start when port 8080 or 3000 is taken (a leftover server would
@@ -929,14 +1135,15 @@ from `.env` (default `dev` / `dev-password-123`). The script:
 - starts TimescaleDB + Mosquitto (`compose.dev.yaml`; they keep running after
   Ctrl+C, stop them with `docker compose -f compose.dev.yaml down`);
 - builds `rmx-server` and `devsim` into `.dev/` (gitignored), creates the dev
-  login or resets its password to `DEV_PASSWORD`;
+  login and sets its password to `123` directly in the dev database (the
+  12-character minimum stays for real logins);
 - runs the web dev server (hot reload), the server and the simulated mower in
   one terminal. On every saved `*.go`, `migrations/*.sql`, `go.mod`, `go.sum` or
   `.env` it rebuilds and restarts the server and the mower; a build error
   waits for the next save. Ctrl+C stops all three;
-- sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it) and
-  `JOB_DIR=dev/jobs` (both gitignored) when `.env` sets none: drop any
-  `<version>.bin` into the board's subdirectory.
+- sets `FIRMWARE_DIR=dev/firmware` (with `gateway/` and `autopilot/` below it,
+  gitignored) when `.env` sets none: drop any `<version>.bin` into the board's
+  subdirectory.
 
 
 **Simulated mower** (`cmd/devsim`). Both boards of a mower on the local
@@ -971,11 +1178,23 @@ still counts and relays the autopilot's topics as it would.
   catalogue (at least 10 s in `idle`) with every key of §16.4 linked, events
   with `boot` and `seq`, live driving on `autopilot/drive` (the setpoint rules
   and the 0.5 s timeout of §9), border recording in batches (§10), `follow`
-  (`reverse`, `blade`, `speed`), and jobs: `job_start` downloads `<job>.json`
-  over `autopilot/job/…`, checks size and SHA-256, drives to the start with the
-  blade off and follows the segments; `job.point` counts the points reached and
+  (`reverse`, `type`; `transit` when it is absent, `bad_request` for an unknown
+  type), and paths: `path_start` downloads `<path>.json` over
+  `autopilot/path/…`, checks size and SHA-256, drives to the start with the
+  blade off and follows the segments, the blade on for `edge` and `fill` and off
+  for `transit` (a segment with another type ends the path with `bad_path`); `path.point` counts the points reached, `path.points` is the length of the file, and
   `from_point` continues. Pauses for command, link or fix (§7.1), faults, `ota`,
   and monitor streams with the budget of 400 values per second.
+- **Speed limits** (§7.1, §8): `speed_limit` is allowed in every mode and applies
+  at once, to a running path (each segment is driven at the limit of its type)
+  and to live driving (`v` is limited by `manual` and `max`, both ways). The
+  speed is never above the limit of the type, nor above `max`; a limit of 0 is
+  no limit, and with `max` at 0 as well the mower uses its top speed, 0.6 m/s
+  (the one top speed of the simulator, also the ceiling for larger limits). The
+  firmware defaults, which `null` returns to: `max` 0.6, `transit` 0.6, `edge`
+  0.3, `fill` 0.5, `manual` 0.6 m/s. The limits are reported in the state, kept
+  with the boot counters (so they survive a restart), and the ack's `result` is
+  the object as it now is.
 - **Motion model.** A differential drive following the live setpoints or the
   path: up to 0.6 m/s with acceleration limits, a heading that is only reported
   while moving (one antenna), a position around a fixed origin (54.687157,
@@ -984,14 +1203,14 @@ still counts and relays the autopilot's topics as it would.
   spins up and down.
 - **Boot counters** and the running firmware are kept in
   `.dev/devsim-<name>.json`, so restarting devsim is a reboot of the mower:
-  `boot` grows and counters start again. `-state -` keeps them in memory;
+  `boot` grows and counters start again; the speed limits stay. `-state -` keeps them in memory;
   delete the file to start from boot 1.
 - **Not simulated:** the board link frames, the NTRIP connection itself (its
   states and byte counts are), the fix following the corrections (it follows
   the `fix` switch, default `rtk_fixed`), signatures of firmware images.
 
 **Switches** provoke the edge cases. Set them at start with `-set name=value`
-(`dev\run.ps1 -SimSet`), or on the running mower with
+(`bun run dev -SimSet`), or on the running mower with
 `go run ./cmd/devsim ctl <name> <value>` (the control endpoint listens on
 `127.0.0.1:18090`; `-control` changes it):
 
@@ -1014,7 +1233,8 @@ the acks up to the final one (a value is JSON when it parses as JSON):
 ```powershell
 go run ./cmd/devsim send ping
 go run ./cmd/devsim send -board autopilot manual_start
-go run ./cmd/devsim send -board autopilot follow 'points=[[54.68722,25.27965]]' blade=true
+go run ./cmd/devsim send -board autopilot follow 'points=[[54.68722,25.27965]]' type=edge
+go run ./cmd/devsim send -board autopilot speed_limit 'limits={"edge":0.2,"max":null}'
 go run ./cmd/devsim ctl fix rtk_float
 go run ./cmd/devsim -name mower-02                     # a second mower
 ```
@@ -1024,37 +1244,12 @@ sends commands and live-driving setpoints and serves chunk transfer
 ([Mower commands](#mower-commands)): `POST /api/devices/<name>/commands` with
 `{"board":"gateway","cmd":"ping"}` reaches the simulated mower and its ack comes
 back in the command's state. A gateway `ota` needs `<version>.bin` in
-`dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a job
-its file in `dev/jobs/`. `devsim send` and the tests
+`dev/firmware/gateway/` (the autopilot's in `dev/firmware/autopilot/`), a path
+a row in the `paths` table (`transfer.StorePath`). `devsim send` and the tests
 ([Tests and checks](#tests-and-checks)) play the server's part without it.
 
 The real board connects only to the VPS broker (port 8884, client
 certificate), so testing with it means a production deploy.
-
-**By hand**, the same steps one by one:
-
-```powershell
-# 1. Settings: dev-only passwords for the local stack.
-Copy-Item .env.example .env
-
-# 2. TimescaleDB + Mosquitto (localhost only).
-docker compose -f compose.dev.yaml up -d --wait
-
-# 3. The server (reads .env, runs migrations, listens on 127.0.0.1:8080).
-go run ./cmd/rmx-server
-
-# 4. The web dev server, in a second terminal.
-cd web
-bun install
-bun run dev
-```
-
-Create a login once (the dev database keeps it), then open
-<http://localhost:3000/> and log in; the workbench loads:
-
-```powershell
-go run ./cmd/rmx-server create-user dev     # any password of 12+ characters
-```
 
 To try MQTT like a device, use any MQTT client on `127.0.0.1:11883` as
 `test-device` with the `TEST_DEVICE_PASSWORD` from `.env`
@@ -1071,7 +1266,7 @@ installed on the PC):
 | 55432 | TimescaleDB (`postgres://app:db-dev@127.0.0.1:55432/app`) |
 | 11883 | Mosquitto, plain MQTT (the server and test devices) |
 
-**How the dev server works.** `bun run dev` runs `web/dev/server.ts`:
+**How the web dev server works.** It is `web/dev/server.ts`:
 `Bun.serve` with an HTML import of `public/index.html`, so Bun bundles the app
 on the fly with hot module reloading and Tailwind (`bun-plugin-tailwind` in
 `bunfig.toml`). The same server proxies `/api/*`, `/health`,
@@ -1113,13 +1308,13 @@ Then open <http://localhost:8080/>.
 allow-list (`internal/app`).
 
 The integration tests (`internal/integration/`: `harness_test.go`, then
-`app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`) start the real
+`app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`, `devsim_path_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
 its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
-ping, chunk transfer (a job file and firmware images side by side, every chunk
+ping, chunk transfer (a path file from the `paths` table and firmware images side by side, a path id that is not in the table, every chunk
 checked against the file's SHA-256, the three sets kept apart), the commands
 (an ack, the resend of a lost ack after 5 s with the same id, open commands
-failed by a new boot, a gateway restart and ota refused while the autopilot is in a job, allowed with the board link down or the autopilot idle),
+failed by a new boot, a gateway restart and ota refused while the autopilot is in a path, allowed with the board link down or the autopilot idle),
 live driving, a monitor stream that runs only while watched, the caster settings
 sent once and on change (the password only on the wire), health, that the records routes and
 tables are gone, the retained server status and graceful shutdown, and the
@@ -1128,8 +1323,8 @@ password and unknown user, protected routes (REST, WebSocket)
 without, with a forged and with a duplicated cookie, expired and idle
 sessions, logout and "log out everywhere", password change, session
 fixation, foreign `Origin`s (REST, login, WebSocket) and the rate limit; and
-the planning API: a map's create/read/update/delete, zone counts per
-category, the revision conflict, invalid input, that users can't see each
+the planning API: a map's create/read/update/delete, area counts per
+category, the checks on zones (at least one, name length, unique ids), the revision conflict, invalid input, that users can't see each
 other's maps, and settings; and the mower domain: a simulated gateway publishes
 state, catalogues, telemetry and events, and the API and WebSocket show the
 device, its keys, latest values, the history of a gauge and of a counter across
@@ -1140,28 +1335,37 @@ The simulated mower has its own tests in `cmd/devsim`. The unit tests run both
 boards on a fake clock and play the server over the same topics: the state
 machine of [Mower-Protocol](Mower-Protocol) §8 (every command in every mode),
 the command id memory and lost acks, live driving and its 0.5 s timeout,
-recording, jobs with chunk download and retry, pauses and faults, monitor
+recording, paths with chunk download and retry, pauses and faults, monitor
 streams and their budget, and the catalogues checked against §16.4 and §16.5.
 `e2e_integration_test.go` (in the integration run) starts devsim against the
 compose Mosquitto on a private topic prefix and plays the server: retained
-`mower/status/server`, commands and repeated ids, driving, recording, a job
-and a gateway update served over chunk transfer, and the switches.
+`mower/status/server`, commands and repeated ids, driving, recording, a path
+and a gateway update served over chunk transfer, and the switches. The integration run also builds devsim and runs it against the
+real server: a path stored in the table is downloaded in chunks and followed,
+and a path with all three segment types is followed with the blade on only for
+`edge` and `fill`, while a `speed_limit` sent during the path changes the speed
+at once and shows in the state (`devsim_path_test.go`).
 
 **Queries** are plain SQL strings checked at run time by the integration tests,
 so after changing one, run them.
 
 ## CI/CD
 
-`.github/workflows/ci.yml`, on every pull request and push:
+`.github/workflows/ci.yml`, on pull requests to `development` and pushes to
+`development` (a newer push cancels the older run). The four job names are the
+required checks; a `development` → `production` PR reuses their results, so
+`production` gets no CI run of its own.
 
 1. **go**: gofmt, `go vet`, staticcheck, `go test -race` (with the import rules), TS types up to date.
 2. **client** (the web app in `web/`; the job keeps its name, a required check): `bun install --frozen-lockfile`, eslint, tsc, `bun test`, build.
 3. **integration**: `compose.dev.yaml` up, integration tests.
-4. **image**: after 1–3 pass, builds the Docker image (cached in the GitHub
-   Actions cache). On pull requests and `development` it is only built. On
-   `production` it is pushed as `sha-<short>` and `production`; on a `v*` tag
-   as `X.Y.Z` and `X.Y`.
-5. **deploy**: only on `production`, sends the new tag to the VPS (see below).
+4. **image**: builds the Docker image (cached in the GitHub Actions cache), in
+   parallel with 1–3. Never pushed.
+
+`.github/workflows/deploy.yml`, on every push to `production` except wiki-only
+changes, and by hand (`workflow_dispatch`, from `production`) to redeploy:
+builds the image, pushes it as `sha-<short>` and `production`, then sends the
+tag to the VPS (see below).
 
 Dependabot (`.github/dependabot.yml`) opens weekly updates for Go modules, the
 web app (`web/`, bun ecosystem: `package.json` + `bun.lock`), GitHub Actions and the
@@ -1178,14 +1382,13 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 |---|---|
 | `sha-<short>` | every push to `production` (deploy this one: immutable) |
 | `production` | latest `production` |
-| `X.Y.Z`, `X.Y` | release tags `vX.Y.Z` |
 
 **Container:**
 
 - Listens on **`0.0.0.0:8080`** (HTTP; TLS is Caddy's job). Publish no port;
   Caddy reaches it over the Docker network.
 - Runs as uid **65532** (distroless `nonroot`), no shell. Needs no volumes
-  unless `FIRMWARE_DIR` or `JOB_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
+  unless `FIRMWARE_DIR` is set (see [Firmware over MQTT](#firmware-over-mqtt)).
 - `HEALTHCHECK` built in (`/app/rmx-server healthcheck` → `GET /health`).
 - Stops cleanly on SIGTERM (closes WebSockets, publishes MQTT `offline`).
 - Memory: about 15 MB at idle; a login briefly needs ~20 MB more (Argon2, one at
@@ -1211,7 +1414,6 @@ This is the contract the VPS side (repo `rmx-server-infra`) can rely on.
 | `DB_MAX_CONNECTIONS` | no | `5` | |
 | `STATIC_DIR` | no | `/app/static` | already set in the image |
 | `FIRMWARE_DIR` | no | `/firmware` | firmware images in the subdirectories `gateway/` and `autopilot/` (`<version>.bin`). Unset: no firmware is served. See [Firmware over MQTT](#firmware-over-mqtt) |
-| `JOB_DIR` | no | `/jobs` | job files (`<job>.json`) served to the autopilot. Unset: none are served |
 | `NTRIP_HOST`, `NTRIP_MOUNTPOINT`, `NTRIP_USER`, `NTRIP_PASSWORD` | no | (secret, server-side `.env`) | the caster the server tells the gateways to use; all four or none. The password is never logged or returned. `NTRIP_PORT` defaults to `2101`. See [Mower commands](#mower-commands) |
 
 **Database:** TimescaleDB on Postgres 17 (`timescale/timescaledb:2.30.2-pg17`
@@ -1245,8 +1447,8 @@ id is its login. Its ACL needs: its own `mower/<login>/#` (covered by the broker
 route: browsers don't use MQTT. An old `MQTT_WS_URL` in the
 environment is ignored.
 
-**Deploy job:** every push to `production` deploys automatically (`feat/…` → PR → `development` → PR → `production`). After the `image`
-job, the `deploy` job in `ci.yml` connects over SSH as the VPS user `deploy`
+**Deploy job:** every push to `production` deploys automatically (`feat/…` → PR → `development` → PR → `production`), except one that only changes `wiki/`. After pushing the image,
+`deploy.yml` connects over SSH as the VPS user `deploy`
 and sends only the tag `sha-<short>`. That user's key is restricted to one
 forced command, the deploy script in `rmx-server-infra` (it moves from the old
 probe stack to `services/app/` in

@@ -9,9 +9,11 @@
 # dev/run.ps1: built binaries and local firmware images
 /.dev/
 /dev/firmware/
-/dev/jobs/
 
 # Editors / OS
 .idea
 .DS_Store
 *.code-workspace
+
+# Built devsim (go build ./cmd/devsim)
+/cmd/devsim/devsim.exe

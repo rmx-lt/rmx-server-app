@@ -1,6 +1,6 @@
 import polygonClipping from "polygon-clipping";
-import type { Zone } from "@/data/planning/schemaTypes";
-import { ZONE_CATEGORY } from "@/config/db-ops/enums";
+import type { Area } from "@/data/planning/schemaTypes";
+import { AREA_CATEGORY } from "@/config/db-ops/enums";
 import { computePolygonArea, type Point } from "@/utils/geometry";
 
 export type { Point };
@@ -38,29 +38,29 @@ function toRing(vertices: Array<{ x: number; y: number }>): [number, number][] {
 }
 
 /**
- * Computes the net area of a zone object: gross area minus the total area of all
- * no-go zone polygons that overlap with it (clipped to the zone boundary).
+ * Computes the net area of an area: gross area minus the total area of all
+ * no-go areas that overlap with it (clipped to the area boundary).
  *
  * Uses the Martinez-Rueda-Feito algorithm (polygon-clipping library) which correctly
  * handles arbitrary concave polygons. Sutherland-Hodgman was replaced because it only
  * works with convex clip polygons.
  *
- * For no-go zone objects the concept of "net area" doesn't apply — returns `null`.
+ * For no-go areas the concept of "net area" doesn't apply — returns `null`.
  */
 export function computeNetArea(
-    obj: Zone,
-    objects: Zone[],
+    obj: Area,
+    objects: Area[],
 ): number | null {
-    if (obj.category !== ZONE_CATEGORY.MOWING) return null;
+    if (obj.category !== AREA_CATEGORY.MOWING) return null;
 
-    const zoneRing = toRing(obj.vertices);
+    const areaRing = toRing(obj.vertices);
 
     let overlapArea = 0;
     for (const o of objects) {
-        if (o.category !== ZONE_CATEGORY.NO_GO) continue;
+        if (o.category !== AREA_CATEGORY.NO_GO) continue;
         const obstRing = toRing(o.vertices);
 
-        const intersection = polygonClipping.intersection([[zoneRing]], [[obstRing]]);
+        const intersection = polygonClipping.intersection([[areaRing]], [[obstRing]]);
         for (const polygon of intersection) {
             // polygon[0] is the outer ring; polygon[1+] are holes (subtract them)
             for (let i = 0; i < polygon.length; i++) {

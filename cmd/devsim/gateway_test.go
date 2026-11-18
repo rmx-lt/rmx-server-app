@@ -263,7 +263,7 @@ func TestUsageCountsWholePackets(t *testing.T) {
 	if _, ok := last["usage.mqtt.up.autopilot/telemetry"]; !ok {
 		t.Fatalf("no member for the telemetry topic: %v", last)
 	}
-	if _, ok := last["usage.mqtt.down.autopilot/job/chunk"]; ok {
+	if _, ok := last["usage.mqtt.down.autopilot/path/chunk"]; ok {
 		t.Fatal("a member without data")
 	}
 }

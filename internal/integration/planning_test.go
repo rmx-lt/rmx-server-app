@@ -17,17 +17,13 @@ import (
 
 func planDoc() api.MapDoc {
 	return api.MapDoc{
-		Format: "polygon", Type: "any_offline", CoordSystem: "Cartesian",
-		HeadlandEnabled: true, HeadlandWidth: "10",
-		Zones: []api.Zone{
+		Zones: []api.Zone{{ID: 1, Name: "Zone 1", Areas: []api.Area{
 			{ID: 1, Category: "mowing", Vertices: []api.Point{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}}},
 			{ID: 2, Category: "mowing", Vertices: []api.Point{{X: 20, Y: 0}, {X: 30, Y: 0}, {X: 30, Y: 10}}},
-			{ID: 3, Category: "no_go", Type: "offline", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
+			{ID: 3, Category: "no_go", Vertices: []api.Point{{X: 1, Y: 1}, {X: 2, Y: 2}, {X: 1, Y: 2}}},
 			{ID: 4, Category: "navigation", Vertices: []api.Point{{X: 10, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 2}}},
-		},
-		Points:        []api.RoutePoint{{Type: "start_end", Point: api.Point{X: 5, Y: 5}}},
-		LayerSettings: []api.LayerSetting{{ID: 1, LayerID: 2, Value: "#00ff00"}},
-		GeoAnchor:     &api.GeoAnchor{Lat: 54.68, Lon: 25.28},
+		}}},
+		GeoAnchor: &api.GeoAnchor{Lat: 54.68, Lon: 25.28},
 	}
 }
 
@@ -58,18 +54,18 @@ func TestMapLifecycle(t *testing.T) {
 	have, _ := json.Marshal(got.Doc)
 	eq(t, string(have), string(want))
 
-	// The list counts the zones by category.
+	// The list counts the areas by category.
 	status, _, body = app.req(app.http, "GET", "/api/maps", nil)
 	eq(t, status, 200)
 	list := decode[api.MapList](t, body)
 	eq(t, len(list.Maps), 1)
-	eq(t, list.Maps[0].MowingZoneCount, 2)
-	eq(t, list.Maps[0].NoGoZoneCount, 1)
-	eq(t, list.Maps[0].NavigationZoneCount, 1)
+	eq(t, list.Maps[0].MowingAreaCount, 2)
+	eq(t, list.Maps[0].NoGoAreaCount, 1)
+	eq(t, list.Maps[0].NavigationAreaCount, 1)
 
 	// Update from revision 1 to 2.
 	doc := planDoc()
-	doc.Zones = doc.Zones[:1]
+	doc.Zones[0].Areas = doc.Zones[0].Areas[:1]
 	status, _, body = app.req(app.http, "PUT", path, api.MapUpdate{Name: "Front garden", Revision: 1, Doc: doc})
 	eq(t, status, 200)
 	updated := decode[api.MapDetail](t, body)
@@ -86,7 +82,7 @@ func TestMapLifecycle(t *testing.T) {
 
 	// Invalid input is a 400 and changes nothing.
 	bad := planDoc()
-	bad.Zones[0].Category = "obstacle"
+	bad.Zones[0].Areas[0].Category = "obstacle"
 	eq(t, app.status(app.http, "PUT", path, api.MapUpdate{Name: "x", Revision: 2, Doc: bad}), 400)
 	eq(t, app.status(app.http, "POST", "/api/maps", map[string]any{"name": "no doc"}), 400)
 	eq(t, app.status(app.http, "GET", "/api/maps/abc", nil), 404)

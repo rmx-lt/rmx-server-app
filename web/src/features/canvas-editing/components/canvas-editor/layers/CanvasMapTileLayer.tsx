@@ -1,11 +1,11 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 import { useGeoAnchorStore } from "@/model/geoAnchorStore";
-import { useLayerSettingsStore, getLayerParam } from "@/model/layerSettingsStore";
+import { useMapLayerStore, type MapLayer } from "@/model/mapLayerStore";
 import { useUiUnitOfMeasureStore } from "@/features/ui-manager/stores/uiUnitOfMeasureStore";
-import { LAYER_ID, LAYER_PARAM_KEY } from "@/data/planning/layerRegistry";
 import { convertLinearToBase } from "@/utils/unitOfMeasure";
 import {
+    MAX_TILE_ZOOM,
     TILE_SIZE,
     lonToMercX,
     latToMercY,
@@ -23,18 +23,39 @@ import type { GeoAnchorMerc } from "@/utils/geoProjection";
 const TILE_BUFFER = 1;
 /** Small overlap (in screen px) to hide anti-aliased seams between tiles. */
 const TILE_OVERLAP_PX = 1;
+/** Images kept in memory; the least recently drawn go first. */
+const MAX_CACHED_TILES = 600;
+/** How many zoom levels up a missing tile looks for a loaded stand-in. */
+const MAX_FALLBACK_LEVELS = 4;
 
 /**
- * ArcGIS World Imagery tile URL.
- * No API key required; attribution to Esri et al. must be shown in production.
+ * Both layers are ArcGIS tiles: no API key; Esri's terms want the attribution
+ * (TILE_ATTRIBUTION) shown on the canvas. OpenStreetMap's own tile servers were
+ * not chosen: their usage policy rules out an app that loads tiles in bulk.
  * Note: ArcGIS uses z/y/x order (row before column), unlike the standard z/x/y.
  */
-function arcgisTileUrl(z: number, x: number, y: number): string {
-    return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+/** The layers that have tiles; Empty draws and requests nothing. */
+type TileLayer = Exclude<MapLayer, "empty">;
+
+const TILE_SERVICE: Record<TileLayer, string> = {
+    satellite: "World_Imagery",
+    street: "World_Street_Map",
+};
+
+export const TILE_ATTRIBUTION: Record<TileLayer, string> = {
+    satellite: "Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+    street: "Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community",
+};
+
+export function tileUrl(layer: TileLayer, z: number, x: number, y: number): string {
+    return `https://server.arcgisonline.com/ArcGIS/rest/services/${TILE_SERVICE[layer]}/MapServer/tile/${z}/${y}/${x}`;
 }
 
 interface TileEntry {
-    key: string;
+    layer: TileLayer;
+    z: number;
+    x: number;
+    y: number;
     url: string;
     /** Left edge in screen pixels. */
     screenX: number;
@@ -45,13 +66,9 @@ interface TileEntry {
 }
 
 function CanvasMapTileLayerInner() {
-    const layers = useLayerSettingsStore((s) => s.layers);
-    const visible = getLayerParam(layers, LAYER_ID.SATELLITE_MAP, LAYER_PARAM_KEY.VISIBLE) !== "false";
-    const opacityStr = getLayerParam(layers, LAYER_ID.SATELLITE_MAP, LAYER_PARAM_KEY.MAP_OPACITY);
-    const opacity = Math.min(100, Math.max(0, Number(opacityStr ?? "100"))) / 100;
-
     const geoAnchor = useGeoAnchorStore((s) => s.mapGeoAnchor);
     const unitOfMeasure = useUiUnitOfMeasureStore((s) => s.unitOfMeasure);
+    const layer = useMapLayerStore((s) => s.layer);
 
     const position = useCanvasViewStore((s) => s.position);
     const scale = useCanvasViewStore((s) => s.scale);
@@ -62,7 +79,7 @@ function CanvasMapTileLayerInner() {
     const [imageVersion, setImageVersion] = useState(0);
 
     const tiles = useMemo<TileEntry[]>(() => {
-        if (!visible || !geoAnchor) return [];
+        if (!geoAnchor || layer === "empty") return [];
 
         const { width, height } = canvasSize;
         if (width <= 0 || height <= 0) return [];
@@ -124,8 +141,11 @@ function CanvasMapTileLayerInner() {
                 const screenY = refScreenY + (ty - refTy) * tilePx;
 
                 result.push({
-                    key: `${zoom}/${tx}/${ty}`,
-                    url: arcgisTileUrl(zoom, tx, ty),
+                    layer,
+                    z: zoom,
+                    x: tx,
+                    y: ty,
+                    url: tileUrl(layer, zoom, tx, ty),
                     screenX,
                     screenY,
                     screenSize: tilePx,
@@ -134,15 +154,25 @@ function CanvasMapTileLayerInner() {
         }
 
         return result;
-    }, [visible, geoAnchor, position, scale, canvasSize, unitOfMeasure]);
+    }, [geoAnchor, position, scale, canvasSize, unitOfMeasure, layer]);
 
     useEffect(() => {
-        if (!visible || tiles.length === 0) return;
+        if (tiles.length === 0) return;
 
         let cancelled = false;
+        const cache = imageCacheRef.current;
+        const wanted = new Set(tiles.map((t) => t.url));
+
+        // A fast zoom or pan leaves loads nobody needs any more: stop them.
+        for (const [url, img] of cache) {
+            if (!wanted.has(url) && !img.complete) {
+                img.src = "";
+                cache.delete(url);
+            }
+        }
 
         for (const tile of tiles) {
-            if (imageCacheRef.current.has(tile.url)) continue;
+            if (cache.has(tile.url)) continue;
 
             const img = new Image();
             img.decoding = "async";
@@ -154,13 +184,19 @@ function CanvasMapTileLayerInner() {
                 if (!cancelled) setImageVersion((v) => v + 1);
             };
             img.src = tile.url;
-            imageCacheRef.current.set(tile.url, img);
+            cache.set(tile.url, img);
+        }
+
+        // Bound the cache: a Map iterates oldest first, and drawn tiles are re-inserted.
+        for (const url of cache.keys()) {
+            if (cache.size <= MAX_CACHED_TILES) break;
+            if (!wanted.has(url)) cache.delete(url);
         }
 
         return () => {
             cancelled = true;
         };
-    }, [visible, tiles]);
+    }, [tiles]);
 
     useLayoutEffect(() => {
         const canvas = canvasRef.current;
@@ -179,32 +215,62 @@ function CanvasMapTileLayerInner() {
 
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, width, height);
-        if (!visible || !geoAnchor || tiles.length === 0) return;
+        if (!geoAnchor || tiles.length === 0) return;
 
-        ctx.globalAlpha = opacity;
         ctx.imageSmoothingEnabled = true;
 
-        for (const tile of tiles) {
-            const img = imageCacheRef.current.get(tile.url);
-            if (!img || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) continue;
-            ctx.drawImage(
-                img,
-                tile.screenX,
-                tile.screenY,
-                tile.screenSize + TILE_OVERLAP_PX,
-                tile.screenSize + TILE_OVERLAP_PX,
-            );
-        }
-    }, [visible, geoAnchor, tiles, canvasSize, opacity, imageVersion]);
+        const cache = imageCacheRef.current;
+        const ready = (url: string) => {
+            const img = cache.get(url);
+            if (!img || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return undefined;
+            // Used again: move to the end so it is evicted last.
+            cache.delete(url);
+            cache.set(url, img);
+            return img;
+        };
+        const o = TILE_OVERLAP_PX;
 
-    if (!visible || !geoAnchor) return null;
+        for (const { layer: l, z, x, y, url, screenX: sx, screenY: sy, screenSize: size } of tiles) {
+            const img = ready(url);
+            if (img) {
+                ctx.drawImage(img, sx, sy, size + o, size + o);
+                continue;
+            }
+
+            // Not loaded yet: show what is cached of the zoom levels around, so the picture never goes blank.
+            let drawn = false;
+            for (let d = 1; d <= MAX_FALLBACK_LEVELS && d <= z && !drawn; d++) {
+                const parent = ready(tileUrl(l, z - d, x >> d, y >> d));
+                if (!parent) continue;
+                const n = 2 ** d;
+                const part = TILE_SIZE / n;
+                ctx.drawImage(parent, (x % n) * part, (y % n) * part, part, part, sx, sy, size + o, size + o);
+                drawn = true;
+            }
+            if (drawn || z >= MAX_TILE_ZOOM) continue;
+            for (let j = 0; j < 2; j++) {
+                for (let i = 0; i < 2; i++) {
+                    const child = ready(tileUrl(l, z + 1, 2 * x + i, 2 * y + j));
+                    if (child) ctx.drawImage(child, sx + (i * size) / 2, sy + (j * size) / 2, size / 2 + o, size / 2 + o);
+                }
+            }
+        }
+    }, [geoAnchor, tiles, canvasSize, imageVersion]);
+
+    if (!geoAnchor || layer === "empty") return null;
 
     return (
-        <canvas
-            ref={canvasRef}
-            className="absolute inset-0 overflow-hidden pointer-events-none"
-            aria-hidden="true"
-        />
+        <>
+            <canvas
+                ref={canvasRef}
+                className="absolute inset-0 overflow-hidden pointer-events-none"
+                aria-hidden="true"
+            />
+            {/* The tile terms ask for it on the map. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-surface/70 px-2 py-0.5 text-right text-[10px] text-muted max-md:hidden">
+                {TILE_ATTRIBUTION[layer]}
+            </div>
+        </>
     );
 }
 

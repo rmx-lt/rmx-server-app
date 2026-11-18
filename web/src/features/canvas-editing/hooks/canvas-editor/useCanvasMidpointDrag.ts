@@ -22,6 +22,8 @@ export function useCanvasMidpointDrag({
 }: UseCanvasMidpointDragOptions) {
     const [midpointDragState, setMidpointDragState] = useState<VertexRef | null>(null);
     const dragStateRef = useRef<VertexRef | null>(null);
+    // Vertex minus pointer at the press: the new vertex keeps this offset instead of jumping to the cursor.
+    const grabOffsetRef = useRef<Point>({ x: 0, y: 0 });
 
     const { schedule, flush } = useRAFThrottle<Point>((pos) => {
         if (dragStateRef.current) moveVertexAt(dragStateRef.current, pos);
@@ -29,13 +31,15 @@ export function useCanvasMidpointDrag({
 
     const handleMidpointMouseDown = useCallback(
         (objectId: number, afterIndex: number, mid: Point) => {
+            const ptr = stageRef.current?.getRelativePointerPosition();
+            grabOffsetRef.current = ptr ? { x: mid.x - ptr.x, y: mid.y - ptr.y } : { x: 0, y: 0 };
             beginBatch();
             const newRef = insertVertex(objectId, afterIndex, mid);
             selectVertex(newRef);
             dragStateRef.current = newRef;
             setMidpointDragState(newRef);
         },
-        [insertVertex, selectVertex],
+        [stageRef, insertVertex, selectVertex],
     );
 
     const handleMidpointDragMouseMove = useCallback(
@@ -45,7 +49,8 @@ export function useCanvasMidpointDrag({
             if (!stage) return;
             const ptr = stage.getRelativePointerPosition();
             if (!ptr) return;
-            schedule({ x: ptr.x, y: ptr.y });
+            const off = grabOffsetRef.current;
+            schedule({ x: ptr.x + off.x, y: ptr.y + off.y });
         },
         [stageRef, schedule],
     );

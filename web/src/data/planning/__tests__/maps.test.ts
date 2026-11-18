@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createMap, deleteMap, listMaps, loadMap, saveMap, type MapContent } from "@/data/planning/maps";
+import { createMap, deleteMap, listMaps, loadMap, saveMap, MapFormatError, type MapContent } from "@/data/planning/maps";
 import { isConflict } from "@/data/api/planning";
 import type { MapDetail, MapDoc } from "@/data/api/planning";
 
@@ -29,18 +29,17 @@ afterEach(() => {
 });
 
 const DOC: MapDoc = {
-    format: "polygon",
-    type: "any_offline",
-    coord_system: "Cartesian",
-    headland_enabled: true,
-    headland_width: "10",
     zones: [
-        { id: 1, category: "mowing", type: "", vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] },
-        { id: 2, category: "no_go", type: "offline", vertices: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }] },
-        { id: 3, category: "navigation", type: "", vertices: [{ x: 10, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 2 }] },
+        {
+            id: 1,
+            name: "Zone 1",
+            areas: [
+                { id: 1, category: "mowing", vertices: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] },
+                { id: 2, category: "no_go", vertices: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }] },
+                { id: 3, category: "navigation", vertices: [{ x: 10, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 2 }] },
+            ],
+        },
     ],
-    points: [{ type: "start_end", point: { x: 5, y: 5 } }],
-    layer_settings: [{ id: 1, layer_id: 2, value: "false" }],
     geo_anchor: { lat: 54.68, lon: 25.28 },
 };
 
@@ -49,22 +48,26 @@ function detail(id: number, revision: number, doc: MapDoc = DOC): MapDetail {
 }
 
 describe("loadMap", () => {
-    test("keeps the server's zone categories and keeps navigation zones out of the canvas", async () => {
+    test("keeps the server's area categories and keeps navigation areas out of the canvas", async () => {
         answers.push({ status: 200, body: detail(7, 3) });
         const content = await loadMap(7);
         expect(calls[0]).toMatchObject({ method: "GET", url: "/api/maps/7" });
-        expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingZoneCount: 1, noGoZoneCount: 1, headlandWidth: "10" });
-        expect(content.zones.map((z) => [z.id, z.category, z.mapId])).toEqual([
+        expect(content.map).toMatchObject({ id: 7, name: "Garden", mowingAreaCount: 1, noGoAreaCount: 1 });
+        expect(content.zones).toEqual([{ id: 1, name: "Zone 1" }]);
+        expect(content.activeZoneId).toBe(1);
+        expect(content.areas.map((a) => [a.id, a.category, a.mapId])).toEqual([
             [1, "mowing", 7],
             [2, "no_go", 7],
         ]);
-        expect(content.zones[0]!.vertexCount).toBe(3);
-        expect(content.zones[0]!.area).toBeGreaterThan(0);
-        expect(content.points).toEqual([{ mapId: 7, type: "start_end", point: { x: 5, y: 5 } }]);
+        expect(content.areas[0]!.vertexCount).toBe(3);
+        expect(content.areas[0]!.area).toBeGreaterThan(0);
         expect(content.geoAnchor).toEqual({ lat: 54.68, lon: 25.28 });
-        // The stored value wins; every other setting gets its default.
-        expect(content.layerSettings.find((s) => s.id === 1 && s.layerId === 2)?.value).toBe("false");
-        expect(content.layerSettings.length).toBeGreaterThan(1);
+    });
+
+    test("refuses a map in the format from before zones", async () => {
+        const old = { zones: [{ id: 1, name: "", areas: null }], geo_anchor: null } as unknown as MapDoc;
+        answers.push({ status: 200, body: detail(7, 3, old) });
+        expect(loadMap(7)).rejects.toBeInstanceOf(MapFormatError);
     });
 });
 
@@ -74,7 +77,7 @@ describe("saveMap", () => {
         return loadMap(7);
     }
 
-    test("puts the whole document with the loaded revision and writes navigation zones back", async () => {
+    test("puts the whole document with the loaded revision and writes navigation areas back", async () => {
         const content = await loaded();
         answers.push({ status: 200, body: detail(7, 4) });
         expect(await saveMap({ ...content, map: { ...content.map, name: "  Front  " } })).toBe(7);
@@ -84,13 +87,13 @@ describe("saveMap", () => {
         const body = put.body as { name: string; revision: number; doc: MapDoc };
         expect(body.name).toBe("Front");
         expect(body.revision).toBe(3);
-        expect(body.doc.zones.map((z) => [z.id, z.category])).toEqual([
+        expect(body.doc.zones.map((z) => [z.id, z.name])).toEqual([[1, "Zone 1"]]);
+        expect(body.doc.zones[0]!.areas.map((a) => [a.id, a.category])).toEqual([
             [1, "mowing"],
             [2, "no_go"],
             [3, "navigation"],
         ]);
         expect(body.doc.geo_anchor).toEqual({ lat: 54.68, lon: 25.28 });
-        expect(body.doc.layer_settings).toContainEqual({ id: 1, layer_id: 2, value: "false" });
 
         // The next save names the new revision.
         answers.push({ status: 200, body: detail(7, 5) });
@@ -98,12 +101,21 @@ describe("saveMap", () => {
         expect((calls[2]!.body as { revision: number }).revision).toBe(4);
     });
 
-    test("moves a navigation zone whose id a new drawn zone took", async () => {
+    test("saves a renamed zone", async () => {
         const content = await loaded();
-        const drawn = { ...content.zones[0]!, id: 3 };
         answers.push({ status: 200, body: detail(7, 4) });
-        await saveMap({ ...content, zones: [...content.zones, drawn] });
-        const ids = (calls[1]!.body as { doc: MapDoc }).doc.zones.map((z) => [z.id, z.category]);
+        await saveMap({ ...content, zones: [{ id: 1, name: "Front lawn" }] });
+        const doc = (calls[1]!.body as { doc: MapDoc }).doc;
+        expect(doc.zones.map((z) => z.name)).toEqual(["Front lawn"]);
+        expect(doc.zones[0]!.areas).toHaveLength(3);
+    });
+
+    test("moves a navigation area whose id a new drawn area took", async () => {
+        const content = await loaded();
+        const drawn = { ...content.areas[0]!, id: 3 };
+        answers.push({ status: 200, body: detail(7, 4) });
+        await saveMap({ ...content, areas: [...content.areas, drawn] });
+        const ids = (calls[1]!.body as { doc: MapDoc }).doc.zones[0]!.areas.map((a) => [a.id, a.category]);
         expect(ids).toEqual([
             [1, "mowing"],
             [2, "no_go"],
@@ -120,37 +132,52 @@ describe("saveMap", () => {
         expect(calls[1]).toMatchObject({ method: "POST", url: "/api/maps" });
     });
 
-    test("a stale revision is a conflict", async () => {
+    test("a stale revision is overwritten with the user's document, never dropped", async () => {
         const content = await loaded();
         answers.push({ status: 409, body: { code: "conflict", message: "changed elsewhere" } });
+        answers.push({ status: 200, body: detail(7, 8) }); // the other save, read for its revision
+        answers.push({ status: 200, body: detail(7, 9) });
+        expect(await saveMap(content)).toBe(7);
+        expect(calls.map((c) => c.method)).toEqual(["GET", "PUT", "GET", "PUT"]);
+        expect((calls[3]!.body as { revision: number }).revision).toBe(8);
+        // and the next save names the revision just written
+        answers.push({ status: 200, body: detail(7, 10) });
+        await saveMap(content);
+        expect((calls[4]!.body as { revision: number }).revision).toBe(9);
+    });
+
+    test("another refusal is thrown (the autosave retries it)", async () => {
+        const content = await loaded();
+        answers.push({ status: 500 });
         const err = await saveMap(content).catch((e: unknown) => e);
-        expect(isConflict(err)).toBe(true);
+        expect(isConflict(err)).toBe(false);
+        expect(err).toBeInstanceOf(Error);
     });
 });
 
 describe("copies and the list", () => {
-    test("a copy carries the source's navigation zones", async () => {
+    test("a copy carries the source's navigation areas", async () => {
         answers.push({ status: 200, body: detail(7, 3) });
         const content = await loadMap(7);
         answers.push({ status: 201, body: detail(8, 1) });
         expect(await createMap(content, "Copy")).toBe(8);
         const body = calls[1]!.body as { name: string; doc: MapDoc };
         expect(body.name).toBe("Copy");
-        expect(body.doc.zones.some((z) => z.category === "navigation")).toBe(true);
+        expect(body.doc.zones[0]!.areas.some((a) => a.category === "navigation")).toBe(true);
     });
 
-    test("lists maps with zone counts and deletes them", async () => {
+    test("lists maps with area counts and deletes them", async () => {
         answers.push({
             status: 200,
             body: {
                 maps: [{
-                    id: 7, name: "Garden", revision: 3, mowing_zone_count: 2, no_go_zone_count: 1,
-                    navigation_zone_count: 1, updated_at: "2026-11-14T12:00:00Z",
+                    id: 7, name: "Garden", revision: 3, mowing_area_count: 2, no_go_area_count: 1,
+                    navigation_area_count: 1, updated_at: "2026-11-14T12:00:00Z",
                 }],
             },
         });
         expect(await listMaps()).toEqual([
-            { id: 7, name: "Garden", mowingZoneCount: 2, noGoZoneCount: 1, updatedAt: "2026-11-14T12:00:00Z" },
+            { id: 7, name: "Garden", mowingAreaCount: 2, noGoAreaCount: 1, updatedAt: "2026-11-14T12:00:00Z" },
         ]);
         answers.push({ status: 204 });
         await deleteMap(7);

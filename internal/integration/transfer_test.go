@@ -1,12 +1,13 @@
 //go:build integration
 
-// The transfer domain: a board downloads a firmware image and a job file over
+// The transfer domain: a board downloads a firmware image and a path file over
 // MQTT, side by side (wiki Mower-Protocol §12).
 
 package integration
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -44,8 +45,8 @@ func (d *mqttDevice) download(set transfer.Set, file string) []byte {
 	return out
 }
 
-func TestTransferServesFirmwareAndJobFilesSideBySide(t *testing.T) {
-	fw, jobs := t.TempDir(), t.TempDir()
+func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
+	fw := t.TempDir()
 	for _, sub := range []string{"gateway", "autopilot"} {
 		if err := os.Mkdir(filepath.Join(fw, sub), 0o755); err != nil {
 			t.Fatal(err)
@@ -54,28 +55,31 @@ func TestTransferServesFirmwareAndJobFilesSideBySide(t *testing.T) {
 	// 9000 bytes: 4096 + 4096 + 808 chunks.
 	gwImage := bytes.Repeat([]byte("gateway-image-"), 650)
 	apImage := bytes.Repeat([]byte("autopilot-"), 900)
-	job := []byte(`{"job":"j-1","speed":0.5,"segments":[{"blade":false,"points":[[54.1,25.1]]}]}`)
-	for path, body := range map[string][]byte{
+	path := []byte(`{"path":"j-1","segments":[{"type":"transit","points":[[54.1,25.1]]}]}`)
+	for file, body := range map[string][]byte{
 		filepath.Join(fw, "gateway", "1.0.0.bin"):   gwImage,
 		filepath.Join(fw, "autopilot", "1.0.0.bin"): apImage,
-		filepath.Join(jobs, "j-1.json"):             job,
 	} {
-		if err := os.WriteFile(path, body, 0o644); err != nil {
+		if err := os.WriteFile(file, body, 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	app := startAppOptions(t, newDatabase(t), appOptions{firmwareDir: fw, jobDir: jobs})
+	pool := newDatabase(t)
+	if err := transfer.StorePath(context.Background(), pool, "j-1", path); err != nil {
+		t.Fatal(err)
+	}
+	app := startAppOptions(t, pool, appOptions{firmwareDir: fw})
 	dev := app.mqttConnect()
 	for _, set := range transfer.Sets {
 		dev.subscribe(dev.topic(set.Chunk()), dev.topic(set.Response()))
 	}
 
-	// A job file and a firmware image side by side: two sets, requests open at once.
-	for _, set := range []transfer.Set{transfer.AutopilotJob, transfer.AutopilotFirmware} {
-		body, _ := json.Marshal(map[string]any{"request_id": "first-" + strings.ReplaceAll(string(set), "/", "-"), "file": map[bool]string{true: "j-1.json", false: "1.0.0.bin"}[set == transfer.AutopilotJob], "chunk": 0})
+	// A path file and a firmware image side by side: two sets, requests open at once.
+	for _, set := range []transfer.Set{transfer.AutopilotPath, transfer.AutopilotFirmware} {
+		body, _ := json.Marshal(map[string]any{"request_id": "first-" + strings.ReplaceAll(string(set), "/", "-"), "file": map[bool]string{true: "j-1.json", false: "1.0.0.bin"}[set == transfer.AutopilotPath], "chunk": 0})
 		dev.publish(dev.topic(set.Request()), body)
 	}
-	for _, set := range []transfer.Set{transfer.AutopilotJob, transfer.AutopilotFirmware} {
+	for _, set := range []transfer.Set{transfer.AutopilotPath, transfer.AutopilotFirmware} {
 		frame, err := transfer.ParseFrame(dev.nextOn(dev.topic(set.Chunk())))
 		if err != nil {
 			t.Fatal(err)
@@ -85,8 +89,8 @@ func TestTransferServesFirmwareAndJobFilesSideBySide(t *testing.T) {
 		}
 	}
 
-	if got := dev.download(transfer.AutopilotJob, "j-1.json"); !bytes.Equal(got, job) {
-		t.Fatal("job file differs")
+	if got := dev.download(transfer.AutopilotPath, "j-1.json"); !bytes.Equal(got, path) {
+		t.Fatal("path file differs")
 	}
 	if got := dev.download(transfer.AutopilotFirmware, "1.0.0.bin"); !bytes.Equal(got, apImage) {
 		t.Fatal("autopilot image differs")
@@ -94,16 +98,20 @@ func TestTransferServesFirmwareAndJobFilesSideBySide(t *testing.T) {
 	if got := dev.download(transfer.GatewayFirmware, "1.0.0.bin"); !bytes.Equal(got, gwImage) {
 		t.Fatal("gateway image differs")
 	}
-	t.Logf("job %d bytes, autopilot image %d bytes and gateway image %d bytes downloaded, hashes match", len(job), len(apImage), len(gwImage))
+	t.Logf("path %d bytes, autopilot image %d bytes and gateway image %d bytes downloaded, hashes match", len(path), len(apImage), len(gwImage))
 
-	// The sets are kept apart: the job file is not in a firmware set.
+	// The sets are kept apart: the path file is not in a firmware set.
 	ask := func(set transfer.Set, body string) transfer.ErrorMessage {
 		t.Helper()
 		dev.publish(dev.topic(set.Request()), []byte(body))
 		return decode[transfer.ErrorMessage](t, dev.nextOn(dev.topic(set.Response())))
 	}
 	eq(t, ask(transfer.AutopilotFirmware, `{"request_id":"e1","file":"j-1.json","chunk":0}`).Error.Code, "not_found")
-	eq(t, ask(transfer.AutopilotJob, `{"request_id":"e2","file":"1.0.0.bin","chunk":0}`).Error.Code, "not_found")
+	eq(t, ask(transfer.AutopilotPath, `{"request_id":"e2","file":"1.0.0.bin","chunk":0}`).Error.Code, "not_found")
+	// A path id that is not in the table is not_found, as a missing file is (§12.3).
+	missing := ask(transfer.AutopilotPath, `{"request_id":"e5","file":"j-404.json","chunk":0}`)
+	eq(t, missing.Error.Code, "not_found")
+	eq(t, missing.RequestID, "e5")
 	bad := ask(transfer.GatewayFirmware, `{"request_id":"e3","file":"../autopilot/1.0.0.bin","chunk":0}`)
 	eq(t, bad.Error.Code, "bad_request")
 	eq(t, bad.RequestID, "e3")

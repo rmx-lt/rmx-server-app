@@ -9,11 +9,12 @@ import (
 	"math"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 )
 
 // The simulated autopilot (wiki Mower-Protocol §7 to §11): the state machine of
-// §8, events, live driving, recording and jobs. The motion model is in
+// §8, events, live driving, recording and paths. The motion model is in
 // motion.go. Everything runs from step(now), so tests drive it with a fake
 // clock.
 
@@ -32,17 +33,18 @@ type faultInfo struct {
 }
 
 type apState struct {
-	Protocol  string     `json:"protocol"`
-	Boot      int        `json:"boot"`
-	Firmware  string     `json:"firmware"`
-	Previous  *string    `json:"previous"`
-	Partition string     `json:"partition"`
-	Mode      string     `json:"mode"`
-	Paused    *string    `json:"paused"`
-	Job       *string    `json:"job"`
-	Recording *string    `json:"recording"`
-	Fault     *faultInfo `json:"fault"`
-	Time      *float64   `json:"time"`
+	Protocol   string             `json:"protocol"`
+	Boot       int                `json:"boot"`
+	Firmware   string             `json:"firmware"`
+	Previous   *string            `json:"previous"`
+	Partition  string             `json:"partition"`
+	Mode       string             `json:"mode"`
+	Paused     *string            `json:"paused"`
+	Path       *string            `json:"path"`
+	Recording  *string            `json:"recording"`
+	Fault      *faultInfo         `json:"fault"`
+	SpeedLimit map[string]float64 `json:"speed_limit"`
+	Time       *float64           `json:"time"`
 }
 
 const (
@@ -63,16 +65,16 @@ var cmdModes = map[string][]string{
 	"follow":       {"idle", "manual"},
 	"record_start": {"idle", "manual"},
 	"record_stop":  {"recording"},
-	"job_start":    {"idle"},
-	"pause":        {"job"},
-	"resume":       {"job"},
+	"path_start":   {"idle"},
+	"pause":        {"path"},
+	"resume":       {"path"},
 	"clear_fault":  {"fault"},
 	"ota":          {"idle"},
 	"restart":      {"idle", "fault"},
 }
 
-var autopilotCmds = []string{"stop", "manual_start", "manual_stop", "blade", "follow", "record_start", "record_stop",
-	"job_start", "pause", "resume", "clear_fault", "monitor_start", "monitor_stop", "ota", "restart"}
+var autopilotCmds = []string{"stop", "manual_start", "manual_stop", "blade", "speed_limit", "follow", "record_start", "record_stop",
+	"path_start", "pause", "resume", "clear_fault", "monitor_start", "monitor_stop", "ota", "restart"}
 
 type autopilot struct {
 	cfg simConfig
@@ -84,7 +86,7 @@ type autopilot struct {
 	version string
 	recv    *receiver
 	mon     *monitor
-	jobDL   *downloader
+	pathDL  *downloader
 	fwDL    *downloader
 	defs    []metricDef
 	cat     catalogue
@@ -92,7 +94,7 @@ type autopilot struct {
 	// state (§7.1)
 	mode      string
 	paused    *string
-	job       *string
+	pathID    *string
 	recording *string
 	fault     *faultInfo
 	seq       int
@@ -153,9 +155,9 @@ func newAutopilot(cfg simConfig, sw *switches, sv *store, gw *gateway) *autopilo
 	a.recv = newReceiver(cfg.cmdMemory, cfg.clock, func() bool { return a.clockSet }, &sw.dropAcks)
 	a.recv.publish = func(p []byte) { a.out("cmd/ack", 1, false, p) }
 	a.mon = newMonitor(400, func(p []byte) { a.out("monitor", 0, false, p) }, a.monRates, a.value)
-	a.jobDL = newDownloader(func(p []byte) { a.out("job/req", 1, false, p) })
+	a.pathDL = newDownloader(func(p []byte) { a.out("path/req", 1, false, p) })
 	a.fwDL = newDownloader(func(p []byte) { a.out("fw/req", 1, false, p) })
-	a.jobDL.timeout, a.fwDL.timeout = cfg.dlTimeout, cfg.dlTimeout
+	a.pathDL.timeout, a.fwDL.timeout = cfg.dlTimeout, cfg.dlTimeout
 	a.confirm = a.st.PendingOTA
 	a.startUp(cfg.clock(), "power_on")
 	return a
@@ -164,7 +166,7 @@ func newAutopilot(cfg simConfig, sw *switches, sv *store, gw *gateway) *autopilo
 // startUp is a boot: everything volatile starts again.
 func (a *autopilot) startUp(now time.Time, reason string) {
 	a.startedAt, a.lastStep, a.lastHB = now, now, time.Time{}
-	a.mode, a.paused, a.job, a.recording, a.fault = "idle", nil, nil, nil, nil
+	a.mode, a.paused, a.pathID, a.recording, a.fault = "idle", nil, nil, nil, nil
 	a.seq, a.lastState = 0, ""
 	a.hbSeen, a.clockSet, a.rawUp, a.lost, a.downSince = false, false, false, false, now
 	a.dropped = 0
@@ -175,7 +177,7 @@ func (a *autopilot) startUp(now time.Time, reason string) {
 	a.fixLostAt, a.batteryWarned = time.Time{}, false
 	a.prevRTK = a.fixLevel() == 4
 	a.tele = map[string]time.Time{}
-	a.jobDL.cancel()
+	a.pathDL.cancel()
 	a.fwDL.cancel()
 	a.mon.endAll()
 	a.recv.reset()
@@ -250,10 +252,10 @@ func (a *autopilot) inbound(rel string, payload []byte, now time.Time) {
 		a.onCommand(payload, now)
 	case "drive":
 		a.onDrive(payload, now)
-	case "job/chunk":
-		a.jobDL.onChunk(payload, now)
-	case "job/res":
-		a.jobDL.onRes(payload)
+	case "path/chunk":
+		a.pathDL.onChunk(payload, now)
+	case "path/res":
+		a.pathDL.onRes(payload)
 	case "fw/chunk":
 		a.fwDL.onChunk(payload, now)
 	case "fw/res":
@@ -284,7 +286,8 @@ func (a *autopilot) onDrive(payload []byte, now time.Time) {
 	}
 	a.haveSeq, a.lastSeq = true, *sp.Seq
 	a.driving, a.lastDriveAt = true, now
-	a.tgtV = math.Max(-maxSpeed, math.Min(maxSpeed, *sp.V))
+	m := a.limitFor("manual")
+	a.tgtV = math.Max(-m, math.Min(m, *sp.V))
 	a.tgtW = math.Max(-maxTurn, math.Min(maxTurn, *sp.W))
 }
 
@@ -326,6 +329,8 @@ func (a *autopilot) onCommand(payload []byte, now time.Time) {
 		}
 		a.blade = on
 		r.done(env, nil)
+	case "speed_limit":
+		a.cmdSpeedLimit(env)
 	case "follow":
 		a.cmdFollow(env, now)
 	case "record_start":
@@ -334,8 +339,8 @@ func (a *autopilot) onCommand(payload []byte, now time.Time) {
 		n := a.stopRecording(now, true)
 		a.setMode("manual")
 		r.done(env, map[string]any{"index": n})
-	case "job_start":
-		a.cmdJobStart(env, now)
+	case "path_start":
+		a.cmdPathStart(env, now)
 	case "pause":
 		if a.paused == nil {
 			a.pause("command", now)
@@ -383,8 +388,8 @@ func (a *autopilot) setMode(mode string) {
 	a.mode = mode
 	a.blade = false
 	a.haveSeq, a.driving, a.tgtV, a.tgtW = false, false, 0, 0
-	if mode != "job" {
-		a.paused, a.job = nil, nil
+	if mode != "path" {
+		a.paused, a.pathID = nil, nil
 	}
 	if mode != "recording" {
 		a.recording = nil
@@ -414,26 +419,28 @@ func (a *autopilot) cmdStop(env cmdEnv, now time.Time) {
 func (a *autopilot) cmdFollow(env cmdEnv, now time.Time) {
 	pts, ok := parsePoints(env.raw["points"], 100)
 	reverse, _ := env.boolean("reverse")
-	blade, _ := env.boolean("blade")
-	speed, hasSpeed := env.num("speed")
+	typ := "transit"
+	if env.has("type") {
+		typ, _ = env.str("type")
+	}
 	switch {
 	case !ok:
 		a.recv.fail(env, "bad_request", "points must be 1-100 points [lat, lon]")
 		return
-	case env.has("reverse") && !isBool(env.raw["reverse"]), env.has("blade") && !isBool(env.raw["blade"]),
-		env.has("speed") && (!hasSpeed || speed <= 0):
-		a.recv.fail(env, "bad_request", "reverse and blade are booleans, speed a number above 0")
+	case env.has("reverse") && !isBool(env.raw["reverse"]), !slices.Contains(segmentTypes, typ):
+		a.recv.fail(env, "bad_request", "reverse is a boolean, type one of "+strings.Join(segmentTypes, ", "))
 		return
 	case a.fixLevel() < 4:
 		a.recv.fail(env, "no_fix", "No fixed RTK solution")
 		return
 	}
 	a.recv.accepted(env)
-	p := &pathRun{kind: "follow", env: env, returnMode: a.mode, reverse: reverse, speed: speed, phase: "drive", reached: -1}
+	p := &pathRun{kind: "follow", env: env, returnMode: a.mode, reverse: reverse, phase: "drive", reached: -1}
 	for _, pt := range pts {
 		x, y := a.toLocal(pt[0], pt[1])
 		p.pts = append(p.pts, pt2{x, y})
-		p.bladeOn = append(p.bladeOn, blade)
+		p.bladeOn = append(p.bladeOn, typ != "transit")
+		p.types = append(p.types, typ)
 		p.segFirst = append(p.segFirst, false)
 	}
 	a.startPath(p)
@@ -444,8 +451,8 @@ func isBool(raw json.RawMessage) bool {
 	return json.Unmarshal(raw, &b) == nil
 }
 
-func (a *autopilot) cmdJobStart(env cmdEnv, now time.Time) {
-	job, ok1 := env.str("job")
+func (a *autopilot) cmdPathStart(env cmdEnv, now time.Time) {
+	path, ok1 := env.str("path")
 	size, ok2 := env.num("size")
 	sum, ok3 := env.str("sha256")
 	from := 0.0
@@ -453,9 +460,9 @@ func (a *autopilot) cmdJobStart(env cmdEnv, now time.Time) {
 	if env.has("from_point") {
 		from, okFrom = env.num("from_point")
 	}
-	if !ok1 || !validID(job) || !ok2 || size < 0 || size != math.Trunc(size) || size > maxJobBytes ||
+	if !ok1 || !validID(path) || !ok2 || size < 0 || size != math.Trunc(size) || size > maxPathBytes ||
 		!ok3 || !sha256Re.MatchString(sum) || !okFrom || from < 0 || from != math.Trunc(from) {
-		a.recv.fail(env, "bad_request", "job_start needs job (an id), size (bytes), sha256 (64 hex characters) and optionally from_point")
+		a.recv.fail(env, "bad_request", "path_start needs path (an id), size (bytes), sha256 (64 hex characters) and optionally from_point")
 		return
 	}
 	if a.fixLevel() < 4 {
@@ -463,59 +470,58 @@ func (a *autopilot) cmdJobStart(env cmdEnv, now time.Time) {
 		return
 	}
 	a.recv.accepted(env)
-	p := &pathRun{kind: "job", env: env, returnMode: "idle", phase: "download", reached: -1,
-		jobID: job, size: int64(size), sha: sum, from: int(from)}
+	p := &pathRun{kind: "path", env: env, returnMode: "idle", phase: "download", reached: -1,
+		pathID: path, size: int64(size), sha: sum, from: int(from)}
 	a.startPath(p)
-	a.job = &job
-	a.jobDL.start(now, job+".json", nil, func(data []byte, _ [32]byte, err *dlError) { a.onJobFile(p, data, err) })
+	a.pathID = &path
+	a.pathDL.start(now, path+".json", nil, func(data []byte, _ [32]byte, err *dlError) { a.onPathFile(p, data, err) })
 }
 
-// onJobFile checks and parses the downloaded file (§11, step 3).
-func (a *autopilot) onJobFile(p *pathRun, data []byte, err *dlError) {
+// onPathFile checks and parses the downloaded file (§11, step 3).
+func (a *autopilot) onPathFile(p *pathRun, data []byte, err *dlError) {
 	if a.path != p {
 		return
 	}
 	now := a.cfg.clock()
 	if err != nil {
-		code, msg := downloadError(err, "bad_job")
+		code, msg := downloadError(err, "bad_path")
 		a.endPath(code, msg, nil, now)
 		return
 	}
 	sum := sha256.Sum256(data)
 	if int64(len(data)) != p.size || hex.EncodeToString(sum[:]) != p.sha {
-		a.endPath("bad_job", "the file does not match size and sha256 of the command", nil, now)
+		a.endPath("bad_path", "the file does not match size and sha256 of the command", nil, now)
 		return
 	}
-	if msg := a.loadJob(p, data); msg != "" {
-		a.endPath("bad_job", msg, nil, now)
+	if msg := a.loadPath(p, data); msg != "" {
+		a.endPath("bad_path", msg, nil, now)
 		return
 	}
 	p.phase = "drive"
 }
 
-func (a *autopilot) loadJob(p *pathRun, data []byte) string {
+func (a *autopilot) loadPath(p *pathRun, data []byte) string {
 	var f struct {
-		Job      string   `json:"job"`
-		Speed    *float64 `json:"speed"`
+		Path     string `json:"path"`
 		Segments []struct {
-			Blade  bool     `json:"blade"`
+			Type   string   `json:"type"`
 			Points []latlon `json:"points"`
 		} `json:"segments"`
 	}
 	if json.Unmarshal(data, &f) != nil {
-		return "the file is not a job"
+		return "the file is not a path"
 	}
-	if f.Job != p.jobID {
-		return "the job id in the file differs from the command"
+	if f.Path != p.pathID {
+		return "the path id in the file differs from the command"
 	}
 	if len(f.Segments) == 0 {
-		return "the job has no segments"
+		return "the path has no segments"
 	}
-	if f.Speed != nil && *f.Speed > 0 {
-		p.speed = *f.Speed
-	}
-	p.pts, p.bladeOn, p.segFirst = nil, nil, nil
+	p.pts, p.bladeOn, p.types, p.segFirst = nil, nil, nil, nil
 	for _, s := range f.Segments {
+		if !slices.Contains(segmentTypes, s.Type) {
+			return "a segment has no known type"
+		}
 		if len(s.Points) == 0 {
 			return "a segment has no points"
 		}
@@ -525,7 +531,8 @@ func (a *autopilot) loadJob(p *pathRun, data []byte) string {
 			}
 			x, y := a.toLocal(pt[0], pt[1])
 			p.pts = append(p.pts, pt2{x, y})
-			p.bladeOn = append(p.bladeOn, s.Blade && i > 0)
+			p.bladeOn = append(p.bladeOn, s.Type != "transit" && i > 0)
+			p.types = append(p.types, s.Type)
 			p.segFirst = append(p.segFirst, i == 0)
 		}
 	}
@@ -648,8 +655,8 @@ func (a *autopilot) confirmUpdate() {
 func (a *autopilot) startPath(p *pathRun) {
 	a.path = p
 	a.long = &longCmd{env: p.env}
-	a.setMode("job")
-	a.paused, a.job = nil, nil
+	a.setMode("path")
+	a.paused, a.pathID = nil, nil
 	a.fixLostAt = time.Time{}
 }
 
@@ -661,14 +668,14 @@ func (a *autopilot) endPath(code, msg string, result any, now time.Time) {
 		return
 	}
 	a.path, a.long = nil, nil
-	a.jobDL.cancel()
+	a.pathDL.cancel()
 	if code == "" {
 		a.recv.done(p.env, result)
 	} else {
 		a.recv.fail(p.env, code, msg)
 	}
 	back := p.returnMode
-	if a.mode == "job" {
+	if a.mode == "path" {
 		a.setMode(back)
 	}
 	a.blade, a.speed, a.omega, a.tgtV, a.tgtW = false, 0, 0, 0, 0
@@ -689,7 +696,7 @@ func (a *autopilot) unpause(now time.Time) {
 
 func (a *autopilot) updatePauseDL(now time.Time) {
 	if a.path != nil && a.path.phase == "download" {
-		a.jobDL.setPaused(a.paused != nil, now)
+		a.pathDL.setPaused(a.paused != nil, now)
 	}
 }
 
@@ -728,7 +735,7 @@ func (a *autopilot) enterFault(code string, now time.Time) {
 
 func (a *autopilot) publishState(now time.Time) {
 	s := apState{Protocol: protocolVersion, Boot: a.st.Boot, Firmware: a.version, Previous: a.st.Previous,
-		Partition: a.st.Partition, Mode: a.mode, Paused: a.paused, Job: a.job, Recording: a.recording, Fault: a.fault}
+		Partition: a.st.Partition, Mode: a.mode, Paused: a.paused, Path: a.pathID, Recording: a.recording, Fault: a.fault, SpeedLimit: a.limits()}
 	key, _ := json.Marshal(s)
 	if string(key) == a.lastState {
 		return

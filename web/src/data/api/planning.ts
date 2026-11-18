@@ -1,35 +1,33 @@
 import type { ApiError } from "./generated/ApiError";
 import type { ErrorCode } from "./generated/ErrorCode";
 import type { GeoAnchor as WireGeoAnchor } from "./generated/GeoAnchor";
-import type { LayerSetting } from "./generated/LayerSetting";
 import type { MapCreate } from "./generated/MapCreate";
 import type { MapDetail } from "./generated/MapDetail";
 import type { MapDoc } from "./generated/MapDoc";
 import type { MapList } from "./generated/MapList";
 import type { MapSummary } from "./generated/MapSummary";
 import type { MapUpdate } from "./generated/MapUpdate";
-import type { RoutePoint } from "./generated/RoutePoint";
 import type { Setting } from "./generated/Setting";
 import type { SettingList } from "./generated/SettingList";
 import type { Zone } from "./generated/Zone";
-import type { ZoneCategory } from "./generated/ZoneCategory";
+import type { Area } from "./generated/Area";
+import type { AreaCategory } from "./generated/AreaCategory";
 
 // REST client of the planning API (wiki Server-App, "Planning API"): the
 // user's maps and settings. Every call needs the session cookie, which the
 // browser sends by itself.
 
 export type {
-    LayerSetting,
     MapCreate,
     MapDetail,
     MapDoc,
     MapSummary,
     MapUpdate,
-    RoutePoint,
     Setting,
     WireGeoAnchor,
+    Area,
+    AreaCategory,
     Zone,
-    ZoneCategory,
 };
 
 /** A request the server refused, or that never reached it (status 0). */

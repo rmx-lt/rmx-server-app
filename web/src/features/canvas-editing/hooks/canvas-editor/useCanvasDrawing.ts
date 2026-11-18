@@ -1,22 +1,17 @@
 import { useCallback, useEffect, useRef } from "react";
 import type Konva from "konva";
 import type { ActiveTool } from "@/features/canvas-editing/types/canvas";
-import { ZONE_CATEGORY, defaultZoneTypeForMap, type ZoneCategory, type ZoneType } from "@/config/db-ops/enums";
+import { AREA_CATEGORY, type AreaCategory } from "@/config/db-ops/enums";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 import { useCanvasDrawingStore } from "@/features/canvas-editing/stores/canvasDrawingStore";
-import { useMapStore } from "@/model/mapStore";
-import { useMapPointStore } from "@/model/mapPointStore";
-import { useCanvasToolStore } from "@/features/canvas-editing/stores/canvasToolStore";
-import { useConfirmationModalStore } from "@/components/modals/confirmation-modal/confirmationModalStore";
 
 interface UseCanvasDrawingOptions {
     activeTool: ActiveTool | null;
     stageRef: React.RefObject<Konva.Stage | null>;
     clearSelection: () => void;
     addObject: (
-        category: ZoneCategory,
+        category: AreaCategory,
         points: Point[],
-        type: ZoneType,
     ) => void;
 }
 
@@ -65,7 +60,7 @@ export function useCanvasDrawing({
             const ptr = stage.getRelativePointerPosition();
             if (!ptr) return;
             pendingPointerPosRef.current = { x: ptr.x, y: ptr.y };
-            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
+            if (activeTool === "addMowingArea" || activeTool === "addNoGoArea") {
                 pendingMousePosRef.current = { x: ptr.x, y: ptr.y };
             }
             if (rafIdRef.current === null) {
@@ -90,49 +85,7 @@ export function useCanvasDrawing({
         (e: Konva.KonvaEventObject<MouseEvent>) => {
             if (e.evt.button !== 0) return;
 
-            if (activeTool === "addStartPoint" || activeTool === "addEndPoint" || activeTool === "addStartEndPoint") {
-                const stage = stageRef.current;
-                if (!stage) return;
-                if (e.target !== stage) return;
-                const ptr = stage.getRelativePointerPosition();
-                if (!ptr) return;
-                const type = activeTool === "addStartPoint" ? "start" : activeTool === "addEndPoint" ? "end" : "start_end";
-                const mapId = useMapStore.getState().map.id;
-                const { startPoint, endPoint, startEndPoint, upsertPoint } = useMapPointStore.getState();
-
-                let conflictMessage: string | null = null;
-                if (type === "start_end") {
-                    if (startPoint && endPoint) {
-                        conflictMessage = "A start and end point already exist. Continuing will remove them.";
-                    } else if (startPoint) {
-                        conflictMessage = "A start point already exists. Continuing will remove it.";
-                    } else if (endPoint) {
-                        conflictMessage = "An end point already exists. Continuing will remove it.";
-                    }
-                } else if (startEndPoint) {
-                    conflictMessage = "A Start & End point already exists. Continuing will remove it.";
-                }
-
-                const doPlace = async () => {
-                    await upsertPoint(mapId, type, { x: ptr.x, y: ptr.y });
-                    useCanvasToolStore.getState().setActiveTool(null);
-                };
-
-                if (conflictMessage) {
-                    useConfirmationModalStore.getState().requestConfirmation({
-                        title: "Point type already in use",
-                        message: conflictMessage,
-                        tone: "warning",
-                        confirmLabel: "Continue",
-                        confirmAction: doPlace,
-                    });
-                } else {
-                    doPlace();
-                }
-                return;
-            }
-
-            if (activeTool === "addMowingZone" || activeTool === "addNoGoZone") {
+            if (activeTool === "addMowingArea" || activeTool === "addNoGoArea") {
                 const stage = stageRef.current;
                 if (!stage) return;
                 if (e.target !== stage) return;
@@ -153,14 +106,12 @@ export function useCanvasDrawing({
         (e: Konva.KonvaEventObject<PointerEvent>) => {
             e.evt.preventDefault();
             if (
-                (activeTool === "addMowingZone" || activeTool === "addNoGoZone") &&
+                (activeTool === "addMowingArea" || activeTool === "addNoGoArea") &&
                 drawingPoints.length >= 3
             ) {
-                const objectType = defaultZoneTypeForMap(useMapStore.getState().map.type);
                 addObject(
-                    activeTool === "addMowingZone" ? ZONE_CATEGORY.MOWING : ZONE_CATEGORY.NO_GO,
+                    activeTool === "addMowingArea" ? AREA_CATEGORY.MOWING : AREA_CATEGORY.NO_GO,
                     drawingPoints,
-                    objectType,
                 );
                 cancelDrawing();
             }

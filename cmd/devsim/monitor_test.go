@@ -223,7 +223,7 @@ func TestGatewayMonitor(t *testing.T) {
 	r.wantAck("gateway", "f", "done", "")
 	r.cmd("gateway", "g", "monitor_start", monCmd("w", `["usage.mqtt.up.*"]`, 5)...)
 	r.wantAck("gateway", "g", "failed", "bad_request")
-	r.cmd("gateway", "h", "monitor_start", monCmd("x", `["usage.mqtt.up.autopilot/job/chunk"]`, 5)...)
+	r.cmd("gateway", "h", "monitor_start", monCmd("x", `["usage.mqtt.up.autopilot/path/chunk"]`, 5)...)
 	r.wantAck("gateway", "h", "failed", "bad_request")
 	// Counters are sent as the running count and grow.
 	r.takeJSON("gateway/monitor")

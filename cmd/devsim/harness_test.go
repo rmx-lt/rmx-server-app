@@ -29,7 +29,7 @@ type rig struct {
 	out   []outMsg
 	read  map[string]int // per topic: how many of its messages were taken
 	files map[string][]byte
-	// drop[set]: answers to chunk requests on that set (job, gw-fw, ap-fw) that
+	// drop[set]: answers to chunk requests on that set (path, gw-fw, ap-fw) that
 	// are not sent; served counts every request.
 	drop   map[string]int
 	served map[string]int
@@ -166,9 +166,9 @@ func (r *rig) wantAck(board, id, state, errCode string) map[string]any {
 // ---- the server's chunk service ---------------------------------------------------
 
 // setOf maps a request topic to a name of a set of files.
-var reqTopics = map[string]string{"autopilot/job/req": "job", "gateway/fw/req": "gw-fw", "autopilot/fw/req": "ap-fw"}
-var chunkTopics = map[string]string{"job": "autopilot/job/chunk", "gw-fw": "gateway/fw/chunk", "ap-fw": "autopilot/fw/chunk"}
-var resTopics = map[string]string{"job": "autopilot/job/res", "gw-fw": "gateway/fw/res", "ap-fw": "autopilot/fw/res"}
+var reqTopics = map[string]string{"autopilot/path/req": "path", "gateway/fw/req": "gw-fw", "autopilot/fw/req": "ap-fw"}
+var chunkTopics = map[string]string{"path": "autopilot/path/chunk", "gw-fw": "gateway/fw/chunk", "ap-fw": "autopilot/fw/chunk"}
+var resTopics = map[string]string{"path": "autopilot/path/res", "gw-fw": "gateway/fw/res", "ap-fw": "autopilot/fw/res"}
 
 func (r *rig) serve() {
 	for topic, set := range reqTopics {
@@ -226,7 +226,7 @@ func buildFrames(rid string, file []byte) [][]byte {
 	return out
 }
 
-// ---- jobs and positions -----------------------------------------------------------
+// ---- paths and positions -----------------------------------------------------------
 
 // geo is a point d metres east and n metres north of the simulator's origin.
 func (r *rig) geo(east, north float64) [2]float64 {
@@ -235,12 +235,12 @@ func (r *rig) geo(east, north float64) [2]float64 {
 }
 
 type seg struct {
-	Blade  bool         `json:"blade"`
+	Type   string       `json:"type"`
 	Points [][2]float64 `json:"points"`
 }
 
-func jobFile(id string, speed float64, segs ...seg) []byte {
-	b, _ := json.Marshal(map[string]any{"job": id, "speed": speed, "segments": segs})
+func pathFile(id string, segs ...seg) []byte {
+	b, _ := json.Marshal(map[string]any{"path": id, "segments": segs})
 	return b
 }
 
@@ -249,11 +249,11 @@ func shaHex(b []byte) string {
 	return hex.EncodeToString(s[:])
 }
 
-// startJob puts a file in the job set and sends job_start.
-func (r *rig) startJob(id string, file []byte, extra ...string) {
-	r.files["job/"+id+".json"] = file
-	params := append([]string{fmt.Sprintf(`"job":%q,"size":%d,"sha256":%q`, id, len(file), shaHex(file))}, extra...)
-	r.cmd("autopilot", "c-"+id, "job_start", params...)
+// startPath puts a file in the path set and sends path_start.
+func (r *rig) startPath(id string, file []byte, extra ...string) {
+	r.files["path/"+id+".json"] = file
+	params := append([]string{fmt.Sprintf(`"path":%q,"size":%d,"sha256":%q`, id, len(file), shaHex(file))}, extra...)
+	r.cmd("autopilot", "c-"+id, "path_start", params...)
 }
 
 func pointsJSON(pts ...[2]float64) string {

@@ -1,6 +1,7 @@
 ﻿import { useCallback, useRef, useState } from "react";
 import type React from "react";
 import type Konva from "konva";
+import { useCanvasViewStore } from "@/features/canvas-editing/stores/canvasViewStore";
 import type { Point } from "@/features/canvas-editing/utils/canvasGeometry";
 
 /**
@@ -29,6 +30,7 @@ export function useCanvasPanning(
             if (!stage) return;
             isPanningRef.current = true;
             setIsPanning(true);
+            useCanvasViewStore.getState().setPanning(true);
             stage.startDrag();
         }
     }, [stageRef]);
@@ -45,6 +47,7 @@ export function useCanvasPanning(
         if (!isPanningRef.current) return;
         isPanningRef.current = false;
         setIsPanning(false);
+        useCanvasViewStore.getState().setPanning(false);
         const stage = stageRef.current;
         if (stage) setPosition({ x: stage.x(), y: stage.y() });
     }, [stageRef, setPosition]);

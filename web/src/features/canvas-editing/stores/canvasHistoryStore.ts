@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Zone } from "@/data/planning/schemaTypes";
+import type { Area } from "@/data/planning/schemaTypes";
 import { useCanvasObjectStore } from "./canvasObjectStore";
 
 // ---------------------------------------------------------------------------
@@ -7,7 +7,7 @@ import { useCanvasObjectStore } from "./canvasObjectStore";
 // ---------------------------------------------------------------------------
 
 interface CanvasSnapshot {
-    objects: Zone[];
+    objects: Area[];
 }
 
 // ---------------------------------------------------------------------------
@@ -19,8 +19,8 @@ function diffSnapshots(
     from: CanvasSnapshot,
     to: CanvasSnapshot,
 ): {
-    dirtyObjects: Zone[];
-    deletedObjects: Zone[];
+    dirtyObjects: Area[];
+    deletedObjects: Area[];
 } {
     const fromObjectMap = new Map(from.objects.map((o) => [o.id, o]));
     const toObjectIds = new Set(to.objects.map((o) => o.id));

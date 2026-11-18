@@ -1,6 +1,107 @@
-@import 'material-symbols/outlined.css';
+@import "tailwindcss";
 
-::selection {
-    background-color: #0d9488; /* teal-600 */
-    color: #ffffff;
+/*
+ * Theme tokens, defined once. `@theme` makes each one a utility (bg-surface,
+ * text-fg, border-line, ...) and a CSS variable. The values below are the light
+ * set; the dark set overrides them under data-theme="dark". The attribute is set
+ * before first paint by the script in public/index.html and by src/utils/theme.ts.
+ * Warm neutrals after the Claude desktop app and one blue accent. `static` keeps the
+ * canvas tokens, which only JS reads, in the output.
+ */
+@theme static {
+    --color-page: #f0eee6; /* app background, behind panels; canvas */
+    --color-surface: #faf9f5; /* panels, bars, menus, modals, inputs */
+    --color-raised: #f0eee6; /* resting buttons, tabs, fields on a surface */
+    --color-hover: #e8e6dc;
+    --color-pressed: #ddd9cc;
+    --color-line: #e5e2d8;
+    --color-line-strong: #cdc9bb;
+    --color-fg: #1f1e1d;
+    --color-muted: #5e5d59;
+    --color-faint: #87867f; /* placeholders, disabled, quiet icons */
+    --color-accent: #1a62bd;
+    --color-accent-hover: #154f9b;
+    --color-on-accent: #ffffff;
+    --color-danger: #b3261e;
+    --color-danger-soft: #fbeae8;
+    --color-ok: #2f7d46;
+    --color-warn: #a86a0c;
+    --color-overlay: #1f1e1d66;
+    --color-tooltip: #1f1e1d; /* tooltip box: dark in both themes */
+    --color-on-tooltip: #f0eee6;
+    --color-tooltip-muted: #b0aea5;
+
+    /* Canvas (read by Konva through src/utils/theme.ts, so hex only) */
+    --color-canvas-grid: #e0ddd0;
+    --color-canvas-mowing: #1f8a4c;
+    --color-canvas-mowing-fill: #1f8a4c33;
+    --color-canvas-mowing-fill-hover: #1f8a4c4d;
+    --color-canvas-mowing-fill-selected: #1f8a4c66;
+    --color-canvas-no-go: #cf3425;
+    --color-canvas-no-go-fill: #cf34253d;
+    --color-canvas-no-go-fill-hover: #cf342555;
+    --color-canvas-no-go-fill-selected: #cf342570;
+    --color-canvas-midpoint: #ffffffcc;
+    --color-canvas-midpoint-edge: #8f8c80;
+}
+
+:root[data-theme="dark"] {
+    --color-page: #1f1e1d;
+    --color-surface: #262624;
+    --color-raised: #30302e;
+    --color-hover: #3a3936;
+    --color-pressed: #46443f;
+    --color-line: #3a3935;
+    --color-line-strong: #55534d;
+    --color-fg: #f0eee6;
+    --color-muted: #b0aea5;
+    --color-faint: #86847c;
+    --color-accent: #5aa2f2;
+    --color-accent-hover: #7ab6f6;
+    --color-on-accent: #10161d;
+    --color-danger: #f0867c;
+    --color-danger-soft: #3d2523;
+    --color-ok: #6cc384;
+    --color-warn: #e3b251;
+    --color-overlay: #00000099;
+    --color-tooltip: #141413;
+    --color-on-tooltip: #f0eee6;
+    --color-tooltip-muted: #9c9a92;
+
+    --color-canvas-grid: #34332f;
+    --color-canvas-mowing: #4fd184;
+    --color-canvas-mowing-fill: #4fd18438;
+    --color-canvas-mowing-fill-hover: #4fd18452;
+    --color-canvas-mowing-fill-selected: #4fd1846b;
+    --color-canvas-no-go: #ff6b5e;
+    --color-canvas-no-go-fill: #ff6b5e45;
+    --color-canvas-no-go-fill-hover: #ff6b5e5e;
+    --color-canvas-no-go-fill-selected: #ff6b5e78;
+    --color-canvas-midpoint: #f0eee6cc;
+    --color-canvas-midpoint-edge: #8a877e;
+}
+
+:root {
+    color-scheme: light;
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+body {
+    @apply select-none; /* a tool, not a document; typed text and errors opt back in below */
+    background-color: var(--color-page);
+    color: var(--color-fg);
+}
+/* One placeholder colour for every field, dimmer than typed text; in the base layer so a placeholder: utility can still override it. */
+@layer base {
+    ::placeholder {
+        color: var(--color-faint);
+    }
+}
+/* Safari inherits user-select: none into inputs and stops them selecting. */
+input,
+textarea,
+[role="alert"] {
+    @apply select-text;
 }

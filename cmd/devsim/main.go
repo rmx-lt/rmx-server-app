@@ -1,7 +1,7 @@
 // devsim: a simulated mower for local development, both boards of wiki
 // Mower-Protocol: the gateway (status, state, catalogue, telemetry, commands,
 // monitor, ota) and the autopilot (state machine, telemetry, events, live
-// driving, recording, follow, jobs). It connects to the local broker
+// driving, recording, follow, paths). It connects to the local broker
 // (compose.dev.yaml) as a device and talks to the local rmx-server.
 //
 //	go run ./cmd/devsim                        # device "mower-sim"

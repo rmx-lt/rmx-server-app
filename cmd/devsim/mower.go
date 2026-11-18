@@ -96,7 +96,7 @@ func (m *mower) subscriptions() []string {
 	base := m.cfg.prefix + "/" + m.cfg.name + "/"
 	subs := []string{m.cfg.prefix + "/status/server"}
 	for _, t := range []string{"gateway/cmd", "gateway/fw/chunk", "gateway/fw/res",
-		"autopilot/cmd", "autopilot/drive", "autopilot/job/chunk", "autopilot/job/res",
+		"autopilot/cmd", "autopilot/drive", "autopilot/path/chunk", "autopilot/path/res",
 		"autopilot/fw/chunk", "autopilot/fw/res"} {
 		subs = append(subs, base+t)
 	}

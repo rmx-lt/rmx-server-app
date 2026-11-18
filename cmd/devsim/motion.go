@@ -25,22 +25,22 @@ const (
 type pt2 struct{ x, y float64 }
 
 type pathRun struct {
-	kind       string // "follow" or "job"
+	kind       string // "follow" or "path"
 	env        cmdEnv
 	returnMode string
 	reverse    bool
-	speed      float64 // limit from the command or the file; 0 = none
-	phase      string  // "download" or "drive"
+	phase      string // "download" or "drive"
 	pts        []pt2
-	bladeOn    []bool // blade while driving to point i
-	segFirst   []bool // point i opens a segment
-	idx        int    // the point being driven to
-	reached    int    // the last point reached, -1 before the first
+	bladeOn    []bool   // blade while driving to point i
+	types      []string // segment type of point i
+	segFirst   []bool   // point i opens a segment
+	idx        int      // the point being driven to
+	reached    int      // the last point reached, -1 before the first
 
-	jobID string
-	size  int64
-	sha   string
-	from  int
+	pathID string
+	size   int64
+	sha    string
+	from   int
 }
 
 type recPoint struct {
@@ -132,7 +132,7 @@ func (a *autopilot) step(now time.Time) {
 	}
 	a.stepTelemetry(now)
 	a.mon.step(now)
-	a.jobDL.tick(now)
+	a.pathDL.tick(now)
 	a.fwDL.tick(now)
 }
 
@@ -168,10 +168,10 @@ func (a *autopilot) onLinkLost(now time.Time) {
 	a.blade = false
 	a.mon.endAll()
 	switch a.mode {
-	case "job":
+	case "path":
 		if a.paused == nil || *a.paused == "fix" {
 			a.pause("link", now)
-			a.event("job_paused", map[string]any{"reason": "link"})
+			a.event("path_paused", map[string]any{"reason": "link"})
 		}
 	case "recording":
 		session := ""
@@ -194,7 +194,7 @@ func (a *autopilot) stepFix(now time.Time) {
 		a.event("fix_regained", map[string]any{"fix": "rtk_fixed"})
 	}
 	a.prevRTK = rtk
-	if a.mode != "job" || a.path == nil {
+	if a.mode != "path" || a.path == nil {
 		return
 	}
 	switch {
@@ -202,7 +202,7 @@ func (a *autopilot) stepFix(now time.Time) {
 		a.fixLostAt = time.Time{}
 		if a.paused != nil && *a.paused == "fix" {
 			a.unpause(now)
-			a.event("job_resumed", map[string]any{"reason": "fix"})
+			a.event("path_resumed", map[string]any{"reason": "fix"})
 		}
 	case a.paused == nil:
 		if a.fixLostAt.IsZero() {
@@ -210,7 +210,7 @@ func (a *autopilot) stepFix(now time.Time) {
 		}
 		if now.Sub(a.fixLostAt) >= a.cfg.fixGrace {
 			a.pause("fix", now)
-			a.event("job_paused", map[string]any{"reason": "fix"})
+			a.event("path_paused", map[string]any{"reason": "fix"})
 		}
 	}
 }
@@ -243,7 +243,7 @@ func (a *autopilot) voltage() float64 {
 
 func (a *autopilot) stepPath(now time.Time) {
 	p := a.path
-	if p == nil || a.mode != "job" {
+	if p == nil || a.mode != "path" {
 		return
 	}
 	if p.phase != "drive" || a.paused != nil {
@@ -260,11 +260,11 @@ func (a *autopilot) stepPath(now time.Time) {
 	}
 	if p.idx >= len(p.pts) {
 		var result any = map[string]any{}
-		if p.kind == "job" {
+		if p.kind == "path" {
 			result = map[string]any{"points": len(p.pts)}
 		}
-		if p.kind == "job" {
-			a.sendJobPoint(now) // the server sees the last point before the job ends
+		if p.kind == "path" {
+			a.sendPathPoint(now) // the server sees the last point before the path ends
 		}
 		a.endPath("", "", result, now)
 		return
@@ -278,10 +278,7 @@ func (a *autopilot) stepPath(now time.Time) {
 		h += 180
 	}
 	errDeg := wrap180(bearing - h)
-	vmax := maxSpeed
-	if p.speed > 0 {
-		vmax = math.Min(vmax, p.speed)
-	}
+	vmax := a.limitFor(p.types[p.idx]) // read every tick: a new limit applies at once
 	w := clamp(-errDeg*math.Pi/180*1.8, -1.2, 1.2)
 	v := 0.0
 	if math.Abs(errDeg) < 30 {
@@ -298,10 +295,10 @@ func (a *autopilot) stepPath(now time.Time) {
 
 func (a *autopilot) integrate(dt float64) {
 	moving := a.mode == "manual" || a.mode == "recording" ||
-		(a.mode == "job" && a.path != nil && a.path.phase == "drive" && a.paused == nil)
+		(a.mode == "path" && a.path != nil && a.path.phase == "drive" && a.paused == nil)
 	if !moving {
 		a.speed, a.omega, a.tgtV, a.tgtW = 0, 0, 0, 0
-		if a.mode != "job" && a.mode != "manual" && a.mode != "recording" {
+		if a.mode != "path" && a.mode != "manual" && a.mode != "recording" {
 			a.blade = false
 		}
 	} else {
@@ -417,12 +414,12 @@ func (a *autopilot) stepTelemetry(now time.Time) {
 	a.out("telemetry", 0, false, payload)
 }
 
-// sendJobPoint publishes a telemetry message with the current job.point at
+// sendPathPoint publishes a telemetry message with the current path.point and path.points at
 // once, outside the metric's period.
-func (a *autopilot) sendJobPoint(now time.Time) {
-	a.tele["job.point"] = now
+func (a *autopilot) sendPathPoint(now time.Time) {
+	a.tele["path.point"], a.tele["path.points"] = now, now
 	payload, _ := json.Marshal(map[string]any{"time": a.timeOrNil(now), "boot": a.st.Boot,
-		"metrics": map[string]any{"job.point": a.value("job.point")}})
+		"metrics": map[string]any{"path.point": a.value("path.point"), "path.points": a.value("path.points")}})
 	a.out("telemetry", 0, false, payload)
 }
 
@@ -475,9 +472,14 @@ func (a *autopilot) value(name string) any {
 			return nil
 		}
 		return roundTo(1.0+0.4*math.Sin(up/3), 1)
-	case "job.point":
-		if a.path != nil && a.path.kind == "job" && a.path.reached >= 0 {
+	case "path.point":
+		if a.path != nil && a.path.kind == "path" && a.path.reached >= 0 {
 			return a.path.reached
+		}
+		return nil
+	case "path.points":
+		if a.path != nil && a.path.kind == "path" && a.path.pts != nil {
+			return len(a.path.pts)
 		}
 		return nil
 	case "battery.v":

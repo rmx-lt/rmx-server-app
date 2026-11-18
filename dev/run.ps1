@@ -5,8 +5,8 @@
 #   dev\run.ps1 -SimSet fix=rtk_float,drop-acks=2   # start it with switches set
 #   dev\run.ps1 -ResetDb    # drop the dev database first (fresh migrations, new dev login)
 #
-# Then open http://localhost:3000/ and log in with DEV_USER / DEV_PASSWORD
-# from .env (default dev / dev-password-123). Ctrl+C stops the Go server, the
+# Then open http://localhost:3000/ and log in with DEV_USER (default dev) / 123.
+# Ctrl+C stops the Go server, the
 # web dev server and the simulated mower (flip its switches while it runs with
 # `go run ./cmd/devsim ctl fix none`); the compose stack keeps running
 # (docker compose -f compose.dev.yaml down to stop it).
@@ -35,13 +35,11 @@ $dotenv = @{}
 foreach ($line in Get-Content .env) {
     if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') { $dotenv[$Matches[1]] = $Matches[2].Trim('"', "'") }
 }
-$devUser = if ($dotenv.DEV_USER) { $dotenv.DEV_USER } else { 'dev' }
-$devPassword = if ($dotenv.DEV_PASSWORD) { $dotenv.DEV_PASSWORD } else { 'dev-password-123' }
+$devUser = if ($dotenv.DEV_USER) { $dotenv.DEV_USER.ToLower() } else { 'dev' }
 if (-not $SimName) { $SimName = if ($dotenv.DEVSIM_NAME) { $dotenv.DEVSIM_NAME } else { 'mower-sim' } }
-# Firmware (gateway/ and autopilot/ below) and job files the server serves to the simulated mower.
+# Firmware (gateway/ and autopilot/ below) the server serves to the simulated mower.
 if (-not $dotenv.FIRMWARE_DIR -and -not $env:FIRMWARE_DIR) { $env:FIRMWARE_DIR = 'dev/firmware' }
-if (-not $dotenv.JOB_DIR -and -not $env:JOB_DIR) { $env:JOB_DIR = 'dev/jobs' }
-New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, dev/jobs, .dev | Out-Null
+New-Item -ItemType Directory -Force -Path dev/firmware/gateway, dev/firmware/autopilot, .dev | Out-Null
 
 # --- ports --------------------------------------------------------------------
 # A leftover server or web dev server on these ports would answer instead of
@@ -87,18 +85,21 @@ function Stop-Tree($proc) {
 Say 'building'
 if (-not (Build)) { throw 'go build failed' }
 
-# Dev login: create it, or reset its password to DEV_PASSWORD when it exists.
-$devPassword | & $server create-user $devUser 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { $devPassword | & $server set-password $devUser 2>&1 | Out-Null }
-if ($LASTEXITCODE -ne 0) { throw "could not create the dev login $devUser (DEV_PASSWORD needs 12+ characters)" }
-Say "login: $devUser (password from DEV_PASSWORD in .env, default dev-password-123)"
+# Dev login with password 123. The CLI refuses passwords under 12 characters
+# (production rule), so create the user with a throwaway one (this also runs the
+# migrations; it fails harmlessly when the user exists), then write the Argon2id
+# hash of "123" into the dev database directly.
+'dev-throwaway-password' | & $server create-user $devUser 2>&1 | Out-Null
+$hash123 = '$argon2id$v=19$m=19456,t=2,p=1$aHzRfh218fyrNznI8LSSyw$kZC0lmswcdBqUD7DdqDFRqZhgeQgqJkP8kS1QEvg8HE'
+$updated = docker compose -f compose.dev.yaml exec -T db psql -U app -d app -tAc "UPDATE users SET password_hash = '$hash123' WHERE username = '$devUser'"
+if ($updated -ne 'UPDATE 1') { throw "could not set the dev login $devUser ($updated)" }
+Say "login: $devUser / 123"
 
 # --- web dev server -----------------------------------------------------------
-if (-not (Test-Path web/node_modules)) {
-    Say 'bun install'
-    Push-Location web; bun install; Pop-Location
-    if ($LASTEXITCODE -ne 0) { throw 'bun install failed' }
-}
+# Every run: a pulled change may have added a dependency; it is quick when nothing changed.
+Say 'bun install'
+Push-Location web; bun install; Pop-Location
+if ($LASTEXITCODE -ne 0) { throw 'bun install failed' }
 
 $web = $null; $srv = $null; $dev = $null
 try {

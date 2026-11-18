@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Tooltip from "@/components/tooltip/Tooltip";
 import { useAuthStore } from "@/features/auth/stores/authStore";
 import { logout } from "@/features/auth/data/session";
 
@@ -12,23 +13,19 @@ export function UserMenu() {
     void logout(everywhere).finally(() => setBusy(false));
   }
 
-  const button = "rounded px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 disabled:opacity-50";
+  const button = "rounded px-2 py-1 text-xs text-fg hover:bg-hover disabled:opacity-50";
 
   return (
     <div className="flex items-center gap-1 text-sm">
-      <span className="px-1 text-gray-500">{username}</span>
+      <span className="px-1 text-muted">{username}</span>
       <button type="button" className={button} disabled={busy} onClick={() => run(false)}>
         Log out
       </button>
-      <button
-        type="button"
-        className={button}
-        disabled={busy}
-        onClick={() => run(true)}
-        title="End every session of this user, on all devices"
-      >
-        Log out everywhere
-      </button>
+      <Tooltip label="End every session of this user, on all devices">
+        <button type="button" className={button} disabled={busy} onClick={() => run(true)}>
+          Log out everywhere
+        </button>
+      </Tooltip>
     </div>
   );
 }

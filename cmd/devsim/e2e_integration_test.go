@@ -26,7 +26,7 @@ import (
 // Devsim against the real Mosquitto of the compose stack, with the test playing
 // the server as wiki Mower-Protocol defines it: it publishes the retained
 // mower/status/server, sends commands and live-driving setpoints, and serves
-// chunk requests on the job and firmware topics. The server itself (issue 92)
+// chunk requests on the path and firmware topics. The server itself (issue 92)
 // does not do these yet, which is why this plays its part.
 //
 //	docker compose -f compose.dev.yaml up -d --wait
@@ -48,7 +48,7 @@ type serverRole struct {
 	ctx    context.Context
 	mu     sync.Mutex
 	got    []recorded
-	files  map[string][]byte // "job/<file>", "gw-fw/<file>"
+	files  map[string][]byte // "path/<file>", "gw-fw/<file>"
 	ctlURL string
 	nextID int
 }
@@ -177,8 +177,8 @@ func (s *serverRole) receive(topic string, payload []byte, retain bool) {
 	s.got = append(s.got, recorded{rel, append([]byte(nil), payload...), retain, time.Now()})
 	s.mu.Unlock()
 	sets := map[string]struct{ set, chunk, res string }{
-		"autopilot/job/req": {"job", "autopilot/job/chunk", "autopilot/job/res"},
-		"gateway/fw/req":    {"gw-fw", "gateway/fw/chunk", "gateway/fw/res"},
+		"autopilot/path/req": {"path", "autopilot/path/chunk", "autopilot/path/res"},
+		"gateway/fw/req":     {"gw-fw", "gateway/fw/chunk", "gateway/fw/res"},
 	}
 	if set, ok := sets[rel]; ok {
 		go s.serveChunk(set.set, set.chunk, set.res, payload)
@@ -451,7 +451,7 @@ func TestMowerOverMQTT(t *testing.T) {
 		}
 	})
 
-	t.Run("a job is downloaded over chunk transfer and followed", func(t *testing.T) {
+	t.Run("a path is downloaded over chunk transfer and followed", func(t *testing.T) {
 		// Points are relative to where the mower is, from its telemetry.
 		lat, _ := s.metric("autopilot", "position.lat")
 		lon, _ := s.metric("autopilot", "position.lon")
@@ -464,16 +464,16 @@ func TestMowerOverMQTT(t *testing.T) {
 		for i := 0; i < 400; i++ {
 			pad = append(pad, pt(0, 0))
 		}
-		file := jobFile("j-e2e", 0.6,
-			seg{false, append(pad, pt(0, 1.5))},
-			seg{true, [][2]float64{pt(0, 1.5), pt(1.5, 1.5)}})
+		file := pathFile("j-e2e",
+			seg{"transit", append(pad, pt(0, 1.5))},
+			seg{"edge", [][2]float64{pt(0, 1.5), pt(1.5, 1.5)}})
 		if len(file) < 2*chunkSize {
 			t.Fatalf("file of %d bytes", len(file))
 		}
 		s.mu.Lock()
-		s.files["job/j-e2e.json"] = file
+		s.files["path/j-e2e.json"] = file
 		s.mu.Unlock()
-		s.cmd("autopilot", "j-1", "job_start", fmt.Sprintf(`"job":"j-e2e","size":%d,"sha256":%q`, len(file), shaHex(file)))
+		s.cmd("autopilot", "j-1", "path_start", fmt.Sprintf(`"path":"j-e2e","size":%d,"sha256":%q`, len(file), shaHex(file)))
 		s.waitFor("accepted", 5*time.Second, func() bool {
 			for _, a := range s.ackOf("autopilot", "j-1") {
 				if a["state"] == "accepted" {
@@ -482,26 +482,30 @@ func TestMowerOverMQTT(t *testing.T) {
 			}
 			return false
 		})
-		s.waitFor("mode job with the job id", 5*time.Second, func() bool {
-			ms := s.matching("autopilot/state", func(m map[string]any) bool { return m["mode"] == "job" && m["job"] == "j-e2e" })
+		s.waitFor("mode path with the path id", 5*time.Second, func() bool {
+			ms := s.matching("autopilot/state", func(m map[string]any) bool { return m["mode"] == "path" && m["path"] == "j-e2e" })
 			return len(ms) > 0
 		})
 		a := s.final("autopilot", "j-1", 30*time.Second)
 		if a["state"] != "done" || int(a["result"].(map[string]any)["points"].(float64)) != 403 {
-			t.Fatalf("job: %v", a)
+			t.Fatalf("path: %v", a)
 		}
-		// job.point advanced while it ran.
+		// path.point advanced while it ran.
 		var points []float64
-		for _, m := range s.matching("autopilot/telemetry", func(m map[string]any) bool { return m["metrics"].(map[string]any)["job.point"] != nil }) {
-			points = append(points, m["metrics"].(map[string]any)["job.point"].(float64))
+		for _, m := range s.matching("autopilot/telemetry", func(m map[string]any) bool { return m["metrics"].(map[string]any)["path.point"] != nil }) {
+			points = append(points, m["metrics"].(map[string]any)["path.point"].(float64))
 		}
 		if len(points) == 0 {
-			t.Fatal("job.point never in telemetry")
+			t.Fatal("path.point never in telemetry")
 		}
 		for i := 1; i < len(points); i++ {
 			if points[i] < points[i-1] {
-				t.Fatalf("job.point went back: %v", points)
+				t.Fatalf("path.point went back: %v", points)
 			}
+		}
+		// path.points is the length of the file once it is parsed.
+		if n := s.matching("autopilot/telemetry", func(m map[string]any) bool { return m["metrics"].(map[string]any)["path.points"] == 403.0 }); len(n) == 0 {
+			t.Fatal("path.points never 403 in telemetry")
 		}
 		s.waitFor("idle again", 5*time.Second, func() bool {
 			ms := s.matching("autopilot/state", nil)
@@ -514,17 +518,17 @@ func TestMowerOverMQTT(t *testing.T) {
 		s.cmd("autopilot", "f-1", "follow", fmt.Sprintf(`"points":[[%.8f,%.8f]]`, 54.69, 25.28))
 		s.waitFor("accepted", 5*time.Second, func() bool { return len(s.ackOf("autopilot", "f-1")) > 0 })
 		s.ctl("fix", "rtk_float")
-		s.waitFor("job_paused", 6*time.Second, func() bool {
-			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "job_paused" && m["reason"] == "fix" })) > 0
+		s.waitFor("path_paused", 6*time.Second, func() bool {
+			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "path_paused" && m["reason"] == "fix" })) > 0
 		})
 		s.ctl("fix", "rtk_fixed")
-		s.waitFor("job_resumed", 6*time.Second, func() bool {
-			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "job_resumed" })) > 0
+		s.waitFor("path_resumed", 6*time.Second, func() bool {
+			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "path_resumed" })) > 0
 		})
 		// Link loss (the server goes away) pauses it, and it stays paused.
 		s.serverOnline(false)
-		s.waitFor("job_paused for the link", 10*time.Second, func() bool {
-			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "job_paused" && m["reason"] == "link" })) > 0
+		s.waitFor("path_paused for the link", 10*time.Second, func() bool {
+			return len(s.matching("autopilot/event", func(m map[string]any) bool { return m["event"] == "path_paused" && m["reason"] == "link" })) > 0
 		})
 		s.serverOnline(true)
 		time.Sleep(2 * time.Second)
