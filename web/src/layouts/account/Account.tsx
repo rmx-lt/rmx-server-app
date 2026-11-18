@@ -16,7 +16,7 @@ export default function Account() {
     return (
         <div className="flex items-center gap-1">
             <Menu>
-                <MenuButton className={`${panelRow} min-w-0 flex-1 text-fg hover:bg-hover data-open:bg-hover`}>
+                <MenuButton className={`${panelRow} h-11 min-w-0 flex-1 text-fg hover:bg-hover data-open:bg-hover`}>
                     <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold uppercase text-on-accent">
                         {username.slice(0, 1)}
                     </span>
@@ -41,7 +41,7 @@ export default function Account() {
                     type="button"
                     aria-label="Settings"
                     onClick={() => openSettings()}
-                    className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-fg"
                 >
                     <Settings size={18} strokeWidth={1.75} />
                 </button>

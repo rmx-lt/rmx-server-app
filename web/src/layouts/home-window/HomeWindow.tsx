@@ -45,7 +45,7 @@ function HomeSidePanel() {
             </Tooltip>
 
             <div className="min-h-0 flex-1 max-md:hidden" />
-            <div className="border-t border-line pt-2">
+            <div className="-mx-3 border-t border-line px-3 pt-2">
                 <Account />
             </div>
         </aside>
