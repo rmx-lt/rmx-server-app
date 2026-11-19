@@ -47,6 +47,7 @@ func startDevsim(t *testing.T, app *testApp) string {
 }
 
 func TestDevsimDownloadsAndFollowsAPathFromTheDatabase(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	name := startDevsim(t, app)
@@ -98,6 +99,7 @@ func TestDevsimDownloadsAndFollowsAPathFromTheDatabase(t *testing.T) {
 // only where the type says so; a speed_limit sent during the path changes the
 // speed at once and shows in the state (wiki Mower-Protocol §7.1, §8, §11).
 func TestDevsimFollowsSegmentTypesAndSpeedLimits(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	name := startDevsim(t, app)
@@ -109,8 +111,9 @@ func TestDevsimFollowsSegmentTypesAndSpeedLimits(t *testing.T) {
 	}
 	doc, _ := json.Marshal(map[string]any{"path": "p-types", "segments": []any{
 		map[string]any{"type": "transit", "points": [][2]float64{at(0, 0), at(0, 2)}},
-		map[string]any{"type": "edge", "points": [][2]float64{at(0, 2), at(3, 2)}},
-		map[string]any{"type": "fill", "points": [][2]float64{at(3, 2), at(3, 14)}},
+		// Short segments: the mower drives at 0.3-0.6 m/s, so every metre is seconds of test.
+		map[string]any{"type": "edge", "points": [][2]float64{at(0, 2), at(2, 2)}},
+		map[string]any{"type": "fill", "points": [][2]float64{at(2, 2), at(2, 8)}},
 	}})
 	if err := transfer.StorePath(context.Background(), pool, "p-types", doc); err != nil {
 		t.Fatal(err)
@@ -189,10 +192,10 @@ func TestDevsimFollowsSegmentTypesAndSpeedLimits(t *testing.T) {
 		case n < 1.7 && e < 0.3: // inside the transit segment
 			seen["transit"] = true
 			eq(t, b, 0.0)
-		case n > 1.7 && n < 2.3 && e > 0.6 && e < 2.5: // inside the edge segment
+		case n > 1.7 && n < 2.3 && e > 0.6 && e < 1.5: // inside the edge segment
 			seen["edge"] = true
 			eq(t, b, 1.0)
-		case e > 2.7 && n > 2.8: // inside the fill segment
+		case e > 1.7 && n > 2.8: // inside the fill segment
 			seen["fill"] = true
 			eq(t, b, 1.0)
 		}

@@ -46,6 +46,7 @@ func (d *mqttDevice) download(set transfer.Set, file string) []byte {
 }
 
 func TestTransferServesFirmwareAndPathFilesSideBySide(t *testing.T) {
+	t.Parallel()
 	fw := t.TempDir()
 	for _, sub := range []string{"gateway", "autopilot"} {
 		if err := os.Mkdir(filepath.Join(fw, sub), 0o755); err != nil {

@@ -124,6 +124,7 @@ func catalogueOf(d api.DeviceDetail, board api.Board) api.BoardCatalogue {
 }
 
 func TestMowerIngestEndToEnd(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	if s := app.status(app.anon, "GET", "/api/devices", nil); s != 401 {
 		t.Fatalf("devices without a session: %d", s)
@@ -370,6 +371,7 @@ func (w *ws) nextResponse(requestID string) api.RpcResult {
 }
 
 func TestMowerCatalogueIsUsedOnlyWhenComplete(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -445,6 +447,7 @@ func TestMowerCatalogueIsUsedOnlyWhenComplete(t *testing.T) {
 }
 
 func TestMowerEventsAreDeduplicatedByBootAndSeq(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -478,6 +481,7 @@ func TestMowerEventsAreDeduplicatedByBootAndSeq(t *testing.T) {
 }
 
 func TestMowerAutopilotStateIsOutOfDateWhileTheGatewayIsNot(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -504,6 +508,7 @@ func TestMowerAutopilotStateIsOutOfDateWhileTheGatewayIsNot(t *testing.T) {
 }
 
 func TestMowerBadMessagesAreDroppedAndTheServerKeepsGoing(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()

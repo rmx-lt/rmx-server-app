@@ -357,7 +357,8 @@ func (s *Service) tick(ctx context.Context, now time.Time) {
 
 	for _, p := range resend {
 		slog.Debug("sending a command again", "device", string(p.device), "id", p.id, "attempt", p.sends)
-		go s.transmit(p)
+		// Store the attempt before sending: an ack that comes back first would
+		// close the command, and the attempt would then not be counted.
 		if p.persist {
 			if c, changed, err := s.cmds.ledger.update(ctx, p.id, func(c api.Command) (api.Command, bool) {
 				if !isOpen(c) {
@@ -371,6 +372,7 @@ func (s *Service) tick(ctx context.Context, now time.Time) {
 				slog.Error("storing a resend failed", "id", p.id, "error", err)
 			}
 		}
+		go s.transmit(p)
 	}
 	for _, p := range lost {
 		slog.Warn("a command got no ack", "device", string(p.device), "board", string(p.board), "cmd", p.cmd, "id", p.id)

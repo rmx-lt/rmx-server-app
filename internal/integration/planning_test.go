@@ -28,6 +28,7 @@ func planDoc() api.MapDoc {
 }
 
 func TestMapLifecycle(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 
 	// Nobody has anything yet; the list is an empty array, not null.
@@ -95,6 +96,7 @@ func TestMapLifecycle(t *testing.T) {
 }
 
 func TestMapsArePerUser(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	status, _, body := app.req(app.http, "POST", "/api/maps", api.MapCreate{Name: "Mine", Doc: planDoc()})
@@ -129,6 +131,7 @@ func TestMapsArePerUser(t *testing.T) {
 }
 
 func TestSettings(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	status, _, body := app.req(app.http, "GET", "/api/settings", nil)
 	eq(t, status, 200)
