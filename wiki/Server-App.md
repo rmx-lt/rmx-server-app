@@ -1046,8 +1046,9 @@ with its layer, from `go list`; a package that is not listed fails the test):
   `clientip`) imports leaves and other platform packages, never a domain.
   (`apperr` imports `api` for the error codes.)
 - **Domains** import platform and leaves, never another domain. A
-  cross-domain need is a small interface declared by the consumer (e.g.
-  `mower.DeviceLookup`), satisfied by the other domain and injected by `app`.
+  cross-domain need is a small interface declared by the consumer (the way
+  `mower.Publisher` is satisfied by `*mqtt.Client`), satisfied by the other
+  domain and injected by `app`. See [Module map](#module-map) for every link.
 - Only `app` and `integration` import everything. `cmd/rmx-server` imports
   only `app`, `cmd/gen-ts` only `api`, `cmd/devsim` only `config` (for `.env`).
 - Each table has one owning domain; foreign keys to `devices` / `users` are
@@ -1063,6 +1064,63 @@ with its layer, from `go list`; a package that is not listed fails the test):
 Not used, on purpose: several Go modules, `pkg/`, an interface around every
 store, an outbox or external bus, an ORM, OpenAPI, sqlc (for now),
 per-domain migration folders.
+
+### Module map
+
+What each domain owns and every link between modules, as of November 2026
+(analysis: rmx-server-app#172). Imports are checked by `internal/arch`; the
+other links are checked by rmx-server-app#173.
+
+| Domain | Tables | `api` file | MQTT in (below `<prefix>/<device>/`) | MQTT out | HTTP / WebSocket |
+|---|---|---|---|---|---|
+| `auth` | `users`, `sessions` | `auth.go` | none | none | `/api/auth/*` |
+| `planning` | `maps`, `user_settings` | `planning.go` | none | none | `/api/maps*`, `/api/settings*` |
+| `mower` | `devices`, `board_state`, `catalogue_parts`, `catalogues`, `device_events`, `metric_latest`, `telemetry`, `commands`, `ntrip_sent` | `mower.go`, `command.go` | the trees `gateway/#` and `autopilot/#` (state, status, telemetry, event, metrics/&lt;part&gt;, cmd/ack, monitor) | `<board>/cmd`, `autopilot/drive` | `/api/devices*`, `/api/ntrip`; WS ops `devices`, `device`, `metric_history`, `drive`, `monitor_watch`, `monitor_unwatch`; pushes |
+| `transfer` | `paths` | none | `<set>/req` for `gateway/fw`, `autopilot/fw`, `autopilot/path` | `<set>/chunk`, `<set>/res` | none |
+
+Shared, owned by no domain: `api.go`, `ws.go`, `union.go`, `app.go` in `api`
+(error codes, the WebSocket envelope, `ping`, health); `<prefix>/status/server`
+(the `mqtt` client's last will); `/health`, `/ws` and the static files (`app`).
+
+Links between modules (all made in `app`, none by a domain itself):
+
+- **Domain → domain: none.** No domain calls, imports or sends events to
+  another. The only cross-domain tie is in the database: `sessions`, `maps`
+  and `user_settings` have a foreign key to `users` (cascade on delete).
+- **`auth` → platform:** `ws.New` gets `auth.SessionValid`, `httpx.NewRouter`
+  gets `auth.RequireSession`, and `auth.CheckOrigin` wraps the whole handler.
+- **`mower` → `ws`:** registers its WS ops and pushes device updates through the
+  `ws.Server` it gets in `mower.New`.
+- **`mower`, `transfer` → `mqtt`:** register their suffixes (`mower.Register`,
+  `transfer.RegisterMQTT`); `mower` publishes through `Connect(*mqtt.Client)`.
+- **`config` → domains:** `mower.SetNTRIP` gets `config.NTRIP` and the MQTT
+  password; `transfer.Open` gets the firmware directory.
+- **`events`:** used only inside `ws` (push to connections). Domains publish no
+  events today.
+
+Hidden coupling found, and what the target does with it:
+
+- `transfer`'s topics sit inside `mower`'s trees (`gateway/fw/req` is under
+  `gateway/#`). It works because `mqtt.Client` tries an exact suffix before a
+  tree and `mower` ignores suffixes it does not know. Target: each domain
+  declares its suffixes, the check refuses a suffix two domains claim, and a
+  tree that holds another domain's suffixes says so.
+- `mower` builds its outgoing suffixes inline (`board + "/cmd"`,
+  `"autopilot/drive"`). Target: declared next to its incoming ones.
+- One `api` file per domain is a convention only. Target: a domain may use only
+  its own `api` files and the shared ones.
+- Table ownership is a convention only, and migrations do not name their domain
+  (the first four predate the naming rule). Target: an owner per table; a
+  domain's SQL names only its tables; a foreign key across domains only to
+  `users` or `devices`.
+- `paths` has no writer outside the tests (`transfer.StorePath`). It stays in
+  `transfer` until path generation lands; the domain that then writes paths
+  does so through an interface `transfer` declares, wired by `app`.
+
+Domains stay as they are: `mower` is the largest, but its parts (ingest,
+commands, drive, monitor, caster settings) share `devices` and the topic trees,
+so splitting it would add links without removing one. Revisit when one part
+gets tables and topics of its own.
 
 ### web/
 
