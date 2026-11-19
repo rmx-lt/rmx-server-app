@@ -1034,7 +1034,7 @@ internal/
                           the drive and monitor streams and the caster settings)
   integration/          harness (fresh database, own topic prefix, logged-in client)
                           + one _test.go per domain
-  arch/                 arch_test.go: the import rules below
+  arch/                 arch_test.go: the import rules below; contracts_test.go: the Module map
 migrations/             one goose sequence; new files <timestamp>_<domain>_<what>.sql (the first four predate this)
 ```
 
@@ -1051,11 +1051,12 @@ with its layer, from `go list`; a package that is not listed fails the test):
   domain and injected by `app`. See [Module map](#module-map) for every link.
 - Only `app` and `integration` import everything. `cmd/rmx-server` imports
   only `app`, `cmd/gen-ts` only `api`, `cmd/devsim` only `config` (for `.env`).
-- Each table has one owning domain; foreign keys to `devices` / `users` are
-  fine, cross-domain queries are not. A cross-domain write uses `db.InTx`
+- Each table has one owning domain; a foreign key to another domain's table
+  needs a declared link, cross-domain queries are not allowed. A cross-domain write uses `db.InTx`
   and passes the transaction to both stores. Events are published after the
   commit; state that must survive (such as a command's ack or expiry) lives
   in the database, not on the bus.
+- Domains do not import `events` until an event is declared in the Module map.
 - Third-party fences: paho only in `mqtt`, coder/websocket only in `ws`, pgx
   (and goose) only in `db` and in the domains' `store.go` files. The
   integration tests are exempt: they play the browser and the devices. `cmd/devsim`
@@ -1068,8 +1069,23 @@ per-domain migration folders.
 ### Module map
 
 What each domain owns and every link between modules, as of November 2026
-(analysis: rmx-server-app#172). Imports are checked by `internal/arch`; the
-other links are checked by rmx-server-app#173.
+(analysis: rmx-server-app#172). `internal/arch/contracts_test.go` holds the
+same as data (`contracts`, `links`) and checks it (rmx-server-app#173):
+
+- every table the migrations leave has one owner, and a domain's string
+  literals name only its own tables;
+- a foreign key between two domains' tables needs a link;
+- a domain uses only its own `api` files and the shared ones; every `api` file
+  is shared or owned;
+- the arch test registers each domain on its own MQTT client and compares
+  `Client.Routes()` with the contract; a domain publishes only on suffixes its
+  `mqtt.go` builds (listed in `mqttPublished`); no suffix has two domains, and
+  `mqtt.Client` panics on a second handler for one; a suffix inside another
+  domain's tree needs a link;
+- each integration test file has one `// Covers: <label>` line: a domain,
+  `app`, or a linked pair `a+b` (a test for a pair goes in that pair's file).
+
+A new link is a line in `links` with the reason, and a line here.
 
 | Domain | Tables | `api` file | MQTT in (below `<prefix>/<device>/`) | MQTT out | HTTP / WebSocket |
 |---|---|---|---|---|---|
@@ -1085,8 +1101,10 @@ Shared, owned by no domain: `api.go`, `ws.go`, `union.go`, `app.go` in `api`
 Links between modules (all made in `app`, none by a domain itself):
 
 - **Domain → domain: none.** No domain calls, imports or sends events to
-  another. The only cross-domain tie is in the database: `sessions`, `maps`
-  and `user_settings` have a foreign key to `users` (cascade on delete).
+  another. Two declared links:
+  - `planning` – `auth`: `maps` and `user_settings` have a foreign key to
+    `users` (cascade on delete).
+  - `transfer` – `mower`: `transfer`'s topics sit inside `mower`'s trees (below).
 - **`auth` → platform:** `ws.New` gets `auth.SessionValid`, `httpx.NewRouter`
   gets `auth.RequireSession`, and `auth.CheckOrigin` wraps the whole handler.
 - **`mower` → `ws`:** registers its WS ops and pushes device updates through the
@@ -1098,21 +1116,15 @@ Links between modules (all made in `app`, none by a domain itself):
 - **`events`:** used only inside `ws` (push to connections). Domains publish no
   events today.
 
-Hidden coupling found, and what the target does with it:
+Hidden coupling found by the analysis, and what the checks do with it:
 
 - `transfer`'s topics sit inside `mower`'s trees (`gateway/fw/req` is under
   `gateway/#`). It works because `mqtt.Client` tries an exact suffix before a
-  tree and `mower` ignores suffixes it does not know. Target: each domain
-  declares its suffixes, the check refuses a suffix two domains claim, and a
-  tree that holds another domain's suffixes says so.
-- `mower` builds its outgoing suffixes inline (`board + "/cmd"`,
-  `"autopilot/drive"`). Target: declared next to its incoming ones.
-- One `api` file per domain is a convention only. Target: a domain may use only
-  its own `api` files and the shared ones.
-- Table ownership is a convention only, and migrations do not name their domain
-  (the first four predate the naming rule). Target: an owner per table; a
-  domain's SQL names only its tables; a foreign key across domains only to
-  `users` or `devices`.
+  tree and `mower` ignores suffixes it does not know. Now a declared link.
+- `mower` built its outgoing suffixes inline; now `mower.CommandTopic` and
+  `mower.DriveTopic` in its `mqtt.go`.
+- One `api` file per domain and table ownership were conventions only; both
+  are checked now.
 - `paths` has no writer outside the tests (`transfer.StorePath`). It stays in
   `transfer` until path generation lands; the domain that then writes paths
   does so through an interface `transfer` declares, wired by `app`.

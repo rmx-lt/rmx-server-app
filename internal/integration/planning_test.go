@@ -1,6 +1,8 @@
 //go:build integration
 
 // The planning domain: maps and settings over REST, per user.
+//
+// Covers: planning
 
 package integration
 

@@ -2,6 +2,8 @@
 
 // What the app wires together: health, the web app's static files, the
 // WebSocket, the server's MQTT status, and the migrations.
+//
+// Covers: app
 
 package integration
 

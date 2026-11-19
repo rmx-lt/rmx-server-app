@@ -3,6 +3,8 @@
 // Commands, live driving, monitor streams and the caster settings: a simulated
 // gateway answers what the server publishes, as wiki Mower-Protocol §5, §9, §13
 // and §15 define it.
+//
+// Covers: mower
 
 package integration
 

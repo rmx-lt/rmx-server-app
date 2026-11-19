@@ -110,3 +110,28 @@ func TestSuffixInsideTreeGoesToItsOwnHandler(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
+
+// A suffix or tree claimed twice panics; Routes lists what is registered.
+func TestRoutesAndDuplicates(t *testing.T) {
+	c := New(config.MQTT{TopicPrefix: "mower"})
+	nop := func(context.Context, core.DeviceID, []byte) {}
+	nopTree := func(context.Context, core.DeviceID, string, []byte) {}
+	c.Handle("gateway/fw/req", nop)
+	c.HandleTree("gateway", nopTree)
+	if got := fmt.Sprint(c.Routes()); got != "[gateway/# gateway/fw/req]" {
+		t.Fatalf("Routes() = %s", got)
+	}
+	for name, register := range map[string]func(){
+		"suffix": func() { c.Handle("gateway/fw/req", nop) },
+		"tree":   func() { c.HandleTree("gateway", nopTree) },
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("a second %s handler did not panic", name)
+				}
+			}()
+			register()
+		}()
+	}
+}

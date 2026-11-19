@@ -27,6 +27,12 @@ const (
 	RootAutopilot = "autopilot"
 )
 
+// DriveTopic carries the live-driving setpoints (§9).
+const DriveTopic = "autopilot/drive"
+
+// CommandTopic is the suffix commands to board go out on (§5).
+func CommandTopic(board api.Board) string { return string(board) + "/cmd" }
+
 // MaxPayloadBytes is the size limit of a JSON message on MQTT (§4).
 const MaxPayloadBytes = 4096
 

@@ -125,7 +125,7 @@ func (s *Service) driveLoop(device core.DeviceID) {
 		}
 		body, err := json.Marshal(sp)
 		if err == nil {
-			err = s.pub.PublishFast(ctx, device, "autopilot/drive", body)
+			err = s.pub.PublishFast(ctx, device, DriveTopic, body)
 		}
 		if err != nil && ctx.Err() == nil {
 			slog.Warn("publishing a setpoint failed", "device", string(device), "error", err)
