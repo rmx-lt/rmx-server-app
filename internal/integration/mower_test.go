@@ -3,6 +3,8 @@
 // The mower domain: a simulated gateway publishes state, metric catalogues,
 // telemetry and events as wiki Mower-Protocol defines them, and the API shows
 // what the server stored.
+//
+// Covers: mower
 
 package integration
 

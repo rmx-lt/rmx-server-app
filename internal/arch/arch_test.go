@@ -26,7 +26,7 @@ const (
 	domain   layer = "domain"   // features; platform and leaves, never another domain
 	root     layer = "root"     // app and the integration tests: everything
 	command  layer = "command"  // cmd/*: one package each, see commandImports
-	meta     layer = "meta"     // this test
+	meta     layer = "meta"     // this test: everything but commands, to inspect it
 )
 
 // layers maps every package (path below the module) to its layer.
@@ -70,12 +70,16 @@ var commandImports = map[string]string{
 // allowed reports whether a package in from may import a package in to.
 func allowed(fromPkg string, from, to layer, toPkg string) bool {
 	switch from {
-	case leaf, meta:
+	case leaf:
 		return false
 	case platform:
 		return to == leaf || to == platform
 	case domain:
-		return to == leaf || to == platform
+		// No domain publishes events yet (wiki Server-App, "Module map");
+		// declare the event in contracts_test.go before lifting this.
+		return (to == leaf || to == platform) && toPkg != "internal/events"
+	case meta:
+		return to != command
 	case root:
 		return to != command && to != meta
 	case command:
@@ -273,6 +277,10 @@ func TestRulesAreCheckable(t *testing.T) {
 		{"cmd/rmx-server", "internal/app", true},
 		{"cmd/gen-ts", "internal/api", true},
 		{"internal/auth", "internal/app", false},
+		{"internal/mower", "internal/events", false},
+		{"internal/ws", "internal/events", true},
+		{"internal/arch", "internal/mower", true},
+		{"internal/arch", "cmd/devsim", false},
 	} {
 		if got := allowed(c.from, layers[c.from], layers[c.to], c.to); got != c.want {
 			t.Errorf("%s -> %s: allowed=%v, want %v", c.from, c.to, got, c.want)

@@ -2,7 +2,8 @@
 
 // The harness of the integration tests against a real TimescaleDB and
 // Mosquitto; the tests themselves are one file per domain (auth_test.go,
-// firmware_test.go) plus app_test.go for what the app wires together.
+// transfer_test.go) plus app_test.go for what the app wires together. Each
+// file says what it covers on a "// Covers:" line (checked by internal/arch).
 //
 // They need the dev compose stack (docker compose -f compose.dev.yaml up -d --wait)
 // and the settings from .env, then:

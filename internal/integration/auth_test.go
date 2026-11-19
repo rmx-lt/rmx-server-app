@@ -1,6 +1,8 @@
 //go:build integration
 
 // The auth domain: login, sessions, the Origin check and the user commands.
+//
+// Covers: auth
 
 package integration
 

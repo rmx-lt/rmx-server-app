@@ -327,7 +327,7 @@ func (s *Service) dispatch(ctx context.Context, o outgoing) (api.Command, error)
 func (s *Service) transmit(p *pending) {
 	ctx, cancel := context.WithTimeout(s.runCtx(), 15*time.Second)
 	defer cancel()
-	if err := s.pub.Publish(ctx, p.device, string(p.board)+"/cmd", p.payload); err != nil && ctx.Err() == nil {
+	if err := s.pub.Publish(ctx, p.device, CommandTopic(p.board), p.payload); err != nil && ctx.Err() == nil {
 		slog.Warn("publishing a command failed", "device", string(p.device), "board", string(p.board), "cmd", p.cmd, "id", p.id, "error", err)
 	}
 }

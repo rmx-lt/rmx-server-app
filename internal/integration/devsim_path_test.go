@@ -3,6 +3,8 @@
 // A path stored in the database is downloaded and followed by the simulated
 // mower: the real server, the real devsim (built here and run as a process) and
 // the broker of the compose stack (wiki Mower-Protocol §11, §12).
+//
+// Covers: transfer
 
 package integration
 

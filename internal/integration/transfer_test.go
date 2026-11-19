@@ -2,6 +2,8 @@
 
 // The transfer domain: a board downloads a firmware image and a path file over
 // MQTT, side by side (wiki Mower-Protocol §12).
+//
+// Covers: transfer
 
 package integration
 

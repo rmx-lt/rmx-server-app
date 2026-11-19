@@ -83,10 +83,15 @@ func New(cfg config.MQTT) *Client {
 	return c
 }
 
-// Handle routes messages on <prefix>/<device>/<suffix> to h. Call it before Start.
+// Handle routes messages on <prefix>/<device>/<suffix> to h. Call it before
+// Start, once per suffix: two handlers for one suffix panic (two domains
+// claiming the same topic).
 func (c *Client) Handle(suffix string, h Handler) {
 	if c.cm != nil {
 		panic("mqtt: Handle after Start")
+	}
+	if _, dup := c.handlers[suffix]; dup {
+		panic("mqtt: a second handler for " + suffix)
 	}
 	c.handlers[suffix] = h
 }
@@ -97,7 +102,24 @@ func (c *Client) HandleTree(root string, h TreeHandler) {
 	if c.cm != nil {
 		panic("mqtt: HandleTree after Start")
 	}
+	if _, dup := c.trees[root]; dup {
+		panic("mqtt: a second handler for " + root + "/#")
+	}
 	c.trees[root] = h
+}
+
+// Routes lists what is registered, sorted: suffixes as they are, trees as
+// "<root>/#". The arch test compares it with each domain's contract.
+func (c *Client) Routes() []string {
+	out := make([]string, 0, len(c.handlers)+len(c.trees))
+	for suffix := range c.handlers {
+		out = append(out, suffix)
+	}
+	for root := range c.trees {
+		out = append(out, root+"/#")
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Start connects in the background. It keeps trying; until it has
