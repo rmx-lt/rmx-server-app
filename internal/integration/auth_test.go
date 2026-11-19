@@ -19,6 +19,7 @@ import (
 )
 
 func TestLoginMeAndLogout(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 
@@ -70,6 +71,7 @@ func TestLoginMeAndLogout(t *testing.T) {
 }
 
 func TestWrongPasswordAndUnknownUser(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	for _, c := range [][2]string{{user, "wrong password!"}, {"nobody", password}, {"not a valid name", password}, {user, ""}} {
 		res := app.login(c[0], c[1])
@@ -83,6 +85,7 @@ func TestWrongPasswordAndUnknownUser(t *testing.T) {
 }
 
 func TestProtectedRoutesNeedASession(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	forged := cookie + "=" + strings.Repeat("ab", 32)
@@ -106,6 +109,7 @@ func TestProtectedRoutesNeedASession(t *testing.T) {
 }
 
 func TestExpiredAndIdleSessionsAreRejected(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	exec := func(sql string) {
@@ -146,6 +150,7 @@ func TestExpiredAndIdleSessionsAreRejected(t *testing.T) {
 }
 
 func TestForeignOriginsAreRejected(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 
@@ -189,6 +194,7 @@ func TestForeignOriginsAreRejected(t *testing.T) {
 }
 
 func TestFailedLoginsAreRateLimited(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	// Five free failures, then the sixth makes the username wait 1 s.
 	for range 6 {
@@ -224,6 +230,7 @@ func TestFailedLoginsAreRateLimited(t *testing.T) {
 }
 
 func TestLogoutEverywhereAndPasswordChange(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 	login := func(pw string) string { return sessionCookie(t, app.login(user, pw)) }
@@ -263,6 +270,7 @@ func TestLogoutEverywhereAndPasswordChange(t *testing.T) {
 }
 
 func TestUserCommands(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	ctx := context.Background()
 	if err := auth.CreateUser(ctx, pool, "Alice", "twelve chars"); err != nil {

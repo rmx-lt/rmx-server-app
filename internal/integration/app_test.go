@@ -21,6 +21,7 @@ import (
 )
 
 func TestHealthAndConfig(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 
 	// Health is public: no cookie needed.
@@ -34,6 +35,7 @@ func TestHealthAndConfig(t *testing.T) {
 }
 
 func TestRecordsAreGone(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t)
 	app := startApp(t, pool)
 
@@ -62,6 +64,7 @@ func TestRecordsAreGone(t *testing.T) {
 }
 
 func TestWebSocketPing(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	sock := app.ws()
 
@@ -87,6 +90,7 @@ func TestWebSocketPing(t *testing.T) {
 }
 
 func TestMQTTServerStatus(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	dev := app.mqttConnect()
 
@@ -99,6 +103,7 @@ func TestMQTTServerStatus(t *testing.T) {
 }
 
 func TestServesClientFilesAtRoot(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	must := func(err error) {
 		if err != nil {
@@ -146,6 +151,7 @@ func TestServesClientFilesAtRoot(t *testing.T) {
 // ---- Login and sessions ---------------------------------------------------------------
 
 func TestMigrationsAdoptASqlxDatabase(t *testing.T) {
+	t.Parallel()
 	pool := newDatabase(t) // fully migrated by goose
 	ctx := context.Background()
 	for _, stmt := range []string{

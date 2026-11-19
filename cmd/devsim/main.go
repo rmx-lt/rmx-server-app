@@ -141,8 +141,14 @@ func simulate(ctx context.Context, b broker, cfg simConfig, controlAddr string, 
 		KeepAlive:                     15,
 		CleanStartOnInitialConnection: true,
 		ConnectTimeout:                10 * time.Second,
-		ReconnectBackoff:              func(attempt int) time.Duration { return min(time.Second<<min(attempt, 4), 15*time.Second) },
-		WillMessage:                   &paho.WillMessage{Topic: base + "gateway/status", Payload: []byte("offline"), QoS: 1, Retain: true},
+		// Attempt 0 is the first connect (autopaho waits before it too): no delay.
+		ReconnectBackoff: func(attempt int) time.Duration {
+			if attempt == 0 {
+				return 0
+			}
+			return min(time.Second<<min(attempt-1, 4), 15*time.Second)
+		},
+		WillMessage: &paho.WillMessage{Topic: base + "gateway/status", Payload: []byte("offline"), QoS: 1, Retain: true},
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, _ *paho.Connack) {
 			go func() {
 				sctx, cancel := context.WithTimeout(ctx, 10*time.Second)

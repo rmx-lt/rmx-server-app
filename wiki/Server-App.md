@@ -1310,7 +1310,8 @@ allow-list (`internal/app`).
 The integration tests (`internal/integration/`: `harness_test.go`, then
 `app_test.go`, `auth_test.go`, `commands_test.go`, `mower_test.go`, `planning_test.go`, `transfer_test.go`, `devsim_path_test.go`) start the real
 server on a random port; each test creates a fresh migrated database, and uses
-its own MQTT topic prefix, so they run in parallel. They cover the WebSocket
+its own MQTT topic prefix, so they run in parallel (`t.Parallel()`; all but the
+caster-settings test, which swaps the default logger to read the log). They cover the WebSocket
 ping, chunk transfer (a path file from the `paths` table and firmware images side by side, a path id that is not in the table, every chunk
 checked against the file's SHA-256, the three sets kept apart), the commands
 (an ack, the resend of a lost ack after 5 s with the same id, open commands

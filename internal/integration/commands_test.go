@@ -142,6 +142,7 @@ func (a *testApp) waitCommand(name, id, what string, cond func(api.Command) bool
 
 // A command is acknowledged; the answer reaches the browser as pushed messages.
 func TestCommandIsAcknowledged(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -236,6 +237,7 @@ func (d *mqttDevice) nextOnNothing(topic string, within time.Duration) bool {
 
 // A lost ack is recovered by the resend with the same id (§5).
 func TestLostAckIsRecoveredByTheResend(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -271,6 +273,7 @@ func TestLostAckIsRecoveredByTheResend(t *testing.T) {
 
 // A new boot value fails every open command of that board (§5).
 func TestNewBootFailsOpenCommands(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -298,6 +301,7 @@ func TestNewBootFailsOpenCommands(t *testing.T) {
 
 // The gateway is restarted or updated only while the autopilot is idle (§6.4).
 func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -350,6 +354,7 @@ func TestGatewayRestartRefusedUnlessTheAutopilotIsIdle(t *testing.T) {
 // Live driving: the browser's setpoint goes to autopilot/drive about 10 times
 // per second, with a counter that grows, for as long as the browser sends (§9).
 func TestLiveDrivingStreamsSetpoints(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -405,6 +410,7 @@ func TestLiveDrivingStreamsSetpoints(t *testing.T) {
 
 // A monitor stream runs only while a client watches (§15).
 func TestMonitorRunsWhileWatched(t *testing.T) {
+	t.Parallel()
 	app := startApp(t, newDatabase(t))
 	m := app.sim()
 	name := m.name()
@@ -516,7 +522,8 @@ func TestMonitorRunsWhileWatched(t *testing.T) {
 }
 
 // The caster settings are sent to a gateway once, and again when they change;
-// the password reaches the gateway and nothing else (§13).
+// the password reaches the gateway and nothing else (§13). Not parallel: it
+// swaps the default logger to read the server log.
 func TestNTRIPSettingsAreSentOnceAndOnChange(t *testing.T) {
 	const secret = "caster-secret-for-the-test"
 	var logs bytes.Buffer

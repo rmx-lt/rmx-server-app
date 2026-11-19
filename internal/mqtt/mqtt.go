@@ -116,9 +116,13 @@ func (c *Client) Start() {
 		CleanStartOnInitialConnection: true,
 		SessionExpiryInterval:         0,
 		ConnectTimeout:                10 * time.Second,
-		// Wait first so a down broker isn't hammered: 1 s, 2 s, ... up to 30 s.
+		// autopaho waits backoff(0) before the first attempt too, so connect at
+		// once, then wait so a down broker isn't hammered: 1 s, 2 s, ... up to 30 s.
 		ReconnectBackoff: func(attempt int) time.Duration {
-			return min(time.Second<<min(attempt, 5), 30*time.Second)
+			if attempt == 0 {
+				return 0
+			}
+			return min(time.Second<<min(attempt-1, 5), 30*time.Second)
 		},
 		WillMessage: &paho.WillMessage{
 			Topic:   StatusTopic(cfg.TopicPrefix),
